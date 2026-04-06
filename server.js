@@ -32,13 +32,13 @@ import categoryRoutes from "./backend/src/routes/categoryRoutes.js";
 import weeklyMenuRoutes from "./backend/src/routes/weeklyMenuRoutes.js";
 
 const slugify = (value) => {
-  return String(value || '')
+  return String(value || "")
     .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .replace(/-+/g, '-');
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .replace(/-+/g, "-");
 };
 
 async function startServer() {
@@ -52,25 +52,39 @@ async function startServer() {
       const initialTables = Array.from({ length: 12 }, (_, i) => ({
         name: `Bàn ${i + 1}`,
         slug: slugify(`Bàn ${i + 1}`),
-        status: "empty"
+        status: "empty",
       }));
       await Table.insertMany(initialTables);
       console.log("✅ Seeded initial tables");
     }
 
-    const tablesMissingSlug = await Table.find({ $or: [{ slug: { $exists: false } }, { slug: '' }] });
+    const tablesMissingSlug = await Table.find({
+      $or: [{ slug: { $exists: false } }, { slug: "" }],
+    });
     if (tablesMissingSlug.length > 0) {
-      await Promise.all(tablesMissingSlug.map(t => (
-        Table.findByIdAndUpdate(t._id, { slug: slugify(t.name) })
-      )));
+      await Promise.all(
+        tablesMissingSlug.map((t) =>
+          Table.findByIdAndUpdate(t._id, { slug: slugify(t.name) }),
+        ),
+      );
       console.log("✅ Backfilled table slugs");
     }
 
     const userCount = await User.countDocuments();
     if (userCount === 0) {
       await User.insertMany([
-        { email: "admin@gmail.com", password: "123456", role: "admin", name: "Quản trị viên" },
-        { email: "staff@gmail.com", password: "123456", role: "staff", name: "Nhân viên" }
+        {
+          email: "admin@gmail.com",
+          password: "123456",
+          role: "admin",
+          name: "Quản trị viên",
+        },
+        {
+          email: "staff@gmail.com",
+          password: "123456",
+          role: "staff",
+          name: "Nhân viên",
+        },
       ]);
       console.log("✅ Seeded initial users");
     }
@@ -86,45 +100,34 @@ async function startServer() {
       origin: [
         "http://localhost:8000",
         "http://localhost:8080",
-        "http://momangshow.vn", "https://momangshow.vn",
-        "http://www.momangshow.vn", "https://www.momangshow.vn",
-        "http://api.momangshow.vn", "https://api.momangshow.vn",
-        "http://admin.momangshow.vn", "https://admin.momangshow.vn",
-        "http://150.95.115.212:8080",
-        "http://150.95.115.212:8000",
-        "http://150.95.115.212",
+
         "http://localhost:3000",
         "http://localhost:3001",
         "https://pay.momangshow.vn/api",
-        "http://127.0.0.1:5500"
+        "http://127.0.0.1:5500",
       ],
-      credentials: true
+      credentials: true,
     },
   });
 
   const PORT = 3000;
 
   // Professional CORS Configuration
-  app.use(cors({
-    origin: [
-      "http://localhost:8000",
-      "http://localhost:8080",
-      "http://momangshow.vn", "https://momangshow.vn",
-      "http://www.momangshow.vn", "https://www.momangshow.vn",
-      "http://api.momangshow.vn", "https://api.momangshow.vn",
-      "http://admin.momangshow.vn", "https://admin.momangshow.vn",
-      "http://150.95.115.212:8080",
-      "http://150.95.115.212:8000",
-      "http://150.95.115.212",
-      "http://localhost:3000",
-      "http://localhost:3001",
-      "https://pay.momangshow.vn/api",
-      "http://127.0.0.1:5500"
-    ],
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: true
-  }));
+  app.use(
+    cors({
+      origin: [
+        "http://localhost:8000",
+        "http://localhost:8080",
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "https://pay.momangshow.vn/api",
+        "http://127.0.0.1:5500",
+      ],
+      methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+      allowedHeaders: ["Content-Type", "Authorization"],
+      credentials: true,
+    }),
+  );
 
   // Make io accessible to our router
   app.use((req, res, next) => {
@@ -136,22 +139,26 @@ async function startServer() {
   app.use("/api", jwtAuthenticationFilter);
 
   // Security Middlewares
-  app.use(helmet({
-    contentSecurityPolicy: false,
-  }));
+  app.use(
+    helmet({
+      contentSecurityPolicy: false,
+    }),
+  );
 
   const limiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 1000,
-    message: { error: "Too many requests from this IP, please try again later." },
-    validate: { xForwardedForHeader: false }
+    message: {
+      error: "Too many requests from this IP, please try again later.",
+    },
+    validate: { xForwardedForHeader: false },
   });
   app.use("/api/", limiter);
-  app.use(express.json({ limit: '50mb' }));
-  app.use(express.urlencoded({ limit: '50mb', extended: true }));
+  app.use(express.json({ limit: "50mb" }));
+  app.use(express.urlencoded({ limit: "50mb", extended: true }));
   app.use(morgan("dev"));
   // app.use(express.json());
-  
+
   // API Routes - REAL DATA ONLY
   app.use("/api/auth", authRoutes);
   app.use("/api/images", imageRoutes);
@@ -176,8 +183,11 @@ async function startServer() {
         error: {
           code: "VALIDATION_ERROR",
           message: "Dữ liệu không hợp lệ",
-          details: err.errors.map(e => ({ path: e.path, message: e.message }))
-        }
+          details: err.errors.map((e) => ({
+            path: e.path,
+            message: e.message,
+          })),
+        },
       });
     }
 
@@ -190,7 +200,7 @@ async function startServer() {
       error: {
         code: errorCode,
         message,
-      }
+      },
     });
   });
 

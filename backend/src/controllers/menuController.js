@@ -59,26 +59,3 @@ export const deleteMenuItem = catchAsync(async (req, res) => {
   await MenuService.deleteMenuItem(req.params.id, req.io);
   res.json({ message: 'Menu item deleted' });
 });
-
-// --- WEEKLY MENU V2 ---
-export const getWeeklyMenuItems = catchAsync(async (req, res) => {
-  const items = await MenuService.getWeeklyMenuItems();
-  res.json(items);
-});
-
-export const getAdminMenuItems = catchAsync(async (req, res) => {
-  const items = await MenuService.getAdminMenuItems();
-  res.json(items);
-});
-
-export const publishWeekly = catchAsync(async (req, res) => {
-  const { itemIds } = req.body;
-  const result = await MenuService.publishWeekly(itemIds, req.io);
-  res.json(result);
-});
-
-export const unpublishWeekly = catchAsync(async (req, res) => {
-  const { id } = req.params;
-  const result = await MenuService.unpublishWeekly(id, req.io);
-  res.json(result);
-});

@@ -68,18 +68,6 @@ export const deleteOrderItem = catchAsync(async (req, res) => {
   res.json(session);
 });
 
-export const updateOrderItemQuantity = catchAsync(async (req, res) => {
-  const { sessionId, itemId } = req.params;
-  const { delta } = req.body;
-  const session = await OrderService.updateOrderItemQuantity(
-    sessionId,
-    itemId,
-    delta,
-    req.io
-  );
-  res.json(session);
-});
-
 export const updateItemStatus = catchAsync(async (req, res) => {
   const { sessionId, itemId } = req.params;
   const { status } = req.body;
@@ -118,4 +106,9 @@ export const getHistory = catchAsync(async (req, res) => {
   const types = type ? type.split(',') : [];
   const history = await OrderService.getOrderHistory(page, limit, start, end, types);
   res.json(history);
+});
+
+export const completeOrder = catchAsync(async (req, res) => {
+  const session = await OrderService.completeOrder(req.params.id, req.io);
+  res.json({ message: "Bàn đã được đóng và giải phóng thành công", session });
 });

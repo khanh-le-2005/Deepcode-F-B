@@ -1,8 +1,10 @@
+import "dotenv/config";
 import express from "express";
 import "express-async-errors";
 import morgan from "morgan";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
+import cookieParser from "cookie-parser";
 import cors from "cors";
 import { jwtAuthenticationFilter } from "./security/SecurityMiddleware.js";
 import apiRoutes from "./routes/index.js";
@@ -18,17 +20,7 @@ app.use(
     origin: [
       "http://localhost:8000",
       "http://localhost:8080",
-      "http://momangshow.vn",
-      "https://momangshow.vn",
-      "http://www.momangshow.vn",
-      "https://www.momangshow.vn",
-      "http://api.momangshow.vn",
-      "https://api.momangshow.vn",
-      "http://admin.momangshow.vn",
-      "https://admin.momangshow.vn",
-      "http://150.95.115.212:8080",
-      "http://150.95.115.212:8000",
-      "http://150.95.115.212",
+
       "http://localhost:3000",
       "http://localhost:3001",
       "https://pay.momangshow.vn/api",
@@ -40,6 +32,8 @@ app.use(
   }),
 );
 
+app.use(cookieParser());
+
 // Global Security Filter (JWT)
 app.use("/api", jwtAuthenticationFilter);
 
@@ -49,7 +43,6 @@ app.use(
     contentSecurityPolicy: false,
   }),
 );
-
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 1000,

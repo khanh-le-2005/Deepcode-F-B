@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from '@/src/lib/axiosClient';
-import { motion } from 'framer-motion';
-import { ChevronLeft, ShoppingBag, Heart, Star } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ChevronLeft, ShoppingBag, Heart, Star, X, Minus, Plus, Trash2 } from 'lucide-react';
 import { MenuItem } from '../../types';
 import { CustomerHeader } from '../../components/CustomerHeader';
 import { InvalidTable } from '../../components/InvalidTable';
@@ -17,9 +17,23 @@ export const MenuItemDetailPage = () => {
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
   const { status } = useTableValidation(tableId);
-  const { addToCart } = useCart();
+  const { cart, addToCart, removeFromCart, updateQuantity, totalItems, totalPrice } = useCart();
   const [selectedOption, setSelectedOption] = useState<any>(null);
   const [selectedAddons, setSelectedAddons] = useState<any[]>([]);
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [activeSession, setActiveSession] = useState<any>(null);
+
+  const fetchActiveSession = async () => {
+    if (!tableId) return;
+    try {
+      const res = await axios.get(`/api/orders/table/${tableId}/active-session`);
+      setActiveSession(res.data);
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        setActiveSession(null);
+      }
+    }
+  };
 
   useEffect(() => {
     if (status !== 'valid') return;
@@ -33,7 +47,8 @@ export const MenuItemDetailPage = () => {
     }).catch(() => {
       setLoading(false);
     });
-  }, [itemId, status]);
+    fetchActiveSession();
+  }, [itemId, status, tableId]);
 
   const handleToggleAddon = (addon: any) => {
     setSelectedAddons(prev => 
@@ -42,6 +57,16 @@ export const MenuItemDetailPage = () => {
         : [...prev, addon]
     );
   };
+
+  const displayCart = tableId ? (activeSession?.items || []) : cart;
+  const displayTotalItems = tableId
+    ? displayCart.reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0)
+    : totalItems;
+  const displayTotalPrice = tableId
+    ? (activeSession?.total ?? displayCart.reduce((sum: number, item: any) => sum + Number(item.quantity || 0) * Number(item.basePrice || 0), 0))
+    : totalPrice;
+  const newItems = displayCart.filter((i: any) => i.status === 'in_cart');
+  const orderedItems = displayCart.filter((i: any) => i.status !== 'in_cart');
 
   const handleAddToCart = async () => {
     if (!item) return;
@@ -65,6 +90,7 @@ export const MenuItemDetailPage = () => {
           items: itemsToAdd
         });
         alert(`Đã thêm ${quantity} ${item.name} vào giỏ bàn ${tableId}!`);
+        await fetchActiveSession();
         navigate(`/table/${tableId}/menu`);
       } catch (err: any) {
         console.error("Failed to add to shared cart", err);
@@ -80,6 +106,18 @@ export const MenuItemDetailPage = () => {
       alert(`Đã thêm ${quantity} ${item.name} vào giỏ hàng!`);
       navigate('/menu');
     }
+  };
+
+  const handleRemoveTableCartItem = async (itemId: string) => {
+    if (!tableId || !activeSession) return;
+    await axios.delete(`/api/orders/${activeSession.id || activeSession._id}/item/${itemId}`);
+    await fetchActiveSession();
+  };
+
+  const handleUpdateTableCartItemQuantity = async (itemId: string, delta: number) => {
+    if (!tableId || !activeSession) return;
+    await axios.patch(`/api/orders/${activeSession.id || activeSession._id}/item/${itemId}/quantity`, { delta });
+    await fetchActiveSession();
   };
 
   if (status === 'loading') {
@@ -109,7 +147,8 @@ export const MenuItemDetailPage = () => {
       <CustomerHeader 
         tableId={tableId}
         showBackButton={true}
-        totalItems={0} 
+        totalItems={displayTotalItems}
+        onCartClick={() => setIsCartOpen(true)}
       />
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-16">
@@ -121,9 +160,13 @@ export const MenuItemDetailPage = () => {
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ duration: 0.5 }}
-              className="w-full max-w-sm md:max-w-md aspect-4/3 rounded-3xl sm:rounded-4xl overflow-hidden shadow-2xl"
+              className="w-full max-w-sm md:max-w-md aspect-4/3 rounded-3xl sm:rounded-4xl overflow-hidden shadow-2xl bg-gray-100"
             >
-              <img src={item.images?.[0] ? `/api/images/${item.images[0]}` : ''} alt={item.name} className="w-full h-full object-cover hover:scale-110 transition-transform duration-700" />
+              <img
+                src={item.images?.[0] ? `/api/images/${item.images[0]}` : ''}
+                alt={item.name}
+                className="w-full h-full object-cover hover:scale-110 transition-transform duration-700"
+              />
             </motion.div>
           </div>
 
@@ -216,6 +259,126 @@ export const MenuItemDetailPage = () => {
           </div>
         </div>
       </main>
+
+      <AnimatePresence>
+        {isCartOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.18, ease: 'easeOut' }}
+              onClick={() => setIsCartOpen(false)}
+              className="fixed inset-0 bg-black/45 sm:bg-black/55 backdrop-blur-[2px] sm:backdrop-blur-sm z-[200]"
+            />
+            <motion.div
+              initial={{ y: "100%", opacity: 0.98 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: "100%", opacity: 0.98 }}
+              transition={{ type: "spring", damping: 28, stiffness: 260, mass: 0.9 }}
+              style={{ willChange: 'transform' }}
+              className="fixed right-0 bottom-0 w-full sm:max-w-md bg-white z-[201] flex flex-col shadow-[0_-16px_40px_rgba(0,0,0,0.18)] rounded-t-[2rem] sm:rounded-t-[2.5rem] overflow-hidden"
+            >
+              <div className="pt-3 pb-2 px-6 sm:px-8 bg-[#111] text-white shrink-0">
+                <div className="mx-auto h-1.5 w-12 rounded-full bg-white/30 mb-4" />
+                <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold italic uppercase" style={{ fontFamily: "'Playfair Display', serif" }}>Giỏ hàng của bạn</h2>
+                <X className="w-6 h-6 cursor-pointer" onClick={() => setIsCartOpen(false)} />
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6 overscroll-contain">
+                {displayCart.length === 0 ? (
+                  <div className="text-center py-20 text-gray-400 font-bold uppercase italic border-2 border-dashed border-gray-100 rounded-3xl">Giỏ hàng trống</div>
+                ) : (
+                  <>
+                    {newItems.length > 0 && (
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-2">
+                          <div className="h-0.5 flex-1 bg-red-100" />
+                          <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-red-600">Món mới chọn</h3>
+                          <div className="h-0.5 flex-1 bg-red-100" />
+                        </div>
+                        {newItems.map((cartItem: any, idx: number) => (
+                          <div key={(cartItem._id || cartItem.menuItemId) + idx} className="flex gap-4 border-b border-gray-100 pb-5">
+                            <img src={cartItem.image ?? ''} className="w-20 h-20 rounded-2xl object-cover" alt="" />
+                            <div className="flex-1">
+                              <h4 className="font-bold italic text-lg" style={{ fontFamily: "'Playfair Display', serif" }}>{cartItem.name}</h4>
+                              {(cartItem.selectedOption || (cartItem.selectedAddons && cartItem.selectedAddons.length > 0)) && (
+                                <div className="mt-1 space-y-0.5">
+                                  {cartItem.selectedOption && <p className="text-[10px] text-gray-500 italic">• {cartItem.selectedOption.name}</p>}
+                                  {cartItem.selectedAddons?.map((addon: any, addonIdx: number) => (
+                                    <p key={addonIdx} className="text-[10px] text-gray-500 italic">• {addon.name}</p>
+                                  ))}
+                                </div>
+                              )}
+                              <p className="text-red-600 font-bold mt-1">{(Number(cartItem.totalPrice || 0) / Number(cartItem.quantity || 1)).toLocaleString()}đ</p>
+                              <div className="flex items-center gap-4 mt-2">
+                                <div className="flex items-center border border-gray-200 rounded-lg bg-white overflow-hidden">
+                                  {tableId ? (
+                                    <>
+                                      <button className="px-3 py-1 hover:bg-red-50 hover:text-red-600 font-bold" onClick={() => handleUpdateTableCartItemQuantity(cartItem._id || cartItem.menuItemId, -1)}><Minus className="w-3 h-3" /></button>
+                                      <span className="px-4 font-bold">{cartItem.quantity}</span>
+                                      <button className="px-3 py-1 hover:bg-red-50 hover:text-red-600 font-bold" onClick={() => handleUpdateTableCartItemQuantity(cartItem._id || cartItem.menuItemId, 1)}><Plus className="w-3 h-3" /></button>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <button className="px-3 py-1 hover:bg-red-50 hover:text-red-600 font-bold" onClick={() => updateQuantity(cartItem.menuItemId, -1)}>-</button>
+                                      <span className="px-4 font-bold">{cartItem.quantity}</span>
+                                      <button className="px-3 py-1 hover:bg-red-50 hover:text-red-600 font-bold" onClick={() => updateQuantity(cartItem.menuItemId, 1)}>+</button>
+                                    </>
+                                  )}
+                                </div>
+                                <Trash2 className="w-4 h-4 text-gray-300 cursor-pointer hover:text-red-600" onClick={() => tableId ? handleRemoveTableCartItem(cartItem._id || cartItem.menuItemId) : removeFromCart(cartItem.menuItemId)} />
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {orderedItems.length > 0 && (
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-2">
+                          <div className="h-0.5 flex-1 bg-gray-100" />
+                          <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Món đang phục vụ</h3>
+                          <div className="h-0.5 flex-1 bg-gray-100" />
+                        </div>
+                        {orderedItems.map((cartItem: any, idx: number) => (
+                          <div key={(cartItem._id || cartItem.menuItemId) + idx} className="flex gap-4 border-b border-gray-100 pb-5 opacity-80 grayscale-[0.3]">
+                            <img src={cartItem.image ?? ''} className="w-16 h-16 rounded-2xl object-cover" alt="" />
+                            <div className="flex-1">
+                              <h4 className="font-bold italic text-base" style={{ fontFamily: "'Playfair Display', serif" }}>{cartItem.name}</h4>
+                              <p className="text-gray-500 font-medium text-xs mt-1">SL: <span className="font-bold text-[#111]">{cartItem.quantity}</span></p>
+                              <span className="inline-flex mt-2 px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-[8px] font-black uppercase tracking-widest">{cartItem.status}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+
+              <div className="p-5 sm:p-8 bg-gray-50 space-y-4 border-t border-gray-100 shrink-0">
+                <div className="flex justify-between items-center px-1">
+                  <span className="text-gray-400 font-bold uppercase text-[10px] tracking-widest italic">Tổng cộng</span>
+                  <span className="text-2xl font-black text-red-600 italic" style={{ fontFamily: "'Playfair Display', serif" }}>
+                    {displayTotalPrice.toLocaleString()}đ
+                  </span>
+                </div>
+
+                <button
+                  onClick={() => setIsCartOpen(false)}
+                  className="w-full bg-[#111] text-white py-4 rounded-2xl font-black italic uppercase transition-all shadow-xl text-xs active:scale-95"
+                >
+                  Đóng giỏ hàng
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

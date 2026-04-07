@@ -10,7 +10,6 @@ router.get("/:id/status", orderController.getOrderStatus);                      
 router.post("/", orderController.createOrder);                                   // Khách thêm món vào giỏ
 router.post("/:sessionId/checkout", orderController.checkoutCart);               // Khách chốt giỏ gửi bếp
 router.delete("/:sessionId/item/:itemId", orderController.deleteOrderItem);      // Khách xóa món (khi đang ở in_cart)
-router.patch("/:sessionId/item/:itemId/quantity", orderController.updateOrderItemQuantity); // Khách cập nhật số lượng món
 
 // --- LUỒNG NHÂN VIÊN / ADMIN (Yêu cầu Token) ---
 router.get("/", authorize(["admin", "staff"]), orderController.getOrders);
@@ -24,6 +23,8 @@ router.post("/counter", authorize(["staff", "admin"]), orderController.createCou
 
 router.put("/:sessionId/approve-all", authorize(["staff", "admin", "chef"]), orderController.approveAllItems);
 router.put("/:sessionId/item/:itemId/status", authorize(["staff", "admin", "chef"]), orderController.updateItemStatus);
+router.post("/:id/complete", authorize(["staff", "admin"]), orderController.completeOrder); // Chốt đơn, đóng phiên & giải phóng bàn
+
 
 // FIX #1: PUT/DELETE toàn bộ order giờ yêu cầu token, ngăn khách xóa bill người khác
 router.put("/:id", authorize(["staff", "admin"]), orderController.updateOrder);

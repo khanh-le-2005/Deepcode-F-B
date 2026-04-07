@@ -435,9 +435,9 @@ export const MenuPage = () => {
 
       <AnimatePresence>
         {displayTotalItems > 0 && (
-          <motion.button initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }} onClick={() => setIsCartOpen(true)} className="fixed bottom-8 right-8 z-[150] w-16 h-16 bg-red-600 text-white rounded-full shadow-2xl border-4 border-white flex items-center justify-center group">
+          <motion.button initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }} onClick={() => setIsCartOpen(true)} className="fixed bottom-8 right-8 z-[150] w-16 h-16 bg-black text-white rounded-full shadow-2xl border-4 border-white flex items-center justify-center group">
             <ShoppingBag className="w-7 h-7 group-hover:rotate-12 transition-transform" />
-            <div className="absolute -top-1 -right-1 bg-[#111] text-white text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center border-2 border-white">{displayTotalItems}</div>
+            <div className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center border-2 border-white">{displayTotalItems}</div>
             <div className="absolute inset-0 rounded-full bg-red-600 animate-ping opacity-20 -z-10" />
           </motion.button>
         )}

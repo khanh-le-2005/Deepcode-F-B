@@ -10,6 +10,7 @@ import { Order } from '../../types';
 import { CustomerHeader } from '../../components/CustomerHeader';
 import { InvalidTable } from '../../components/InvalidTable';
 import { useTableValidation } from '../../hooks/useTableValidation';
+import { PaymentSuccessModal } from '../../components/customer/PaymentSuccessModal';
 import axiosLib from 'axios';
 
 const socket = io();
@@ -29,6 +30,7 @@ export const OrderTrackingPage = () => {
     gatewayWarning?: string;
   } | null>(null);
    const [paymentError, setPaymentError] = useState('');
+   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const paymentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -82,7 +84,8 @@ export const OrderTrackingPage = () => {
       setOrder(prev => {
         const currentId = prev?.id || (prev as any)?._id;
         if (currentId === data.orderId && data.paymentStatus === 'paid') {
-          toast.success("Thanh toán thành công! Cảm ơn bạn đã ghé thăm 🎉");
+          // toast.success("Thanh toán thành công! Cảm ơn bạn đã ghé thăm 🎉");
+          setShowSuccessModal(true);
           return { ...prev, paymentStatus: 'paid', status: 'completed' } as Order;
         }
         return prev;
@@ -95,6 +98,33 @@ export const OrderTrackingPage = () => {
       socket.off('order-paid');
     };
   }, [tableId, orderId, status, initialSession]);
+
+  // Backup polling for order status
+  useEffect(() => {
+    if (status !== 'valid' || !order) return;
+    
+    // Nếu đã thanh toán rồi thì không poll nữa
+    if (order.paymentStatus === 'paid') return;
+
+    const currentOrderId = order.id || (order as any)._id;
+    if (!currentOrderId) return;
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const res = await axios.get(`/api/orders/${currentOrderId}/status`);
+        if (res.data && res.data.paymentStatus === 'paid') {
+          setOrder(prev => ({ ...prev, ...res.data }));
+          setShowSuccessModal(true);
+          setPaymentQr(null);
+          clearInterval(pollInterval);
+        }
+      } catch (err) {
+        // Silent error for polling
+      }
+    }, 5000);
+
+    return () => clearInterval(pollInterval);
+  }, [status, order?.id, (order as any)?._id, order?.paymentStatus]);
 
   if (status === 'loading') {
     return <div className="min-h-screen flex items-center justify-center bg-[#fcf9f4]"><div className="w-10 h-10 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div></div>;
@@ -375,6 +405,14 @@ export const OrderTrackingPage = () => {
           )}
         </div>
       </main>
+
+      <PaymentSuccessModal
+        isOpen={showSuccessModal}
+        onClose={() => setShowSuccessModal(false)}
+        order={order}
+        tableId={tableId}
+        onViewMenu={() => navigate(tableId ? `/table/${tableId}/menu` : '/menu')}
+      />
     </div>
   );
 };

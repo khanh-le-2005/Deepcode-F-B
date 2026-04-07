@@ -1,6 +1,10 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChefHat, Clock, CheckCircle2, Play, ArrowLeft, LogOut, ShoppingCart, Utensils, AlertCircle } from 'lucide-react';
+import { 
+  ChefHat, Clock, CheckCircle2, Play, ArrowLeft, LogOut, 
+  ShoppingCart, Utensils, AlertCircle, Timer, Coffee,
+  Sun, Moon // Thêm icon cho mode
+} from 'lucide-react';
 import axios from '@/src/lib/axiosClient';
 import { io } from 'socket.io-client';
 import { useNavigate } from 'react-router-dom';
@@ -14,9 +18,11 @@ const socket = io();
 export const KitchenDisplay = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [tableNameMap, setTableNameMap] = useState<Record<string, string>>({});
+  const [isDark, setIsDark] = useState(true); // State quản lý mode
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
+  // --- GIỮ NGUYÊN LOGIC NGHIỆP VỤ ---
   const handleAuthFailure = () => {
     logout();
     navigate('/login', { replace: true });
@@ -40,13 +46,11 @@ export const KitchenDisplay = () => {
       setOrders(prev => {
         const updatedId = (updatedOrder as any)._id || updatedOrder.id;
         const exists = prev.some(o => ((o as any)._id === updatedId || o.id === updatedId));
-        
         if (!exists) {
           const relevant = updatedOrder.items.some(i => i.status === 'pending_approval' || i.status === 'cooking');
           if (relevant) return [updatedOrder, ...prev];
           return prev;
         }
-        
         return prev.map(o => ((o as any)._id === updatedId || o.id === updatedId) ? updatedOrder : o);
       });
     });
@@ -97,7 +101,6 @@ export const KitchenDisplay = () => {
         handleAuthFailure();
         return;
       }
-      console.error("Failed to approve all items:", err);
     }
   };
 
@@ -110,168 +113,205 @@ export const KitchenDisplay = () => {
         handleAuthFailure();
         return;
       }
-      console.error("Failed to update item status:", err);
     }
   };
+  // --- KẾT THÚC LOGIC ---
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white flex flex-col overflow-x-hidden">
-      {/* Premium Kitchen Header */}
-      <header className="bg-slate-900/40 backdrop-blur-3xl border-b border-white/5 px-6 lg:px-12 py-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 sticky top-0 z-50">
-        <div className="flex items-center gap-6">
-          <div className="w-16 h-16 bg-brand rounded-4xl flex items-center justify-center shadow-2xl shadow-brand/20 group-hover:rotate-12 transition-transform duration-500">
-            <ChefHat className="w-9 h-9 text-white" />
+    <div className={cn(
+      "min-h-screen transition-colors duration-500 flex flex-col selection:bg-brand/30",
+      isDark ? "bg-[#020617] text-slate-200" : "bg-slate-50 text-slate-900"
+    )}>
+      {/* Header */}
+      <header className={cn(
+        "h-24 px-8 flex items-center justify-between border-b sticky top-0 z-50 backdrop-blur-2xl transition-colors duration-500",
+        isDark ? "bg-slate-950/50 border-white/5" : "bg-white/70 border-slate-200"
+      )}>
+        <div className="flex items-center gap-5">
+          <div className="relative group">
+            <div className="absolute -inset-1 bg-gradient-to-r from-brand to-orange-600 rounded-2xl blur opacity-25 group-hover:opacity-50 transition duration-1000"></div>
+            <div className={cn(
+              "relative w-14 h-14 rounded-2xl flex items-center justify-center border transition-colors",
+              isDark ? "bg-slate-900 border-white/10" : "bg-white border-slate-200 shadow-sm"
+            )}>
+              <ChefHat className="w-8 h-8 text-brand" />
+            </div>
           </div>
           <div>
-            <h1 className="text-3xl lg:text-4xl font-black tracking-tight font-serif italic text-white leading-none">NHÀ BẾP</h1>
-            <div className="flex items-center gap-3 mt-3">
-              <span className="flex items-center gap-2 text-[10px] font-black uppercase text-emerald-500 tracking-[0.2em] bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
-                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
-                Đang trực tuyến
+            <div className="flex items-center gap-3">
+              <h1 className={cn("text-2xl font-bold uppercase italic font-serif", isDark ? "text-white" : "text-slate-900")}>KDS Terminal</h1>
+              <span className="px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-[10px] font-bold rounded-md animate-pulse">
+                LIVE
               </span>
-              <span className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em]">• {orders.length} ĐƠN ĐANG CHỜ</span>
             </div>
+            <p className="text-slate-500 text-xs font-medium tracking-widest mt-0.5 uppercase">
+               {orders.length} đơn hàng đang chuẩn bị
+            </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-4 w-full md:w-auto">
-          <div className="flex-1 md:flex-none flex items-center gap-3">
-            <Button
-              variant="outline"
-              className="flex-1 md:flex-none border-white/10 hover:text-white h-14 px-6 rounded-2xl text-xs font-black uppercase tracking-widest transition-all"
-              onClick={() => navigate('/pos')}
-            >
-              <ShoppingCart className="w-4 h-4 mr-2" /> BÀN TRỐNG
-            </Button>
-            {user?.role === 'admin' && (
-              <Button
-                variant="ghost"
-                className="text-slate-400 hover:text-white hover:bg-white/5 h-14 rounded-2xl px-6 font-black text-xs uppercase tracking-widest transition-all hidden lg:flex"
-                onClick={() => navigate('/admin')}
-              >
-                <ArrowLeft className="w-4 h-4 mr-2" /> ADMIN
-              </Button>
-            )}
-          </div>
+        <div className="flex items-center gap-3">
+          {/* Mode Toggle Button */}
           <button
-            onClick={() => {
-              logout();
-              navigate('/login');
-            }}
-            className="h-14 w-14 bg-rose-500/10 text-rose-500 rounded-2xl hover:bg-rose-500 transition-all hover:text-white flex items-center justify-center shadow-lg shadow-rose-500/10"
+            onClick={() => setIsDark(!isDark)}
+            className={cn(
+              "h-12 w-12 flex items-center justify-center rounded-xl transition-all duration-300 border",
+              isDark ? "bg-slate-900 border-white/10 text-yellow-400 hover:bg-slate-800" : "bg-white border-slate-200 text-indigo-600 hover:bg-slate-50 shadow-sm"
+            )}
+          >
+            {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+          </button>
+
+          <div className={cn("w-[1px] h-8 mx-2", isDark ? "bg-white/10" : "bg-slate-200")} />
+
+          <Button
+            variant="ghost"
+            onClick={() => navigate('/pos')}
+            className={cn(
+              "rounded-xl h-12 px-5 transition-all",
+              isDark ? "text-slate-400 hover:text-white hover:bg-white/5" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+            )}
+          >
+            <ShoppingCart className="w-4 h-4 mr-2" />
+            Sơ đồ bàn
+          </Button>
+          
+          <button
+            onClick={() => { logout(); navigate('/login'); }}
+            className="h-12 w-12 flex items-center justify-center rounded-xl bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white transition-all duration-300"
           >
             <LogOut className="w-5 h-5" />
           </button>
         </div>
       </header>
 
-      {/* Orders Grid - Responsive Layout */}
-      <main className="flex-1 p-6 lg:p-12">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 content-start">
+      {/* Main Grid */}
+      <main className="p-8 flex-1 overflow-y-auto custom-scrollbar">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6">
           <AnimatePresence mode="popLayout">
             {orders.map((order, i) => {
               const orderId = (order as any)._id || order.id;
               const kitchenItems = order.items.filter(i => i.status === 'pending_approval' || i.status === 'cooking');
-
               if (kitchenItems.length === 0) return null;
 
               const isAnyCooking = kitchenItems.some(i => i.status === 'cooking');
 
               return (
                 <motion.div
-                  layout
-                  initial={{ opacity: 0, scale: 0.95, y: 30 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                  transition={{ delay: i * 0.05 }}
                   key={orderId}
+                  layout
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
                   className={cn(
-                    "bg-slate-900 rounded-[3rem] border flex flex-col overflow-hidden shadow-premium transition-all duration-500 relative group",
-                    isAnyCooking ? "border-brand/40 bg-slate-900/60 ring-1 ring-brand/20" : "border-white/5"
+                    "flex flex-col rounded-[2rem] overflow-hidden border transition-all duration-500",
+                    isDark 
+                      ? (isAnyCooking ? "bg-slate-900/40 border-brand/30 shadow-[0_20px_50px_rgba(217,119,6,0.1)]" : "bg-slate-900/40 border-white/5 shadow-2xl")
+                      : (isAnyCooking ? "bg-white border-brand/40 shadow-[0_20px_40px_rgba(217,119,6,0.1)]" : "bg-white border-slate-200 shadow-sm")
                   )}
                 >
-                  {/* Glowing Indicator for Cooking orders */}
-                  {isAnyCooking && <div className="absolute top-0 left-12 right-12 h-[2px] bg-brand shadow-[0_0_20px_rgba(217,119,6,0.8)]" />}
-
                   {/* Ticket Header */}
                   <div className={cn(
-                    "p-8 flex items-center justify-between",
-                    isAnyCooking ? "bg-brand/10" : "bg-white/[0.02]"
+                    "p-6 relative",
+                    isDark ? (isAnyCooking ? "bg-brand/5" : "bg-white/[0.02]") : (isAnyCooking ? "bg-brand/5" : "bg-slate-50")
                   )}>
-                    <div>
-                      <h3 className="text-3xl font-serif italic font-black text-white leading-none">BÀN {tableNameMap[order.tableId] || order.tableId}</h3>
-                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mt-3 group-hover:text-brand transition-colors">#{orderId.slice(-6).toUpperCase()}</p>
-                    </div>
-                    <div className="bg-slate-950/80 px-4 py-3 rounded-2xl border border-white/5 flex items-center gap-3">
-                      <Clock className={cn("w-4 h-4", isAnyCooking ? "text-brand animate-pulse" : "text-slate-500")} />
-                      <span className="text-sm font-black text-white">{new Date(order.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</span>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em]">BÀN</span>
+                        <h2 className={cn("text-4xl font-serif italic font-black leading-tight", isDark ? "text-white" : "text-slate-900")}>
+                          {tableNameMap[order.tableId] || order.tableId}
+                        </h2>
+                      </div>
+                      <div className="text-right">
+                        <div className={cn(
+                          "flex items-center gap-2 px-3 py-1.5 rounded-full border mb-2",
+                          isDark ? "bg-black/40 border-white/5" : "bg-white border-slate-200"
+                        )}>
+                          <Timer className={cn("w-3.5 h-3.5", isAnyCooking ? "text-brand animate-pulse" : "text-slate-400")} />
+                          <span className={cn("text-xs font-mono font-bold", isDark ? "text-white" : "text-slate-700")}>
+                            {new Date(order.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
-                  {kitchenItems.some(item => item.status === 'pending_approval') && (
-                    <div className="px-6">
+                  {/* Items List */}
+                  <div className="p-5 flex-1 flex flex-col gap-4">
+                    {kitchenItems.some(item => item.status === 'pending_approval') && (
                       <button
                         onClick={() => approveAllItems(orderId)}
-                        className="w-full h-12 rounded-2xl border border-white/10 bg-white/5 text-white font-black text-[10px] uppercase tracking-widest hover:bg-white/10 transition-all"
+                        className={cn(
+                          "w-full py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all",
+                          isDark ? "bg-white/5 text-slate-300 hover:bg-white/10" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                        )}
                       >
-                        Duyệt tất cả món chờ duyệt
+                        Duyệt tất cả
                       </button>
-                    </div>
-                  )}
+                    )}
 
-                  {/* Items Section */}
-                  <div className="flex-1 p-6 space-y-4">
-                    {kitchenItems.map((item, idx) => {
-                      const itemId = (item as any)._id || idx.toString();
-                      return (
-                        <div key={itemId} className={cn(
-                          "p-6 rounded-4xl border relative overflow-hidden transition-all duration-300",
-                          item.status === 'cooking' ? "bg-white/[0.03] border-brand/20 shadow-inner" : "bg-white/[0.01] border-white/5"
-                        )}>
-                          <div className="flex items-start justify-between gap-4 mb-6">
-                            <div className="flex-1">
-                              <p className="text-lg font-black text-white leading-tight font-sans tracking-tight">{item.name}</p>
-                              {item.note && (
-                                <div className="flex items-start gap-2 mt-2 text-brand">
-                                  <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                                  <p className="text-xs font-bold leading-tight line-clamp-2 italic">{item.note}</p>
-                                </div>
+                    <div className="space-y-3">
+                      {kitchenItems.map((item, idx) => {
+                        const itemId = (item as any)._id || idx.toString();
+                        const isCooking = item.status === 'cooking';
+
+                        return (
+                          <div key={itemId} className={cn(
+                            "p-4 rounded-3xl border transition-all duration-300",
+                            isDark 
+                              ? (isCooking ? "bg-slate-800/50 border-brand/20" : "bg-black/20 border-white/5 opacity-70")
+                              : (isCooking ? "bg-orange-50/50 border-brand/20 shadow-sm" : "bg-slate-50 border-slate-100")
+                          )}>
+                            <div className="flex justify-between gap-4">
+                              <div className="flex-1">
+                                <h4 className={cn("font-bold text-base leading-snug", isDark ? "text-white" : "text-slate-900")}>
+                                  {item.name}
+                                </h4>
+                                {item.note && (
+                                  <div className="mt-2 flex items-start gap-2 text-orange-500 bg-orange-500/5 p-2 rounded-xl border border-orange-500/10">
+                                    <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                                    <p className="text-[11px] leading-tight font-medium italic">{item.note}</p>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="text-2xl font-black font-mono text-brand">
+                                <span className="text-xs text-slate-400 mr-1 italic font-sans">x</span>
+                                {item.quantity}
+                              </div>
+                            </div>
+
+                            <div className="mt-4 flex gap-2">
+                              {item.status === 'pending_approval' ? (
+                                <button
+                                  onClick={() => updateItemStatus(orderId, itemId, 'cooking')}
+                                  className="w-full h-11 bg-brand text-white rounded-xl font-bold text-[10px] uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-lg shadow-brand/20"
+                                >
+                                  <Play className="w-3.5 h-3.5 fill-current" /> Bắt đầu nấu
+                                </button>
+                              ) : (
+                                <>
+                                  <button
+                                    onClick={() => updateItemStatus(orderId, itemId, 'pending_approval')}
+                                    className={cn(
+                                      "h-11 px-4 rounded-xl transition-all border",
+                                      isDark ? "bg-white/5 text-slate-500 border-white/5 hover:text-white" : "bg-white text-slate-400 border-slate-200 hover:text-slate-600"
+                                    )}
+                                  >
+                                    Dừng
+                                  </button>
+                                  <button
+                                    onClick={() => updateItemStatus(orderId, itemId, 'served')}
+                                    className="flex-1 h-11 bg-emerald-500 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-emerald-600 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20"
+                                  >
+                                    <CheckCircle2 className="w-4 h-4" /> Hoàn tất
+                                  </button>
+                                </>
                               )}
                             </div>
-                            <span className="w-12 h-12 shrink-0 bg-slate-950 rounded-2xl flex items-center justify-center font-black text-xl text-brand border border-brand/20 shadow-lg">
-                              x{item.quantity}
-                            </span>
                           </div>
-
-                          {/* Item Action Buttons */}
-                          <div className="flex gap-2 w-full pt-2">
-                            {item.status === 'pending_approval' ? (
-                              <button
-                                onClick={() => updateItemStatus(orderId, itemId, 'cooking')}
-                                className="flex-1 h-14 bg-brand text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all shadow-xl shadow-brand/20 flex items-center justify-center gap-2"
-                              >
-                                <Play className="w-4 h-4 fill-current" /> BẮT ĐẦU NẤU
-                              </button>
-                            ) : (
-                              <>
-                                <button
-                                  onClick={() => updateItemStatus(orderId, itemId, 'pending_approval')}
-                                  className="h-14 px-5 bg-white/5 text-slate-500 rounded-2xl hover:text-white transition-all active:scale-95 border border-white/5"
-                                >
-                                  DỪNG
-                                </button>
-                                <button
-                                  onClick={() => updateItemStatus(orderId, itemId, 'served')}
-                                  className="flex-1 h-14 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-500 active:scale-95 transition-all shadow-xl shadow-emerald-500/20 flex items-center justify-center gap-2"
-                                >
-                                  <CheckCircle2 className="w-4 h-4" /> XONG MÓN
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                   </div>
                 </motion.div>
               );
@@ -281,27 +321,45 @@ export const KitchenDisplay = () => {
 
         {/* Empty State */}
         {orders.length === 0 && (
-          <div className="flex-1 flex flex-col items-center justify-center p-8 text-center min-h-[60vh]">
-            <div className="w-40 h-40 bg-slate-900 rounded-[4rem] flex items-center justify-center mb-10 border border-white/5 relative group">
-              <ChefHat className="w-20 h-20 text-slate-700 transition-transform group-hover:scale-125 duration-700" />
-              <div className="absolute inset-0 bg-brand/5 rounded-[4rem] animate-pulse" />
+          <div className="h-[60vh] flex flex-col items-center justify-center text-center">
+            <div className={cn(
+              "w-32 h-32 rounded-[3rem] flex items-center justify-center shadow-2xl mb-8 border transition-colors",
+              isDark ? "bg-slate-900 border-white/10" : "bg-white border-slate-200"
+            )}>
+              <Coffee className={cn("w-12 h-12", isDark ? "text-slate-700" : "text-slate-300")} />
             </div>
-            <h2 className="text-4xl font-serif italic font-black text-white mb-4">Mọi thứ đã sẵn sàng!</h2>
-            <p className="text-slate-500 max-w-sm mx-auto text-lg leading-relaxed font-medium">Hiện chưa có đơn hàng nào cần chuẩn bị. Hãy thư giãn một chút nhé!</p>
+            <h2 className={cn("text-3xl font-serif italic font-black mb-3", isDark ? "text-white" : "text-slate-900")}>Tạm hết đơn hàng</h2>
+            <p className="text-slate-500 max-w-xs font-medium italic">Bếp của bạn đã hoàn thành mọi thứ!</p>
           </div>
         )}
       </main>
 
-      {/* Modern Sidebar/Floating Indicator for Desktop - Optional but looks premium */}
-      <div className="fixed bottom-10 right-10 hidden xl:flex flex-col gap-4">
-        <div className="bg-slate-900 px-6 py-4 rounded-3xl border border-white/10 shadow-2xl backdrop-blur-xl flex items-center gap-4">
-          <Utensils className="w-6 h-6 text-brand" />
-          <div>
-            <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Hiệu suất bếp</p>
-            <p className="text-sm font-black text-white uppercase">Cực kỳ tốt</p>
+      {/* Footer */}
+      <footer className={cn(
+        "h-14 px-8 border-t flex items-center justify-between text-[10px] font-bold uppercase tracking-widest transition-colors",
+        isDark ? "bg-slate-950/80 border-white/5 text-slate-500" : "bg-white border-slate-200 text-slate-400"
+      )}>
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+            Connected
           </div>
+          <div>Kitchen: <span className={isDark ? "text-slate-300" : "text-slate-600"}>{user?.name}</span></div>
         </div>
-      </div>
+        <div className="flex items-center gap-2 italic">
+          <Utensils className="w-3 h-3" />
+          v2.2.0 • {isDark ? 'Dark Mode' : 'Light Mode'}
+        </div>
+      </footer>
+
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { 
+          background: ${isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'}; 
+          border-radius: 10px; 
+        }
+      `}</style>
     </div>
   );
 };

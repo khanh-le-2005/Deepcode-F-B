@@ -22,7 +22,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem('qr_dine_token');
+    const token = localStorage.getItem('qr_dine_access_token');
     const savedUser = localStorage.getItem('qr_dine_user');
 
     if (!token) {
@@ -33,10 +33,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
+    // Luôn fetch thông tin user mới nhất khi khởi động nếu đã có token
     axiosClient.get('/api/auth/me')
       .then((response) => {
         const currentUser = {
-          id: response.data.id,
+          id: response.data.id || response.data._id,
           email: response.data.email,
           name: response.data.name,
           role: response.data.role,
@@ -45,11 +46,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         localStorage.setItem('qr_dine_user', JSON.stringify(currentUser));
       })
       .catch((error) => {
-        setUser(null);
-        localStorage.removeItem('qr_dine_user');
-        const status = error?.response?.status;
-        if (status === 401 || status === 403) {
-          localStorage.removeItem('qr_dine_token');
+        // Lỗi 401/403 sẽ được xử lý bởi axios interceptor (thử refresh token)
+        // Nếu catch ở đây nghĩa là refresh token cũng hỏng
+        if (error?.response?.status === 401) {
+             setUser(null);
+             localStorage.removeItem('qr_dine_user');
+             localStorage.removeItem('qr_dine_access_token');
         }
       })
       .finally(() => {
@@ -63,16 +65,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         email, password
       });
 
-      const data = response.data;
+      const { success, user: userData, accessToken } = response.data;
+      
+      if (!success) return false;
+
       const newUser: User = {
-        id: data.user.id,
-        email: data.user.email,
-        name: data.user.name,
-        role: data.user.role
+        id: userData.id || userData._id,
+        email: userData.email,
+        name: userData.name,
+        role: userData.role
       };
+      
       setUser(newUser);
       localStorage.setItem('qr_dine_user', JSON.stringify(newUser));
-      localStorage.setItem('qr_dine_token', data.token);
+      localStorage.setItem('qr_dine_access_token', accessToken);
+      
       return true;
     } catch (error) {
       console.error("Login failed:", error);
@@ -80,10 +87,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('qr_dine_user');
-    localStorage.removeItem('qr_dine_token');
+  const logout = async () => {
+    try {
+      // Gọi API đăng xuất để huỷ refresh token ở backend
+      await axiosClient.post('/api/auth/logout');
+    } catch (error) {
+      console.error("Logout error:", error);
+    } finally {
+      setUser(null);
+      localStorage.removeItem('qr_dine_user');
+      localStorage.removeItem('qr_dine_access_token');
+      window.location.href = '/auth/login';
+    }
   };
 
   return (

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useCart } from '../../contexts/CartContext';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import axios from '@/src/lib/axiosClient';
 import { toast } from 'react-toastify';
 import { CustomerHeader } from '../../components/CustomerHeader';
 

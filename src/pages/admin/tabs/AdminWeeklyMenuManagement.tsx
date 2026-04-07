@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Search, CalendarDays, Edit2, Trash2, X, CheckCircle2, CalendarRange, UtensilsCrossed } from 'lucide-react';
-import axios from 'axios';
+import axios from '@/src/lib/axiosClient';
 import { toast } from 'react-toastify';
 import { Button } from '../../../components/Button';
 import { MenuItem } from '../../../types';
@@ -188,7 +188,7 @@ export const AdminWeeklyMenuManagement = () => {
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
         <div>
           <h2 className="text-4xl font-black text-gray-900 tracking-tight font-serif">Thực đơn tuần</h2>
-          <p className="text-gray-500 font-medium mt-1">Tạo lịch xuất bán món theo đúng API `/api/weekly-menu`</p>
+          {/* <p className="text-gray-500 font-medium mt-1">Tạo lịch xuất bán món theo đúng API `/api/weekly-menu`</p> */}
         </div>
         <Button
           variant="secondary"

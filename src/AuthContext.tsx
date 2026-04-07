@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import axios from 'axios';
+import axiosClient from '@/src/lib/axiosClient';
 
 interface User {
   id?: string;
@@ -33,9 +33,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    axios.get('/api/auth/me')
+    axiosClient.get('/api/auth/me')
       .then((response) => {
-        axios.defaults.headers.common.Authorization = `Bearer ${token}`;
         const currentUser = {
           id: response.data.id,
           email: response.data.email,
@@ -51,7 +50,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const status = error?.response?.status;
         if (status === 401 || status === 403) {
           localStorage.removeItem('qr_dine_token');
-          delete axios.defaults.headers.common.Authorization;
         }
       })
       .finally(() => {
@@ -61,27 +59,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+      const response = await axiosClient.post('/api/auth/login', {
+        email, password
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        const newUser: User = {
-          id: data.user.id,
-          email: data.user.email,
-          name: data.user.name,
-          role: data.user.role
-        };
-        setUser(newUser);
-        localStorage.setItem('qr_dine_user', JSON.stringify(newUser));
-        localStorage.setItem('qr_dine_token', data.token);
-        axios.defaults.headers.common.Authorization = `Bearer ${data.token}`;
-        return true;
-      }
-      return false;
+      const data = response.data;
+      const newUser: User = {
+        id: data.user.id,
+        email: data.user.email,
+        name: data.user.name,
+        role: data.user.role
+      };
+      setUser(newUser);
+      localStorage.setItem('qr_dine_user', JSON.stringify(newUser));
+      localStorage.setItem('qr_dine_token', data.token);
+      return true;
     } catch (error) {
       console.error("Login failed:", error);
       return false;
@@ -92,7 +84,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUser(null);
     localStorage.removeItem('qr_dine_user');
     localStorage.removeItem('qr_dine_token');
-    delete axios.defaults.headers.common.Authorization;
   };
 
   return (

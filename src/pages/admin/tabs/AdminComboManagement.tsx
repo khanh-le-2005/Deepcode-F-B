@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Package, Search, Plus, Edit2, Trash2, X, CheckCircle2 } from 'lucide-react';
-import axios from 'axios';
+import axios from '@/src/lib/axiosClient';
 import { toast } from 'react-toastify';
 import { Combo, MenuItem } from '../../../types';
 import { Button } from '../../../components/Button';
@@ -152,7 +152,7 @@ export const AdminComboManagement = () => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <h2 className="text-3xl font-black text-gray-900 tracking-tight">Quản lý combo</h2>
-          <p className="text-gray-500 font-medium mt-1">Tạo và quản lý các gói món theo đúng API `/api/combos`</p>
+          {/* <p className="text-gray-500 font-medium mt-1">Tạo và quản lý các gói món theo đúng API `/api/combos`</p> */}
         </div>
         <Button variant="secondary" size="lg" onClick={openCreateForm} className="shadow-xl shadow-amber-500/20">
           <Plus className="w-5 h-5" /> Thêm combo

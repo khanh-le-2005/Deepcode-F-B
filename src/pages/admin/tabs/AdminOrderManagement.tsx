@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ShoppingCart, Search, Filter, Clock, CheckCircle2, XCircle, MoreVertical, CreditCard, Receipt, ChevronRight } from 'lucide-react';
-import axios from 'axios';
+import axios from '@/src/lib/axiosClient';
 import { toast } from 'react-toastify';
 import { io } from 'socket.io-client';
 import { Order } from '../../../types';
@@ -80,19 +80,17 @@ export const AdminOrderManagement = () => {
   };
 
   const handlePayment = async (order: Order) => {
+    const orderId = (order as any)._id || order.id;
     const orderTotal = Number(order.total || 0);
-    if (!window.confirm(`Xác nhận thu tiền ${orderTotal.toLocaleString()}đ và đóng bàn?`)) return;
+    if (!window.confirm(`Xác nhận hoàn tất đơn hàng ${orderTotal.toLocaleString()}đ và giải phóng bàn?`)) return;
     try {
-      await axios.post('/api/payments', {
-        orderId: (order as any)._id || order.id,
-        amount: orderTotal,
-        method: 'Cash'
-      });
+      // API v3.0: Use dedicated complete endpoint which handles status + table reset
+      await axios.post(`/api/orders/${orderId}/complete`);
       fetchOrders();
-      toast.success('Thanh toán và đóng bàn thành công!');
+      toast.success('Đơn hàng đã hoàn tất, bàn đã sẵn sàng!');
     } catch (err) {
-      console.error('Payment failed:', err);
-      toast.error('Lỗi khi thanh toán!');
+      console.error('Completion failed:', err);
+      toast.error('Lỗi khi chốt đơn hàng!');
     }
   };
 

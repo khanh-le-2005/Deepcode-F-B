@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import React from 'react';
 import { motion } from 'framer-motion';
 import { X, Upload, Image as ImageIcon, Plus, Trash2 } from 'lucide-react';
-import axios from 'axios';
+import axios from '@/src/lib/axiosClient';
 import { MenuItem, MenuItemOption, MenuItemAddon, Category } from '../../../types';
 import { Button } from '../../../components/Button';
 import { getCategoryId, getMenuItemImageUrl } from '../../../lib/menuHelpers';

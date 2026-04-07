@@ -19,7 +19,8 @@ const menuItemSchema = new mongoose.Schema({
   description: String,
   options: [menuItemOptionSchema], // Tuỳ chọn thêm (Không bắt buộc. Cho phép mảng rỗng [] nếu món không có Option)
   addons: [menuItemAddonSchema], // Có thể chọn nhiều hoặc không chọn
-  status: { type: String, enum: ['available', 'unavailable'], default: 'available' }
+  status: { type: String, enum: ['available', 'unavailable'], default: 'available' },
+  availableUntil: { type: Date }
 }, globalSchemaOptions);
 
 menuItemSchema.index({ categoryId: 1, status: 1 });

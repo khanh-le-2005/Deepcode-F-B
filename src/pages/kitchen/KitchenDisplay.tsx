@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChefHat, Clock, CheckCircle2, Play, ArrowLeft, LogOut, ShoppingCart, Utensils, AlertCircle } from 'lucide-react';
-import axios from 'axios';
+import axios from '@/src/lib/axiosClient';
 import { io } from 'socket.io-client';
 import { useNavigate } from 'react-router-dom';
 import { Order, OrderItem } from '../../types';

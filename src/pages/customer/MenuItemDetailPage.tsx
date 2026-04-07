@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import axios from '@/src/lib/axiosClient';
 import { motion } from 'framer-motion';
 import { ChevronLeft, ShoppingBag, Heart, Star } from 'lucide-react';
 import { MenuItem } from '../../types';

@@ -12,6 +12,7 @@ import { AdminPayments } from './tabs/AdminPayments';
 import { AdminReports } from './tabs/AdminReports';
 import { AdminSettings } from './tabs/AdminSettings';
 import { AdminBankAccounts } from './tabs/AdminBankAccounts';
+import { AdminUserManagement } from './tabs/AdminUserManagement';
 
 export const AdminDashboard = () => {
   return (
@@ -20,15 +21,16 @@ export const AdminDashboard = () => {
         <Route index element={<AdminOverview />} />
         <Route path="tables" element={<AdminTableManagement />} />
         <Route path="categories" element={<AdminCategoryManagement />} />
-        <Route path="weekly-menu" element={<AdminWeeklyMenuManagement />} />
         <Route path="menu" element={<AdminMenuManagement />} />
         <Route path="combo" element={<AdminComboManagement />} />
+        <Route path="weekly-menu" element={<AdminWeeklyMenuManagement />} />
         <Route path="order-history" element={<AdminOrderHistory />} />
         <Route path="orders" element={<AdminOrderManagement />} />
         <Route path="payments" element={<AdminPayments />} />
         <Route path="bank-accounts" element={<AdminBankAccounts />} />
         <Route path="reports" element={<AdminReports />} />
         <Route path="settings" element={<AdminSettings />} />
+        <Route path="users" element={<AdminUserManagement />} />
         <Route path="*" element={<Navigate to="/admin" replace />} />
       </Routes>
     </AdminLayout>

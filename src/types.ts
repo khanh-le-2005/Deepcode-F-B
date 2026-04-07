@@ -51,6 +51,7 @@ export interface MenuItem {
   options: MenuOption[];
   addons: MenuAddon[];
   status: 'available' | 'unavailable';
+  availableUntil?: string;
 }
 
 export interface Combo {
@@ -128,6 +129,7 @@ export interface Order {
 // ─────────────────────────────────────────────────
 export interface Payment {
   _id: string;
+  id?: string;                     // Frontend alias
   orderId: string | Order;         // Trọn bộ session nếu được populate
   amount: number;
   method: string;                  // "Tiền mặt", "Chuyển khoản..."
@@ -135,6 +137,7 @@ export interface Payment {
   tableName: string;               // Snapshot tên bàn lúc thu tiền
   bankNameSnapshot: string;        // Snapshot tên ngân hàng + STK lúc thu tiền
   cashierName: string;             // Snapshot tên thu ngân lúc thu tiền
+  orderTypeSnapshot?: 'dine_in' | 'takeaway';
   status: 'success' | 'failed' | 'processing';
   createdAt: string;
 }

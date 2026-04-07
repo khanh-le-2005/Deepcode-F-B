@@ -50,7 +50,7 @@ export const AdminLayout = ({ children }: { children: ReactNode }) => {
                 <span className="truncate">{today}</span>
               </h2>
               <p className="text-sm lg:text-lg font-black text-gray-900 truncate max-w-[150px] lg:max-w-none">
-                Chào, <span className="text-brand">{user?.name?.split(' ')[0] || 'Admin'}</span>!
+                Chào, <span className="text-brand">{user?.name || 'Admin'}</span>
               </p>
             </div>
           </div>

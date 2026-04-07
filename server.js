@@ -1,4 +1,4 @@
-﻿import express from "express";
+import express from "express";
 import "express-async-errors";
 import morgan from "morgan";
 import helmet from "helmet";
@@ -30,6 +30,7 @@ import imageRoutes from "./backend/src/routes/imageRoutes.js";
 import bankAccountRoutes from "./backend/src/routes/bankAccountRoutes.js";
 import categoryRoutes from "./backend/src/routes/categoryRoutes.js";
 import weeklyMenuRoutes from "./backend/src/routes/weeklyMenuRoutes.js";
+import userRoutes from "./backend/src/routes/userRoutes.js";
 
 const slugify = (value) => {
   return String(value || '')
@@ -151,7 +152,7 @@ async function startServer() {
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
   app.use(morgan("dev"));
   // app.use(express.json());
-  
+
   // API Routes - REAL DATA ONLY
   app.use("/api/auth", authRoutes);
   app.use("/api/images", imageRoutes);
@@ -164,6 +165,7 @@ async function startServer() {
   app.use("/api/payments", paymentRoutes);
   app.use("/api/bank-accounts", bankAccountRoutes);
   app.use("/api/stats", statsRoutes);
+  app.use("/api/users", userRoutes);
 
   // Global Error Handler
   app.use((err, req, res, next) => {

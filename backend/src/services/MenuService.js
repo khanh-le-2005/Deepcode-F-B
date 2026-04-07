@@ -46,6 +46,50 @@ class MenuService {
     }
     return item;
   }
+
+  // --- WEEKLY MENU V2 ---
+  async getWeeklyMenuItems() {
+    // Chỉ lấy các món có availableUntil >= ngày hiện tại VÀ status là available
+    return MenuItem.find({
+      status: "available",
+      availableUntil: { $exists: true, $ne: null, $gte: new Date() },
+    }).populate("categoryId");
+  }
+
+  async getAdminMenuItems() {
+    // Admin lấy tất cả
+    return MenuItem.find().populate("categoryId").sort({ createdAt: -1 });
+  }
+
+  async publishWeekly(itemIds, io) {
+    // Set thời hạn 7 ngày cho các món được chọn
+    const availableUntil = new Date();
+    availableUntil.setDate(availableUntil.getDate() + 7);
+
+    await MenuItem.updateMany(
+      { _id: { $in: itemIds } },
+      { $set: { availableUntil } }
+    );
+
+    if (io) {
+      io.emit("menu-updated", { message: "weekly-menu-published" });
+    }
+    return { success: true, count: itemIds.length, availableUntil };
+  }
+
+  async unpublishWeekly(id, io) {
+    const item = await MenuItem.findByIdAndUpdate(
+      id,
+      { $set: { availableUntil: null } },
+      { new: true }
+    );
+    if (!item) throw new NotFoundError('Menu item not found');
+    
+    if (io) {
+      io.emit("menu-updated", { message: "weekly-menu-unpublished", id });
+    }
+    return item;
+  }
 }
 
 export default new MenuService();

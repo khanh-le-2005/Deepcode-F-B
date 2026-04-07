@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Download, CreditCard, ShoppingCart, Grid, TrendingUp, Award, ChevronRight, FileText } from 'lucide-react';
-import axios from 'axios';
+import axios from '@/src/lib/axiosClient';
 import {
   AreaChart,
   Area,

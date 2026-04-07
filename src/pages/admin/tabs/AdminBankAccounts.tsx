@@ -1,5 +1,5 @@
 import { useEffect, useState, FormEvent } from 'react';
-import axios from 'axios';
+import axios from '@/src/lib/axiosClient';
 import { toast } from 'react-toastify';
 import { BankAccount } from '../../../types';
 import { Button } from '../../../components/Button';

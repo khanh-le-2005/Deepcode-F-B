@@ -3,7 +3,12 @@ import { NotFoundError, BadRequestError } from '../utils/AppError.js';
 
 class WeeklyMenuService {
   async getWeeklyMenus() {
-    return WeeklyMenu.find().sort({ startDate: -1 });
+    return WeeklyMenu.find()
+      .populate({
+        path: 'menuItems',
+        populate: { path: 'categoryId', select: 'name slug image status' }
+      })
+      .sort({ startDate: -1 });
   }
 
   async getWeeklyMenuById(id) {

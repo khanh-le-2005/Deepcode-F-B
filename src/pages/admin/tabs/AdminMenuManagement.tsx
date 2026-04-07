@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Search, Filter, Edit2, Trash2, Eye, EyeOff, Image as ImageIcon, UtensilsCrossed, ChevronRight } from 'lucide-react';
-import axios from 'axios';
+import { Plus, Search, Filter, Edit2, Trash2, Eye, EyeOff, Image as ImageIcon, UtensilsCrossed, ChevronRight, CheckCircle2, Clock, X } from 'lucide-react';
+import axios from '@/src/lib/axiosClient';
 import { toast } from 'react-toastify';
 import { MenuItem } from '../../../types';
 import { Button } from '../../../components/Button';
@@ -11,6 +11,7 @@ import { getMenuItemCategoryName, getMenuItemImageUrl, getMenuItemId } from '../
 
 export const AdminMenuManagement = () => {
   const [menu, setMenu] = useState<MenuItem[]>([]);
+  const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -21,7 +22,8 @@ export const AdminMenuManagement = () => {
   }, []);
 
   const fetchMenu = () => {
-    axios.get('/api/menu')
+    // Weekly Menu v2: Admin fetches ALL items (including unpublished ones)
+    axios.get('/api/menu/admin/all')
       .then(res => {
         setMenu(res.data);
       })
@@ -78,6 +80,50 @@ export const AdminMenuManagement = () => {
     }
   };
 
+  const handleToggleSelection = (id: string) => {
+    setSelectedItemIds(prev =>
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const handlePublishWeekly = async () => {
+    if (selectedItemIds.length === 0) return;
+    try {
+      await axios.patch('/api/menu/publish-weekly', { itemIds: selectedItemIds });
+      toast.success(`Đã xuất bán ${selectedItemIds.length} món cho tuần tới!`);
+      setSelectedItemIds([]);
+      fetchMenu();
+    } catch (err) {
+      toast.error("Xuất bản thất bại");
+    }
+  };
+
+  const handleUnpublish = async (id: string) => {
+    if (!confirm("Bạn có chắc muốn gỡ món này khỏi thực đơn tuần?")) return;
+    try {
+      await axios.patch(`/api/menu/${id}/unpublish`);
+      toast.info("Đã gỡ món khỏi thực đơn tuần");
+      fetchMenu();
+    } catch (err) {
+      toast.error("Gỡ bỏ thất bại");
+    }
+  };
+
+  const handleRenew = async (id: string) => {
+    try {
+      await axios.patch('/api/menu/publish-weekly', { itemIds: [id] });
+      toast.success("Đã gia hạn thêm 7 ngày cho món này!");
+      fetchMenu();
+    } catch (err) {
+      toast.error("Gia hạn thất bại");
+    }
+  };
+
+  const isPublished = (item: MenuItem) => {
+    if (!item.availableUntil) return false;
+    return new Date(item.availableUntil) > new Date();
+  };
+
   const categories = ['Tất cả', ...new Set(menu.map(item => getMenuItemCategoryName(item)))];
   const filteredMenu = menu.filter(item => {
     const normalizedCategory = getMenuItemCategoryName(item);
@@ -94,17 +140,50 @@ export const AdminMenuManagement = () => {
           <h2 className="text-4xl font-black text-gray-900 tracking-tight font-serif">Thực Đơn</h2>
           <p className="text-gray-500 font-medium mt-1">Cập nhật danh mục món ăn và đồ uống của nhà hàng</p>
         </div>
-        <Button
-          variant="secondary"
-          size="lg"
-          onClick={() => {
-            setEditingItem(null);
-            setIsModalOpen(true);
-          }}
-          className="bg-brand text-white hover:bg-brand-dark px-8 h-14 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-brand/20 border-none transition-all hover:-translate-y-1"
-        >
-          <Plus className="w-5 h-5 mr-2" /> Thêm món mới
-        </Button>
+        <div className="flex flex-wrap items-center gap-4">
+          <Button
+            variant="secondary"
+            size="lg"
+            onClick={() => {
+              setEditingItem(null);
+              setIsModalOpen(true);
+            }}
+            className="bg-brand text-white hover:bg-brand-dark px-8 h-14 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-brand/20 border-none transition-all hover:-translate-y-1"
+          >
+            <Plus className="w-5 h-5 mr-2" /> Thêm món mới
+          </Button>
+        </div>
+      </div>
+
+      {/* Selection Control & Actions */}
+      <div className="flex flex-col lg:flex-row items-center justify-between gap-4 p-4 bg-slate-50 border border-gray-100 rounded-3xl">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => {
+              if (selectedItemIds.length === filteredMenu.length) {
+                setSelectedItemIds([]);
+              } else {
+                setSelectedItemIds(filteredMenu.map(m => getMenuItemId(m)));
+              }
+            }}
+            className="px-6 py-2 bg-white border border-gray-200 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-900 hover:border-brand hover:text-brand transition-all flex items-center gap-2"
+          >
+            <CheckCircle2 className={cn("w-4 h-4", selectedItemIds.length === filteredMenu.length ? "text-brand" : "text-gray-300")} />
+            {selectedItemIds.length === filteredMenu.length ? "Bỏ chọn tất cả" : "Chọn tất cả món đang lọc"}
+          </button>
+          <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+            Đã chọn: <span className="text-brand">{selectedItemIds.length}</span> món
+          </span>
+        </div>
+
+        {selectedItemIds.length > 0 && (
+          <button
+            onClick={handlePublishWeekly}
+            className="w-full lg:w-auto px-10 py-3 bg-emerald-600 text-white rounded-xl font-black text-[10px] uppercase tracking-[0.2em] shadow-lg shadow-emerald-500/20 hover:bg-emerald-700 transition-all flex items-center justify-center gap-3"
+          >
+            <Plus className="w-4 h-4" /> Xuất bán tuần cho các món đã chọn
+          </button>
+        )}
       </div>
 
       {/* Search & Filters */}
@@ -152,10 +231,24 @@ export const AdminMenuManagement = () => {
                 transition={{ delay: i * 0.05 }}
                 key={itemId}
                 className={cn(
-                  "premium-card overflow-hidden group/card relative",
-                  item.status === 'unavailable' && "opacity-80 grayscale-[0.3]"
+                  "premium-card overflow-hidden group/card relative transition-all duration-300",
+                  item.status === 'unavailable' && "opacity-80 grayscale-[0.3]",
+                  selectedItemIds.includes(itemId) && "ring-2 ring-brand ring-offset-4"
                 )}
               >
+                {/* Checkbox Overlay */}
+                <div 
+                  onClick={() => handleToggleSelection(itemId)}
+                  className={cn(
+                    "absolute top-4 right-4 z-20 w-8 h-8 rounded-xl border-2 flex items-center justify-center cursor-pointer transition-all",
+                    selectedItemIds.includes(itemId) 
+                      ? "bg-brand border-brand text-white" 
+                      : "bg-white/20 backdrop-blur-md border-white/40 text-transparent hover:border-white"
+                  )}
+                >
+                  <Plus className={cn("w-4 h-4 transition-transform", selectedItemIds.includes(itemId) ? "rotate-45" : "rotate-0")} />
+                </div>
+
                 {/* Image Section */}
                 <div className="relative h-56 overflow-hidden bg-gray-50">
                   <img
@@ -169,6 +262,29 @@ export const AdminMenuManagement = () => {
                     <span className="bg-white/90 backdrop-blur-md px-3 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest text-slate-900 shadow-sm border border-white/20">
                       {getMenuItemCategoryName(item, 'Món chính')}
                     </span>
+                    {isPublished(item) && (
+                      <div className="flex items-center gap-1 group/badge">
+                        <span className="ml-2 bg-emerald-500 text-white px-3 py-1 rounded-lg text-[8px] font-bold uppercase tracking-widest shadow-sm flex items-center gap-1">
+                          Đang bán tuần
+                        </span>
+                        <div className="flex opacity-0 group-hover/badge:opacity-100 transition-opacity gap-1">
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); handleRenew(itemId); }}
+                            className="bg-amber-500 text-white p-1 rounded-md hover:bg-amber-600 shadow-sm"
+                            title="Gia hạn 7 ngày"
+                          >
+                            <Clock className="w-3 h-3" />
+                          </button>
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); handleUnpublish(itemId); }}
+                            className="bg-rose-500 text-white p-1 rounded-md hover:bg-rose-600 shadow-sm"
+                            title="Gỡ khỏi tuần"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Quick Actions Overlay */}

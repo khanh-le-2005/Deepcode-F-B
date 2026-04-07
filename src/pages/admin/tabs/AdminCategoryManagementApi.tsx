@@ -16,7 +16,7 @@ import {
   Upload,
   WandSparkles,
 } from 'lucide-react';
-import axios from 'axios';
+import axios from '@/src/lib/axiosClient';
 import { toast } from 'react-toastify';
 import { Button } from '../../../components/Button';
 import { cn } from '../../../lib/cn';
@@ -212,15 +212,7 @@ export const AdminCategoryManagement = () => {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(245,158,11,0.26),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(255,255,255,0.08),transparent_28%)]" />
         <div className="relative z-10 flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-[10px] font-black uppercase tracking-[0.24em] text-amber-200">
-              <Sparkles className="h-3.5 w-3.5" />
-              Đồng bộ theo backend `/api/categories`
-            </div>
             <h2 className="mt-5 text-4xl font-black tracking-tight font-serif lg:text-6xl">Danh Mục</h2>
-            <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300 lg:text-base">
-              Trang này giờ đọc dữ liệu thật từ backend, có tạo/sửa/xóa, upload ảnh danh mục và đồng bộ đúng schema
-              hiện tại của hệ thống.
-            </p>
           </div>
 
           <div className="grid grid-cols-3 gap-3 lg:min-w-[360px]">
@@ -466,7 +458,7 @@ export const AdminCategoryManagement = () => {
 
               <label className="block">
                 <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.22em] text-gray-400">
-                  Ảnh danh mục
+                  Ảnh danh mục(nếu có)
                 </span>
                 <div className="overflow-hidden rounded-[1.75rem] border border-dashed border-gray-200 bg-white">
                   <input

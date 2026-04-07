@@ -68,6 +68,18 @@ export const deleteOrderItem = catchAsync(async (req, res) => {
   res.json(session);
 });
 
+export const updateOrderItemQuantity = catchAsync(async (req, res) => {
+  const { sessionId, itemId } = req.params;
+  const { delta } = req.body;
+  const session = await OrderService.updateOrderItemQuantity(
+    sessionId,
+    itemId,
+    delta,
+    req.io
+  );
+  res.json(session);
+});
+
 export const updateItemStatus = catchAsync(async (req, res) => {
   const { sessionId, itemId } = req.params;
   const { status } = req.body;
@@ -102,7 +114,8 @@ export const getKitchenOrders = catchAsync(async (req, res) => {
 });
 
 export const getHistory = catchAsync(async (req, res) => {
-  const { page, limit, start, end } = req.query;
-  const history = await OrderService.getOrderHistory(page, limit, start, end);
+  const { page, limit, start, end, type } = req.query;
+  const types = type ? type.split(',') : [];
+  const history = await OrderService.getOrderHistory(page, limit, start, end, types);
   res.json(history);
 });

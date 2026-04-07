@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Grid, Trash2, Edit2, QrCode, X, Printer, ChevronRight, Utensils } from 'lucide-react';
-import axios from 'axios';
+import axios from '@/src/lib/axiosClient';
 import { toast } from 'react-toastify';
 import { io } from 'socket.io-client';
 import { QRCodeSVG } from 'qrcode.react';

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { ShoppingCart, CreditCard, Grid, Clock, TrendingUp, Users, Utensils, ChevronRight } from 'lucide-react';
-import axios from 'axios';
+import axios from '@/src/lib/axiosClient';
 import { io } from 'socket.io-client';
 import {
   XAxis,

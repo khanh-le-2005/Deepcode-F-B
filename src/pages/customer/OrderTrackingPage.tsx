@@ -1,15 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { io } from 'socket.io-client';
-import axios from 'axios';
+import axios from '@/src/lib/axiosClient';
 import { motion } from 'framer-motion';
-import { CheckCircle2, Clock, ChefHat } from 'lucide-react';
+import { CheckCircle2, Clock, ChefHat, Download } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { cn } from '../../lib/cn';
 import { Order } from '../../types';
 import { CustomerHeader } from '../../components/CustomerHeader';
 import { InvalidTable } from '../../components/InvalidTable';
 import { useTableValidation } from '../../hooks/useTableValidation';
+import axiosLib from 'axios';
 
 const socket = io();
 
@@ -27,7 +28,14 @@ export const OrderTrackingPage = () => {
     orderId: string;
     gatewayWarning?: string;
   } | null>(null);
-  const [paymentError, setPaymentError] = useState('');
+   const [paymentError, setPaymentError] = useState('');
+  const paymentRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (paymentQr && paymentRef.current) {
+      paymentRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [paymentQr]);
 
   useEffect(() => {
     if (status !== 'valid') return;
@@ -45,7 +53,7 @@ export const OrderTrackingPage = () => {
           setOrder(res.data);
         }
       } catch (err) {
-        if (axios.isAxiosError(err) && err.response?.status === 404) {
+        if (axiosLib.isAxiosError(err) && err.response?.status === 404) {
           setOrder(null);
         } else {
           console.error("Failed to fetch order:", err);
@@ -148,7 +156,7 @@ export const OrderTrackingPage = () => {
         gatewayWarning: response.data?.gatewayWarning,
       });
     } catch (error) {
-      const message = axios.isAxiosError(error)
+      const message = axiosLib.isAxiosError(error)
         ? error.response?.data?.message || error.response?.data?.error || error.message
         : 'Không thể tạo mã thanh toán lúc này. Vui lòng thử lại sau.';
       console.error('Failed to generate payment QR:', message, error);
@@ -156,6 +164,22 @@ export const OrderTrackingPage = () => {
     } finally {
       setIsGeneratingQr(false);
     }
+  };
+
+  const handleDownloadQR = () => {
+    if (!paymentQr?.qrBase64) return;
+    const link = document.createElement('a');
+    const imgSrc = paymentQr.qrBase64.startsWith('data:')
+      ? paymentQr.qrBase64
+      : paymentQr.qrBase64.startsWith('http')
+        ? paymentQr.qrBase64
+        : `data:image/png;base64,${paymentQr.qrBase64}`;
+    
+    link.href = imgSrc;
+    link.download = `qr-order-${order?.id || order?._id}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   return (
@@ -199,8 +223,8 @@ export const OrderTrackingPage = () => {
                     initial={{ scale: 0.8 }}
                     animate={{ scale: isCurrent ? 1.15 : 1, backgroundColor: active ? 'white' : '#f3f4f6' }}
                     className={cn(
-                      "w-14 h-14 sm:w-20 sm:h-20 rounded-full flex items-center justify-center border-[6px] border-white shadow-xl transition-colors duration-500",
-                      active ? step.bg + " text-white" : "text-gray-300"
+                      "w-14 h-14 sm:w-20 sm:h-20 rounded-full flex items-center justify-center border-[6px] border-white shadow-xl transition-colors duration-500 text-red-600",
+                      active ? step.bg : "text-gray-300"
                     )}
                   >
                     <StepIcon className="w-6 h-6 sm:w-8 sm:h-8" />
@@ -270,10 +294,11 @@ export const OrderTrackingPage = () => {
               <button
                 onClick={handleRequestPayment}
                 disabled={isGeneratingQr}
-                className="mt-6 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-60 disabled:cursor-not-allowed text-white px-8 py-4 rounded-xl font-black uppercase tracking-widest transition-transform shadow-xl"
+                className="mt-6 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-60 disabled:cursor-not-allowed text-white px-8 py-4 rounded-xl font-black uppercase tracking-widest transition-transform shadow-xl w-full sm:w-auto"
               >
-                {isGeneratingQr ? 'Đang tạo mã...' : 'Yêu Cầu Thanh Toán'}
+                {isGeneratingQr ? 'Đang tạo mã...' : 'Thanh Toán Chuyển Trước'}
               </button>
+              <p className="mt-3 text-sm text-gray-500 font-bold italic">Có thể trả sau khi ra quầy</p>
               {paymentError && (
                 <p className="mt-4 text-sm font-bold text-rose-500">{paymentError}</p>
               )}
@@ -283,31 +308,43 @@ export const OrderTrackingPage = () => {
 
           {paymentQr && (
             <motion.div
+              ref={paymentRef}
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               className="mt-10 bg-slate-950 text-white rounded-4xl p-6 sm:p-8 shadow-2xl"
             >
               <div className="flex flex-col sm:flex-row items-center gap-6">
-                <div className="w-44 h-44 rounded-3xl bg-white p-3 flex items-center justify-center shrink-0 overflow-hidden">
-                  {paymentQr.qrBase64 ? (
-                    <img
-                      src={
-                        paymentQr.qrBase64.startsWith('data:')
-                          ? paymentQr.qrBase64
-                          : paymentQr.qrBase64.startsWith('http')
+                {/* QR side */}
+                <div className="flex flex-col items-center">
+                  <div className="w-44 h-44 rounded-3xl bg-white p-3 flex items-center justify-center shrink-0 overflow-hidden">
+                    {paymentQr.qrBase64 ? (
+                      <img
+                        src={
+                          paymentQr.qrBase64.startsWith('data:')
                             ? paymentQr.qrBase64
-                            : `data:image/png;base64,${paymentQr.qrBase64}`
-                      }
-                      alt="Mã QR thanh toán"
-                      className="w-full h-full object-contain"
-                    />
-                  ) : (
-                    <div className="text-slate-500 text-sm font-black uppercase tracking-widest text-center">
-                      Không có QR
-                    </div>
-                  )}
+                            : paymentQr.qrBase64.startsWith('http')
+                              ? paymentQr.qrBase64
+                              : `data:image/png;base64,${paymentQr.qrBase64}`
+                        }
+                        alt="Mã QR thanh toán"
+                        className="w-full h-full object-contain"
+                      />
+                    ) : (
+                      <div className="text-slate-500 text-sm font-black uppercase tracking-widest text-center">
+                        Không có QR
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={handleDownloadQR}
+                    className="mt-4 w-full flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
+                  >
+                    <Download className="w-3 h-3" />
+                    Lưu mã QR
+                  </button>
                 </div>
 
+                {/* Text side */}
                 <div className="flex-1 text-left">
                   <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-400">Thanh toán QR</p>
                   <h3 className="text-2xl sm:text-3xl font-black italic mt-2" style={{ fontFamily: "'Playfair Display', serif" }}>

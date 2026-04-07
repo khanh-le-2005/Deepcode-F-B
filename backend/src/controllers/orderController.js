@@ -102,7 +102,13 @@ export const getKitchenOrders = catchAsync(async (req, res) => {
 });
 
 export const getHistory = catchAsync(async (req, res) => {
-  const { page, limit, start, end } = req.query;
-  const history = await OrderService.getOrderHistory(page, limit, start, end);
+  const { page, limit, start, end, type } = req.query;
+  const types = type ? type.split(',') : [];
+  const history = await OrderService.getOrderHistory(page, limit, start, end, types);
   res.json(history);
+});
+
+export const completeOrder = catchAsync(async (req, res) => {
+  const session = await OrderService.completeOrder(req.params.id, req.io);
+  res.json({ message: "Bàn đã được đóng và giải phóng thành công", session });
 });

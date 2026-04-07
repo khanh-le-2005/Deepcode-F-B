@@ -19,9 +19,8 @@ class PaymentService {
     }
 
     // Trích xuất Tên Bàn cụ thể
-    const orderObj = await Order.findById(orderId).populate("tableId");
-    const tableNameStr =
-      orderObj?.tableName || orderObj?.tableId?.name || "Mang đi / Đã xóa bàn";
+    const orderObj = await Order.findById(orderId);
+    const tableNameStr = orderObj?.tableName || "Mang đi / Takeaway";
 
     // Trích xuất chi tiết Ngân hàng thụ hưởng
     let bankNameSnapshotStr = method || "Tiền mặt";
@@ -39,13 +38,18 @@ class PaymentService {
       method,
       bankAccountId: bankAccountId || null,
       tableName: tableNameStr,
+      orderTypeSnapshot: orderObj?.orderType || "dine_in",
       bankNameSnapshot: bankNameSnapshotStr,
       cashierName: user ? user.name : "Thu ngân ấn nút",
     });
     payment = await payment.save();
 
     // Cập nhật ngày chốt đơn và ai là người thu tiền
-    const updateData = { status: "paid", completedAt: new Date() };
+    const updateData = { 
+      paymentStatus: "paid", 
+      status: "completed", 
+      completedAt: new Date() 
+    };
     if (user) {
       updateData.completedBy = user.id;
       updateData.completedByName = user.name;
@@ -99,7 +103,7 @@ class PaymentService {
   async getPayments() {
     return Payment.find()
       .populate("bankAccountId", "bankName accountNo accountName")
-      .populate("orderId", "tableId total")
+      .populate("orderId", "tableId total orderType")
       .sort({ createdAt: -1 });
   }
 
@@ -126,9 +130,7 @@ class PaymentService {
     await Table.findByIdAndUpdate(order.tableId, { status: "empty" });
 
     // 5. Lấy thông tin bàn để ghi lịch sử
-    const orderData = await Order.findById(orderId).populate("tableId");
-    const tableNameStr =
-      orderData?.tableName || orderData?.tableId?.name || "Bàn không xác định";
+    const tableNameStr = order.tableName || "Mang đi / Takeaway";
 
     // 5. Lấy thông tin ngân hàng mặc định
     const defaultBank = await BankAccount.findOne({ isDefault: true });
@@ -144,6 +146,7 @@ class PaymentService {
       method: "Chuyển khoản (Bot Python Auto quét)",
       bankAccountId: defaultBank ? defaultBank._id : null,
       tableName: tableNameStr,
+      orderTypeSnapshot: order.orderType || "dine_in",
       bankNameSnapshot: bankNameSnapshotStr,
       cashierName: "Hệ thống điện tử tự động",
       status: "success",

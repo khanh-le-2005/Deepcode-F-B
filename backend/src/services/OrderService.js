@@ -125,6 +125,7 @@ class OrderService {
         items: newItems,
         total: newItemsTotal,
         status: "active",
+        orderType: data.orderType || "dine_in",
       });
       session = await newOrder.save();
       await Table.findByIdAndUpdate(
@@ -147,12 +148,14 @@ class OrderService {
     }
 
     let tableIdStr;
+    let fallbackTableName;
 
     if (data.tableId) {
       // 1. Khách ngồi tại bàn thực tế nhưng gọi qua Thu Ngân/Staff, truyền kèm tableId
       const table = await this._findTable(data.tableId);
       if (!table) throw new NotFoundError("Table not found");
       tableIdStr = String(table._id);
+      fallbackTableName = table.name;
       await Table.findByIdAndUpdate(
         table._id,
         { status: "occupied" },
@@ -167,6 +170,7 @@ class OrderService {
       const table = new Table({ name: tableName, status: "occupied", slug });
       await table.save();
       tableIdStr = String(table._id);
+      fallbackTableName = tableName;
     }
 
     const activeMenu = await WeeklyMenuService.getActiveWeeklyMenu();
@@ -225,10 +229,12 @@ class OrderService {
       const sessionToken = crypto.randomBytes(16).toString("hex");
       let newOrder = new Order({
         tableId: tableIdStr,
+        tableName: fallbackTableName,
         sessionToken,
         items: newItems,
         total: newItemsTotal,
         status: "active",
+        orderType: data.orderType || (data.tableId ? "dine_in" : "takeaway"),
       });
       session = await newOrder.save();
     }
@@ -379,7 +385,7 @@ class OrderService {
     return order;
   }
 
-  async getOrderHistory(page = 1, limit = 20, startDate, endDate) {
+  async getOrderHistory(page = 1, limit = 20, startDate, endDate, types) {
     const query = {
       // SỬA "paid" THÀNH "completed"
       status: { $in: ["completed", "cancelled"] },
@@ -391,6 +397,10 @@ class OrderService {
         $gte: new Date(startDate),
         $lte: new Date(endDate),
       };
+    }
+
+    if (types && types.length > 0) {
+      query.orderType = { $in: types };
     }
 
     const total = await Order.countDocuments(query);

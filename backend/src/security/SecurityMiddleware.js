@@ -1,4 +1,5 @@
 import JwtUtil from './JwtUtil.js';
+import { User } from '../models/User.js';
 
 // Danh sách các URL không cần token (Whitelist giống Spring Security permitAll)
 const PUBLIC_PATHS = [
@@ -32,15 +33,23 @@ const PUBLIC_PATHS = [
 ];
 
 // Middleware xác thực JWT
-export const jwtAuthenticationFilter = (req, res, next) => {
-  // 1. Luôn thử parse token nếu có Header Authorization (dù public hay private)
-  //    → Staff gọi public route vẫn có req.user đầy đủ để authorize() hoạt động
-  const authHeader = req.headers.authorization;
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    const token = authHeader.split(' ')[1];
-    const decoded = JwtUtil.verifyToken(token);
-    if (decoded) req.user = decoded; // Set nếu hợp lệ, bỏ qua nếu token sai
-  }
+export const jwtAuthenticationFilter = async (req, res, next) => {
+  try {
+    // 1. Luôn thử parse token nếu có Header Authorization (dù public hay private)
+    //    → Staff gọi public route vẫn có req.user đầy đủ để authorize() hoạt động
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.split(' ')[1];
+      const decoded = JwtUtil.verifyAccessToken(token);
+      
+      if (decoded && decoded.id) {
+        // Query database trực tiếp bằng id để lấy thông tin mới nhất
+        const user = await User.findById(decoded.id).select('-password');
+        if (user) {
+          req.user = user; 
+        }
+      }
+    }
 
   // 2. Kiểm tra nếu là đường dẫn Public → cho qua dù có token hay không
   const isPublic = PUBLIC_PATHS.some(path => req.originalUrl.startsWith(path));
@@ -50,10 +59,13 @@ export const jwtAuthenticationFilter = (req, res, next) => {
 
   // 3. Route Private → BẮT BUỘC phải có token hợp lệ
   if (!req.user) {
-    return res.status(401).json({ error: 'Unauthorized: No token provided' });
+    return res.status(401).json({ error: 'Unauthorized: Trạng thái phiên đăng nhập không hợp lệ hoặc đã bị khóa.' });
   }
 
   next();
+  } catch (err) {
+    next(err);
+  }
 };
 
 // Middleware phân quyền theo Role

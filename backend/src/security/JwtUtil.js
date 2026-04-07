@@ -1,15 +1,37 @@
-import jwt from 'jsonwebtoken';
+import jwt from "jsonwebtoken";
+import { env } from "../config/env.js";
 
-const JWT_SECRET = process.env.JWT_SECRET || 'qr-dine-super-secret-key-2024';
+const ACCESS_TOKEN_SECRET = env.JWT_ACCESS_SECRET;
+const REFRESH_TOKEN_SECRET = env.JWT_REFRESH_SECRET;
+
+// Báo lỗi ngay nếu quên file .env
+if (!ACCESS_TOKEN_SECRET || !REFRESH_TOKEN_SECRET) {
+  console.error(
+    "❌ FATAL ERROR: JWT Secret chưa được cấu hình trong file .env!",
+  );
+  process.exit(1);
+}
 
 class JwtUtil {
-  generateToken(payload, expiresIn = '24h') {
-    return jwt.sign(payload, JWT_SECRET, { expiresIn });
+  generateAccessToken(payload) {
+    return jwt.sign(payload, ACCESS_TOKEN_SECRET, { expiresIn: "15m" });
   }
 
-  verifyToken(token) {
+  generateRefreshToken(payload) {
+    return jwt.sign(payload, REFRESH_TOKEN_SECRET, { expiresIn: "1d" });
+  }
+
+  verifyAccessToken(token) {
     try {
-      return jwt.verify(token, JWT_SECRET);
+      return jwt.verify(token, ACCESS_TOKEN_SECRET);
+    } catch (error) {
+      return null;
+    }
+  }
+
+  verifyRefreshToken(token) {
+    try {
+      return jwt.verify(token, REFRESH_TOKEN_SECRET);
     } catch (error) {
       return null;
     }

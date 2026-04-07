@@ -17,6 +17,7 @@ const paymentSchema = new mongoose.Schema(
 
     // LƯU VẾT LỊCH SỬ CỐ ĐỊNH (Tránh việc xóa Bàn/Xóa Ngân hàng bị mất data)
     tableName: { type: String, default: "Chưa xác định" }, // Tên bàn hoặc người mang đi
+    orderTypeSnapshot: { type: String, default: "dine_in" }, // dine_in, takeaway, delivery
     bankNameSnapshot: { type: String, default: "Tiền mặt" }, // Tên ngân hàng & STK
     cashierName: { type: String, default: "Hệ thống tự động" }, // Thu ngân nào thao tác
 

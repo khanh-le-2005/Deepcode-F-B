@@ -1,7 +1,7 @@
 // src/services/user.service.js
 import { User } from "../models/User.js";
 import { BadRequestError } from "../utils/AppError.js";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 
 class UserService {
   // 1. THÊM MỚI (Đã làm ở trên)

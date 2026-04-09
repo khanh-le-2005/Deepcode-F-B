@@ -6,6 +6,7 @@ import { toast } from 'react-toastify';
 import { MenuItem } from '../../../types';
 import { Button } from '../../../components/Button';
 import { AdminMenuModal } from '../modals/AdminMenuModal';
+import { ConfirmModal } from '../../../components/modals/ConfirmModal';
 import { cn } from '../../../lib/cn';
 import { getMenuItemCategoryName, getMenuItemImageUrl, getMenuItemId } from '../../../lib/menuHelpers';
 
@@ -16,6 +17,19 @@ export const AdminMenuManagement = () => {
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Tất cả');
+  const [confirmConfig, setConfirmConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    variant: 'danger' | 'warning' | 'info';
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+    variant: 'warning'
+  });
 
   useEffect(() => {
     fetchMenu();
@@ -66,17 +80,23 @@ export const AdminMenuManagement = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (window.confirm('Bạn có chắc chắn muốn xoá món này?')) {
-      try {
-        await axios.delete(`/api/menu/${id}`);
-        fetchMenu();
-        toast.success('Đã xoá món ăn!');
-    } catch (err: any) {
-      console.error("Failed to delete menu item:", err);
-      const apiMessage = err?.response?.data?.error?.message || err?.response?.data?.message;
-      toast.error(apiMessage || 'Lỗi khi xoá món ăn!');
-    }
-    }
+    setConfirmConfig({
+      isOpen: true,
+      title: 'Xóa món ăn?',
+      message: 'Bạn có chắc chắn muốn xóa món ăn này khỏi thực đơn?',
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          await axios.delete(`/api/menu/${id}`);
+          fetchMenu();
+          toast.success('Đã xoá món ăn thành công!');
+        } catch (err: any) {
+          console.error("Failed to delete menu item:", err);
+          const apiMessage = err?.response?.data?.error?.message || err?.response?.data?.message;
+          toast.error(apiMessage || 'Lỗi khi xoá món ăn!');
+        }
+      }
+    });
   };
 
   const toggleStatus = async (item: MenuItem) => {
@@ -376,6 +396,15 @@ export const AdminMenuManagement = () => {
         onClose={() => setIsModalOpen(false)}
         onSave={handleSave}
         item={editingItem}
+      />
+
+      <ConfirmModal
+        isOpen={confirmConfig.isOpen}
+        onClose={() => setConfirmConfig({ ...confirmConfig, isOpen: false })}
+        onConfirm={confirmConfig.onConfirm}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        variant={confirmConfig.variant}
       />
     </div>
   );

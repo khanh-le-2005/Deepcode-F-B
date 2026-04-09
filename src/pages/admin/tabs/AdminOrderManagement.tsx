@@ -6,6 +6,7 @@ import { toast } from 'react-toastify';
 import { io } from 'socket.io-client';
 import { Order } from '../../../types';
 import { Button } from '../../../components/Button';
+import { ConfirmModal } from '../../../components/modals/ConfirmModal';
 import { cn } from '../../../lib/cn';
 
 const socket = io();
@@ -15,6 +16,19 @@ export const AdminOrderManagement = () => {
   const [tableNameMap, setTableNameMap] = useState<Record<string, string>>({});
   const [filter, setFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [confirmConfig, setConfirmConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    variant: 'danger' | 'warning' | 'info';
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+    variant: 'warning'
+  });
 
   useEffect(() => {
     fetchOrders();
@@ -52,7 +66,26 @@ export const AdminOrderManagement = () => {
   };
 
   const updateStatus = async (id: string, status: string) => {
-    if (status === 'cancelled' && !window.confirm('Bạn có chắc chắn muốn huỷ đơn hàng này?')) return;
+    if (status === 'cancelled') {
+      setConfirmConfig({
+        isOpen: true,
+        title: 'Hủy đơn hàng?',
+        message: 'Bạn có chắc chắn muốn hủy đơn hàng này? Thao tác này không thể hoàn tác.',
+        variant: 'danger',
+        onConfirm: async () => {
+          try {
+            await axios.put(`/api/orders/${id}`, { status });
+            fetchOrders();
+            toast.success(`Đã hủy đơn hàng!`);
+          } catch (err) {
+            console.error('Failed to cancel order:', err);
+            toast.error('Lỗi khi hủy đơn hàng!');
+          }
+        }
+      });
+      return;
+    }
+
     try {
       await axios.put(`/api/orders/${id}`, { status });
       fetchOrders();
@@ -82,16 +115,24 @@ export const AdminOrderManagement = () => {
   const handlePayment = async (order: Order) => {
     const orderId = (order as any)._id || order.id;
     const orderTotal = Number(order.total || 0);
-    if (!window.confirm(`Xác nhận hoàn tất đơn hàng ${orderTotal.toLocaleString()}đ và giải phóng bàn?`)) return;
-    try {
-      // API v3.0: Use dedicated complete endpoint which handles status + table reset
-      await axios.post(`/api/orders/${orderId}/complete`);
-      fetchOrders();
-      toast.success('Đơn hàng đã hoàn tất, bàn đã sẵn sàng!');
-    } catch (err) {
-      console.error('Completion failed:', err);
-      toast.error('Lỗi khi chốt đơn hàng!');
-    }
+    
+    setConfirmConfig({
+      isOpen: true,
+      title: 'Xác nhận hoàn tất',
+      message: `Xác nhận hoàn tất đơn hàng ${orderTotal.toLocaleString()}đ và giải phóng bàn?`,
+      variant: 'info',
+      onConfirm: async () => {
+        try {
+          // API v3.0: Use dedicated complete endpoint which handles status + table reset
+          await axios.post(`/api/orders/${orderId}/complete`);
+          fetchOrders();
+          toast.success('Đơn hàng đã hoàn tất, bàn đã sẵn sàng!');
+        } catch (err) {
+          console.error('Completion failed:', err);
+          toast.error('Lỗi khi chốt đơn hàng!');
+        }
+      }
+    });
   };
 
   const filteredOrders = orders.filter(o => {
@@ -287,6 +328,15 @@ export const AdminOrderManagement = () => {
           <p className="text-gray-400 font-medium">Hãy thử thay đổi bộ lọc hoặc từ khóa tìm kiếm</p>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={confirmConfig.isOpen}
+        onClose={() => setConfirmConfig({ ...confirmConfig, isOpen: false })}
+        onConfirm={confirmConfig.onConfirm}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        variant={confirmConfig.variant}
+      />
     </div>
   );
 };

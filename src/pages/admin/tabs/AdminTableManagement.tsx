@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Grid, Trash2, Edit2, QrCode, X, Printer, ChevronRight, Utensils } from 'lucide-react';
+import { Plus, Grid, Trash2, Edit2, QrCode, X, Printer, ChevronRight, Utensils, DollarSign } from 'lucide-react';
 import axios from '@/src/lib/axiosClient';
 import { toast } from 'react-toastify';
 import { io } from 'socket.io-client';
@@ -10,6 +10,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { Table } from '../../../types';
 import { Button } from '../../../components/Button';
 import { AdminTableModal } from '../modals/AdminTableModal';
+import { ConfirmModal } from '../../../components/modals/ConfirmModal';
 import { cn } from '../../../lib/cn';
 
 const socket = io();
@@ -23,6 +24,19 @@ export const AdminTableManagement = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTable, setEditingTable] = useState<Table | null>(null);
   const [selectedQR, setSelectedQR] = useState<Table | null>(null);
+  const [confirmConfig, setConfirmConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    variant: 'danger' | 'warning' | 'info';
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+    variant: 'warning'
+  });
 
   useEffect(() => {
     fetchTables();
@@ -55,15 +69,58 @@ export const AdminTableManagement = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (window.confirm('Bạn có chắc chắn muốn xoá bàn này?')) {
-      try {
-        await axios.delete(`/api/tables/${id}`);
-        fetchTables();
-        toast.success('Đã xoá bàn!');
-      } catch (err) {
-        console.error("Failed to delete table:", err);
-        toast.error('Lỗi khi xoá bàn!');
+    setConfirmConfig({
+      isOpen: true,
+      title: 'Xóa bàn này?',
+      message: 'Hành động này không thể hoàn tác. Bạn có chắc chắn muốn xóa bàn này?',
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          await axios.delete(`/api/tables/${id}`);
+          fetchTables();
+          toast.success('Đã xoá bàn!');
+        } catch (err) {
+          console.error("Failed to delete table:", err);
+          toast.error('Lỗi khi xoá bàn!');
+        }
       }
+    });
+  };
+
+  const handleCloseOrder = async (table: Table) => {
+    try {
+      const tableId = table.id || (table as any)._id;
+      const ordersRes = await axios.get(`/api/orders/table/${tableId}/active`);
+      const activeOrder = ordersRes.data;
+
+      if (!activeOrder) {
+        toast.warning('Bàn này không có đơn hàng đang hoạt động');
+        return;
+      }
+
+      setConfirmConfig({
+        isOpen: true,
+        title: 'Xác nhận thanh toán',
+        message: `Xác nhận thu tiền ${activeOrder.totalAmount.toLocaleString()}đ và đóng bàn?`,
+        variant: 'info',
+        onConfirm: async () => {
+          try {
+            await axios.post(`/api/orders/${activeOrder._id || activeOrder.id}/pay`, {
+              paymentMethod: 'cash',
+              status: 'completed'
+            });
+
+            toast.success('Đã thanh toán và đóng bàn!');
+            fetchTables();
+          } catch (err) {
+            console.error("Error closing table:", err);
+            toast.error('Lỗi khi đóng bàn');
+          }
+        }
+      });
+    } catch (err) {
+      console.error("Error checking active order:", err);
+      toast.error('Lỗi khi kiểm tra đơn hàng');
     }
   };
 
@@ -201,6 +258,16 @@ export const AdminTableManagement = () => {
         onClose={() => setIsModalOpen(false)}
         onSave={handleSave}
         table={editingTable}
+        tables={tables}
+      />
+
+      <ConfirmModal
+        isOpen={confirmConfig.isOpen}
+        onClose={() => setConfirmConfig({ ...confirmConfig, isOpen: false })}
+        onConfirm={confirmConfig.onConfirm}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        variant={confirmConfig.variant}
       />
 
       {/* QR Modal */}

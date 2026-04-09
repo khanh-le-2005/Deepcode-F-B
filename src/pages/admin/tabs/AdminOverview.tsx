@@ -12,11 +12,11 @@ import {
   AreaChart,
   Area
 } from 'recharts';
+import { useSocket } from '../../../contexts/SocketContext';
 import { cn } from '../../../lib/cn';
 
-const socket = io();
-
 export const AdminOverview = () => {
+  const { socket } = useSocket();
   const [stats, setStats] = useState({ revenue: 0, totalOrders: 0, activeTablesCount: 0, pendingOrders: 0 });
   const [dailyRevenue, setDailyRevenue] = useState<any[]>([]);
   const [topItems, setTopItems] = useState<any[]>([]);
@@ -33,30 +33,33 @@ export const AdminOverview = () => {
     };
   }, []);
 
-  const fetchStats = () => {
-    axios.get('/api/stats')
-      .then(res => {
-        const data = res.data || {};
+  const fetchStats = async () => {
+    try {
+      const response = await axios.get('/api/stats');
+      if (response.data) {
+        const d = response.data;
         setStats({
-          revenue: data.revenue || 0,
-          totalOrders: data.totalOrders ?? data.orderCount ?? 0,
-          activeTablesCount: data.activeTablesCount ?? data.activeTables ?? 0,
-          pendingOrders: data.pendingOrders || 0
+          revenue: d.revenue || 0,
+          totalOrders: d.orderCount || 0,
+          activeTablesCount: d.activeTables || 0,
+          pendingOrders: d.pendingOrders || 0
         });
-        setDailyRevenue(data.dailyRevenue || []);
-        setTopItems(data.topItems || []);
-      })
-      .catch(err => console.error("Failed to fetch stats:", err));
+        setDailyRevenue(d.dailyRevenue || []);
+        setTopItems(d.topItems || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch statistics:", err);
+    }
   };
 
   const normalizedDailyRevenue = dailyRevenue.map((item) => ({
-    name: item.name || item.date || '',
-    value: item.value ?? item.revenue ?? 0,
+    name: item.label || item.name || item.date || '',
+    value: item.revenue ?? item.value ?? 0,
   }));
 
   const normalizedTopItems = topItems.map((item, i) => ({
     name: item.name,
-    sales: item.sales ?? item.count ?? 0,
+    sales: item.totalQuantitySold ?? item.sales ?? item.count ?? 0,
     trend: item.trend || `+${Math.floor(Math.random() * 20) + 5}%`,
   }));
 

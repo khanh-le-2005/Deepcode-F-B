@@ -25,9 +25,19 @@ export const AdminMenuManagement = () => {
     // Weekly Menu v2: Admin fetches ALL items (including unpublished ones)
     axios.get('/api/menu/admin/all')
       .then(res => {
-        setMenu(res.data);
+        if (Array.isArray(res.data)) {
+          setMenu(res.data);
+        } else if (res.data?.success && Array.isArray(res.data.data)) {
+          setMenu(res.data.data);
+        } else {
+          console.error("API did not return an array:", res.data);
+          setMenu([]);
+        }
       })
-      .catch(err => console.error("Failed to fetch menu:", err));
+      .catch(err => {
+        console.error("Failed to fetch menu:", err);
+        setMenu([]);
+      });
   };
 
   const handleSave = async (data: any, files: File[] | null) => {
@@ -48,9 +58,10 @@ export const AdminMenuManagement = () => {
       fetchMenu();
       setIsModalOpen(false);
       toast.success(editingItem ? 'Cập nhật món ăn thành công!' : 'Thêm món ăn mới thành công!');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Lỗi khi lưu:', err);
-      toast.error('Không thể lưu thay đổi!');
+      const apiMessage = err?.response?.data?.error?.message || err?.response?.data?.message;
+      toast.error(apiMessage || 'Không thể lưu món ăn!');
     }
   };
 
@@ -60,10 +71,11 @@ export const AdminMenuManagement = () => {
         await axios.delete(`/api/menu/${id}`);
         fetchMenu();
         toast.success('Đã xoá món ăn!');
-      } catch (err) {
-        console.error("Failed to delete menu item:", err);
-        toast.error('Lỗi khi xoá món ăn!');
-      }
+    } catch (err: any) {
+      console.error("Failed to delete menu item:", err);
+      const apiMessage = err?.response?.data?.error?.message || err?.response?.data?.message;
+      toast.error(apiMessage || 'Lỗi khi xoá món ăn!');
+    }
     }
   };
 
@@ -74,9 +86,10 @@ export const AdminMenuManagement = () => {
       await axios.put(`/api/menu/${itemId}`, { status: newStatus });
       fetchMenu();
       toast.info(`Đã chuyển trạng thái sang: ${newStatus === 'available' ? 'Còn món' : 'Hết món'}`);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to toggle status:', err);
-      toast.error('Lỗi khi đổi trạng thái!');
+      const apiMessage = err?.response?.data?.error?.message || err?.response?.data?.message;
+      toast.error(apiMessage || 'Lỗi khi đổi trạng thái!');
     }
   };
 
@@ -124,10 +137,11 @@ export const AdminMenuManagement = () => {
     return new Date(item.availableUntil) > new Date();
   };
 
-  const categories = ['Tất cả', ...new Set(menu.map(item => getMenuItemCategoryName(item)))];
-  const filteredMenu = menu.filter(item => {
+  const menuArray = Array.isArray(menu) ? menu : [];
+  const categories = ['Tất cả', ...new Set(menuArray.map(item => getMenuItemCategoryName(item)))];
+  const filteredMenu = menuArray.filter(item => {
     const normalizedCategory = getMenuItemCategoryName(item);
-    const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = (item.name || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = selectedCategory === 'Tất cả' || normalizedCategory === selectedCategory;
     return matchesSearch && matchesCategory;
   });

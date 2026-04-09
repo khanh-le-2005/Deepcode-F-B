@@ -13,12 +13,15 @@ import { AdminReports } from './tabs/AdminReports';
 import { AdminSettings } from './tabs/AdminSettings';
 import { AdminBankAccounts } from './tabs/AdminBankAccounts';
 import { AdminUserManagement } from './tabs/AdminUserManagement';
+import { AdminPaymentRequests } from './tabs/AdminPaymentRequests';
+import { AdminNotifications } from './tabs/AdminNotifications';
 
 export const AdminDashboard = () => {
   return (
     <AdminLayout>
       <Routes>
         <Route index element={<AdminOverview />} />
+        <Route path="notifications" element={<AdminNotifications />} />
         <Route path="tables" element={<AdminTableManagement />} />
         <Route path="categories" element={<AdminCategoryManagement />} />
         <Route path="menu" element={<AdminMenuManagement />} />
@@ -31,6 +34,7 @@ export const AdminDashboard = () => {
         <Route path="reports" element={<AdminReports />} />
         <Route path="settings" element={<AdminSettings />} />
         <Route path="users" element={<AdminUserManagement />} />
+        <Route path="payment-requests" element={<AdminPaymentRequests />} />
         <Route path="*" element={<Navigate to="/admin" replace />} />
       </Routes>
     </AdminLayout>

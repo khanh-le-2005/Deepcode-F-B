@@ -1,6 +1,7 @@
 import { Order } from "../models/Order.js";
 import { Table } from "../models/Table.js";
 import { Payment } from "../models/Payment.js";
+import { Notification } from "../models/Notification.js";
 import mongoose from "mongoose";
 import crypto from "crypto";
 import { NotFoundError, BadRequestError } from "../utils/AppError.js";
@@ -125,7 +126,6 @@ class OrderService {
         items: newItems,
         total: newItemsTotal,
         status: "active",
-        orderType: data.orderType || "dine_in",
       });
       session = await newOrder.save();
       await Table.findByIdAndUpdate(
@@ -136,7 +136,17 @@ class OrderService {
     }
 
     if (io) {
-      io.emit("new-order", session);
+      // Lưu thông báo vào DB
+      const notif = await Notification.create({
+        type: "new_order",
+        title: "🛒 Đơn hàng mới!",
+        message: `Bàn ${session.tableName || "?"} vừa gọi thêm món`,
+        referenceId: session._id,
+      });
+
+      // Chỉ bắn vào room admin_hub (staff/admin đã login)
+      io.to("admin_hub").emit("new_notification", notif);
+      io.to("admin_hub").emit("new-order", session);
       io.emit("tables-updated", await Table.find());
     }
     return session;
@@ -148,14 +158,12 @@ class OrderService {
     }
 
     let tableIdStr;
-    let fallbackTableName;
 
     if (data.tableId) {
       // 1. Khách ngồi tại bàn thực tế nhưng gọi qua Thu Ngân/Staff, truyền kèm tableId
       const table = await this._findTable(data.tableId);
       if (!table) throw new NotFoundError("Table not found");
       tableIdStr = String(table._id);
-      fallbackTableName = table.name;
       await Table.findByIdAndUpdate(
         table._id,
         { status: "occupied" },
@@ -170,7 +178,6 @@ class OrderService {
       const table = new Table({ name: tableName, status: "occupied", slug });
       await table.save();
       tableIdStr = String(table._id);
-      fallbackTableName = tableName;
     }
 
     const activeMenu = await WeeklyMenuService.getActiveWeeklyMenu();
@@ -229,18 +236,25 @@ class OrderService {
       const sessionToken = crypto.randomBytes(16).toString("hex");
       let newOrder = new Order({
         tableId: tableIdStr,
-        tableName: fallbackTableName,
         sessionToken,
         items: newItems,
         total: newItemsTotal,
         status: "active",
-        orderType: data.orderType || (data.tableId ? "dine_in" : "takeaway"),
       });
       session = await newOrder.save();
     }
 
     if (io) {
-      io.emit("new-order", session);
+      // Lưu thông báo vào DB
+      const notif = await Notification.create({
+        type: "new_order",
+        title: "🛒 Gọi món tại quầy!",
+        message: `Nhân viên vừa tạo đơn${session.tableName ? ` cho ${session.tableName}` : " mang đi"}`,
+        referenceId: session._id,
+      });
+
+      io.to("admin_hub").emit("new_notification", notif);
+      io.to("admin_hub").emit("new-order", session);
       io.emit("order-updated", session);
       io.emit("tables-updated", await Table.find());
     }
@@ -385,7 +399,7 @@ class OrderService {
     return order;
   }
 
-  async getOrderHistory(page = 1, limit = 20, startDate, endDate, types) {
+  async getOrderHistory(page = 1, limit = 20, startDate, endDate) {
     const query = {
       // SỬA "paid" THÀNH "completed"
       status: { $in: ["completed", "cancelled"] },
@@ -397,10 +411,6 @@ class OrderService {
         $gte: new Date(startDate),
         $lte: new Date(endDate),
       };
-    }
-
-    if (types && types.length > 0) {
-      query.orderType = { $in: types };
     }
 
     const total = await Order.countDocuments(query);

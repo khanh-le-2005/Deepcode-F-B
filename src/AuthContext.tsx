@@ -1,11 +1,11 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+  import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import axiosClient from '@/src/lib/axiosClient';
 
 interface User {
   id?: string;
   email: string;
   name?: string;
-  role: 'admin' | 'staff';
+  role: 'admin' | 'staff' | 'chef';
 }
 
 interface AuthContextType {
@@ -65,7 +65,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         email, password
       });
 
-      const { success, user: userData, accessToken } = response.data;
+      const { success, user: userData, token } = response.data;
       
       if (!success) return false;
 
@@ -78,7 +78,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       setUser(newUser);
       localStorage.setItem('qr_dine_user', JSON.stringify(newUser));
-      localStorage.setItem('qr_dine_access_token', accessToken);
+      localStorage.setItem('qr_dine_access_token', token);
       
       return true;
     } catch (error) {

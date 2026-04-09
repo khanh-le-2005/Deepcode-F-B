@@ -53,13 +53,6 @@ const orderSchema = new mongoose.Schema(
       default: "unpaid",
     },
 
-    // 3. LOẠI ĐƠN HÀNG (Ăn tại quán / Mua mang đi / Giao hàng)
-    orderType: {
-      type: String,
-      enum: ["dine_in", "takeaway", "delivery"],
-      default: "dine_in",
-    },
-
     completedAt: { type: Date },
     completedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     completedByName: { type: String },

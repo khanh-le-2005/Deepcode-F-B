@@ -124,7 +124,7 @@ export const AdminPayments = () => {
                       </div>
                     </td>
                     <td className="px-8 py-6">
-                      <span className="px-4 py-2 bg-emerald-100 text-emerald-600 rounded-xl text-[10px] font-black uppercase tracking-widest border border-emerald-200">
+                      <span className="inline-flex items-center justify-center px-4 py-2 bg-emerald-100 text-emerald-600 rounded-xl text-[10px] font-black uppercase tracking-widest border border-emerald-200 whitespace-nowrap">
                         Thành công
                       </span>
                     </td>

@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import axios from '@/src/lib/axiosClient';
 import { motion } from 'framer-motion';
-import { CheckCircle2, Clock, ChefHat, Download } from 'lucide-react';
+import { CheckCircle2, Clock, ChefHat, Download, CreditCard } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { cn } from '../../lib/cn';
 import { Order } from '../../types';
@@ -31,6 +31,8 @@ export const OrderTrackingPage = () => {
   } | null>(null);
    const [paymentError, setPaymentError] = useState('');
    const [showSuccessModal, setShowSuccessModal] = useState(false);
+   const [isRequestingCash, setIsRequestingCash] = useState(false);
+   const [cashRequestSent, setCashRequestSent] = useState(false);
   const paymentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -186,13 +188,42 @@ export const OrderTrackingPage = () => {
         gatewayWarning: response.data?.gatewayWarning,
       });
     } catch (error) {
-      const message = axiosLib.isAxiosError(error)
-        ? error.response?.data?.message || error.response?.data?.error || error.message
-        : 'Không thể tạo mã thanh toán lúc này. Vui lòng thử lại sau.';
+      let message = 'Không thể tạo mã thanh toán lúc này. Vui lòng thử lại sau.';
+      
+      if (axiosLib.isAxiosError(error)) {
+        // Trích xuất message từ cấu trúc { success: false, error: { message, code } } của backend
+        const backendError = error.response?.data?.error;
+        message = typeof backendError === 'object' ? backendError.message : (error.response?.data?.message || error.message);
+      }
+      
       console.error('Failed to generate payment QR:', message, error);
-      setPaymentError(message || 'Không thể tạo mã thanh toán lúc này. Vui lòng thử lại sau.');
+      setPaymentError(message);
     } finally {
       setIsGeneratingQr(false);
+    }
+  };
+
+  const handleRequestCashPayment = async () => {
+    try {
+      setIsRequestingCash(true);
+      
+      // Gửi tín hiệu trực tiếp qua Socket.io để nhân viên nhận được ngay
+      socket.emit('payment-requested', {
+        tableId: tableId,
+        tableName: order?.tableName || tableId,
+        orderId: order?.id || order?._id,
+        total: order?.total
+      });
+
+      // Giả lập delay một chút cho trải nghiệm người dùng
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
+      setCashRequestSent(true);
+      toast.success('Đã gửi yêu cầu thanh toán tiền mặt. Nhân viên sẽ sớm đến kiểm tra!');
+    } catch (err) {
+      toast.error('Không thể gửi yêu cầu lúc này.');
+    } finally {
+      setIsRequestingCash(false);
     }
   };
 
@@ -251,9 +282,9 @@ export const OrderTrackingPage = () => {
                 <div key={step.id} className="relative z-10 flex flex-col items-center">
                   <motion.div
                     initial={{ scale: 0.8 }}
-                    animate={{ scale: isCurrent ? 1.15 : 1, backgroundColor: active ? 'white' : '#f3f4f6' }}
+                    animate={{ scale: isCurrent ? 1.15 : 1, backgroundColor: active ? '#ffffff' : '#f3f4f6' }}
                     className={cn(
-                      "w-14 h-14 sm:w-20 sm:h-20 rounded-full flex items-center justify-center border-[6px] border-white shadow-xl transition-colors duration-500 text-red-600",
+                      "w-14 h-14 sm:w-20 sm:h-20 rounded-full flex items-center justify-center border-[6px] border-white shadow-xl transition-all duration-500 text-red-600",
                       active ? step.bg : "text-gray-300"
                     )}
                   >
@@ -299,14 +330,14 @@ export const OrderTrackingPage = () => {
                     </div>
                   </span>
                   <span className="text-gray-900 underline decoration-red-600 decoration-2 underline-offset-4">
-                    {item.totalPrice.toLocaleString()}đ
+                    {(item.totalPrice ?? 0).toLocaleString()}đ
                   </span>
                 </li>
               ))}
             </ul>
             <div className="flex justify-between items-center pt-6 border-t border-gray-200 text-2xl font-black italic shadow-[0_-15px_15px_-15px_rgba(0,0,0,0.05)]" style={{ fontFamily: "'Playfair Display', serif" }}>
               <span className="text-gray-400 uppercase tracking-widest text-sm not-italic font-bold">Tổng cộng</span>
-              <span className="text-red-600">{order.total.toLocaleString()}đ</span>
+              <span className="text-red-600">{(order.total ?? 0).toLocaleString()}đ</span>
             </div>
           </div>
 
@@ -323,12 +354,34 @@ export const OrderTrackingPage = () => {
 
               <button
                 onClick={handleRequestPayment}
-                disabled={isGeneratingQr}
+                disabled={isGeneratingQr || cashRequestSent}
                 className="mt-6 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-60 disabled:cursor-not-allowed text-white px-8 py-4 rounded-xl font-black uppercase tracking-widest transition-transform shadow-xl w-full sm:w-auto"
               >
                 {isGeneratingQr ? 'Đang tạo mã...' : 'Thanh Toán Chuyển Trước'}
               </button>
-              <p className="mt-3 text-sm text-gray-500 font-bold italic">Có thể trả sau khi ra quầy</p>
+              
+              <div className="mt-6">
+                {cashRequestSent ? (
+                  <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-2xl flex items-center justify-center gap-3">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                    <span className="text-emerald-700 font-bold text-sm">Đã gửi yêu cầu tính tiền mặt</span>
+                  </div>
+                ) : (
+                  <button
+                    onClick={handleRequestCashPayment}
+                    disabled={isRequestingCash}
+                    className="w-full sm:w-auto px-8 py-4 bg-white border-2 border-slate-200 text-slate-600 rounded-xl font-black uppercase tracking-widest hover:border-slate-300 hover:bg-slate-50 transition-all flex items-center justify-center gap-2"
+                  >
+                    {isRequestingCash ? (
+                       <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></div>
+                    ) : (
+                      <CreditCard className="w-4 h-4" />
+                    )}
+                    Trả tiền mặt tại quầy
+                  </button>
+                )}
+              </div>
+
               {paymentError && (
                 <p className="mt-4 text-sm font-bold text-rose-500">{paymentError}</p>
               )}
@@ -410,6 +463,7 @@ export const OrderTrackingPage = () => {
         isOpen={showSuccessModal}
         onClose={() => setShowSuccessModal(false)}
         order={order}
+        amount={paymentQr?.amount}
         tableId={tableId}
         onViewMenu={() => navigate(tableId ? `/table/${tableId}/menu` : '/menu')}
       />

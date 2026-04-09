@@ -7,6 +7,7 @@ interface PaymentSuccessModalProps {
   isOpen: boolean;
   onClose: () => void;
   order: Order | null;
+  amount?: number;
   tableId?: string;
   onViewMenu: () => void;
 }
@@ -15,6 +16,7 @@ export const PaymentSuccessModal = ({
   isOpen,
   onClose,
   order,
+  amount,
   tableId,
   onViewMenu
 }: PaymentSuccessModalProps) => {
@@ -90,7 +92,7 @@ export const PaymentSuccessModal = ({
                 <div className="flex justify-between items-center">
                   <span className="text-slate-400 text-xs font-bold uppercase tracking-widest">Tổng thanh toán</span>
                   <span className="text-emerald-600 text-xl font-black italic" style={{ fontFamily: "'Playfair Display', serif" }}>
-                    {order?.total?.toLocaleString()}đ
+                    {(amount || order?.total || 0).toLocaleString()}đ
                   </span>
                 </div>
               </motion.div>

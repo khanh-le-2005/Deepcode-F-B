@@ -1,16 +1,22 @@
-import mongoose from "mongoose";
-import { globalSchemaOptions } from "../utils/schemaOptions.js";
+import mongoose from 'mongoose';
+import bcrypt from 'bcryptjs';
+import { globalSchemaOptions } from '../utils/schemaOptions.js';
 
-const userSchema = new mongoose.Schema(
-  {
-    email: { type: String, required: true, unique: true },
-    password: { type: String, required: true },
-    name: { type: String, required: true },
-    role: { type: String, enum: ["admin", "staff", "chef"], default: "staff" },
-    // Thêm mảng lưu trữ Refresh Token để quản lý phiên đăng nhập
-    refreshTokens: [{ type: String }],
-  },
-  globalSchemaOptions,
-);
+const userSchema = new mongoose.Schema({
+  email: { type: String, required: true, unique: true },
+  password: { type: String, required: true },
+  name: { type: String, required: true },
+  role: { type: String, enum: ['admin', 'staff', 'chef'], default: 'staff' }
+}, globalSchemaOptions);
 
-export const User = mongoose.model("User", userSchema);
+userSchema.pre('save', async function() {
+  if (!this.isModified('password')) return;
+  const salt = await bcrypt.genSalt(10);
+  this.password = await bcrypt.hash(this.password, salt);
+});
+
+userSchema.methods.comparePassword = async function(candidatePassword) {
+  return await bcrypt.compare(candidatePassword, this.password);
+};
+
+export const User = mongoose.model('User', userSchema);

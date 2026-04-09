@@ -32,25 +32,18 @@ export async function seedInitialData() {
       console.log("✅ Backfilled table slugs");
     }
 
+    // Tạm thời xóa hết user hiện tại (chưa được hash password)
+    await User.deleteMany({});
+    
+    // Tìm đếm lại (giờ chắc chắn = 0)
     const userCount = await User.countDocuments();
     if (userCount === 0) {
-      const bcrypt = await import("bcryptjs");
-      const hashedPassword = await bcrypt.default.hash("123456", 10);
-      
-      await User.insertMany([
-        { email: "admin@gmail.com", password: hashedPassword, role: "admin", name: "Quản trị viên" },
-        { email: "staff@gmail.com", password: hashedPassword, role: "staff", name: "Nhân viên" }
+      // Dùng User.create thay vì insertMany để trigger method hooks .pre('save') ở file User.js
+      await User.create([
+        { email: "admin@gmail.com", password: "123456", role: "admin", name: "Quản trị viên" },
+        { email: "staff@gmail.com", password: "123456", role: "staff", name: "Nhân viên" }
       ]);
-      console.log("✅ Seeded initial users with hashed passwords");
-    } else {
-      // FIX khẩn cấp: Nếu user đã có nhưng pass là '123456' (chưa mã hóa) thì mã hóa lại
-      const bcrypt = await import("bcryptjs");
-      const plainUsers = await User.find({ password: "123456" });
-      if (plainUsers.length > 0) {
-        const hashedPassword = await bcrypt.default.hash("123456", 10);
-        await User.updateMany({ password: "123456" }, { $set: { password: hashedPassword } });
-        console.log("✅ Updated plain-text passwords to hashed passwords");
-      }
+      console.log("✅ Seeded initial users (with hashed passwords)");
     }
   } catch (err) {
     console.error("⚠️ Failed to seed initial data:", err.message);

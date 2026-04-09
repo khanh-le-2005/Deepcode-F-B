@@ -2,6 +2,7 @@ import { Payment } from "../models/Payment.js";
 import { Order } from "../models/Order.js";
 import { Table } from "../models/Table.js";
 import { BankAccount } from "../models/BankAccount.js";
+import { Notification } from "../models/Notification.js";
 import paymentGateway from "../utils/paymentGatewayClient.js";
 import { NotFoundError, BadRequestError, ServiceUnavailableError } from "../utils/AppError.js";
 
@@ -19,8 +20,9 @@ class PaymentService {
     }
 
     // Trích xuất Tên Bàn cụ thể
-    const orderObj = await Order.findById(orderId);
-    const tableNameStr = orderObj?.tableName || "Mang đi / Takeaway";
+    const orderObj = await Order.findById(orderId).populate("tableId");
+    const tableNameStr =
+      orderObj?.tableName || orderObj?.tableId?.name || "Mang đi / Đã xóa bàn";
 
     // Trích xuất chi tiết Ngân hàng thụ hưởng
     let bankNameSnapshotStr = method || "Tiền mặt";
@@ -38,7 +40,6 @@ class PaymentService {
       method,
       bankAccountId: bankAccountId || null,
       tableName: tableNameStr,
-      orderTypeSnapshot: orderObj?.orderType || "dine_in",
       bankNameSnapshot: bankNameSnapshotStr,
       cashierName: user ? user.name : "Thu ngân ấn nút",
     });
@@ -47,7 +48,7 @@ class PaymentService {
     // Cập nhật ngày chốt đơn và ai là người thu tiền
     const updateData = { 
       paymentStatus: "paid", 
-      status: "completed", 
+      status: "completed", // Đóng vòng đời phục vụ
       completedAt: new Date() 
     };
     if (user) {
@@ -103,7 +104,7 @@ class PaymentService {
   async getPayments() {
     return Payment.find()
       .populate("bankAccountId", "bankName accountNo accountName")
-      .populate("orderId", "tableId total orderType")
+      .populate("orderId", "tableId total")
       .sort({ createdAt: -1 });
   }
 
@@ -130,7 +131,9 @@ class PaymentService {
     await Table.findByIdAndUpdate(order.tableId, { status: "empty" });
 
     // 5. Lấy thông tin bàn để ghi lịch sử
-    const tableNameStr = order.tableName || "Mang đi / Takeaway";
+    const orderData = await Order.findById(orderId).populate("tableId");
+    const tableNameStr =
+      orderData?.tableName || orderData?.tableId?.name || "Bàn không xác định";
 
     // 5. Lấy thông tin ngân hàng mặc định
     const defaultBank = await BankAccount.findOne({ isDefault: true });
@@ -146,16 +149,23 @@ class PaymentService {
       method: "Chuyển khoản (Bot Python Auto quét)",
       bankAccountId: defaultBank ? defaultBank._id : null,
       tableName: tableNameStr,
-      orderTypeSnapshot: order.orderType || "dine_in",
       bankNameSnapshot: bankNameSnapshotStr,
       cashierName: "Hệ thống điện tử tự động",
       status: "success",
     });
 
-    // 7. Bắn Socket cho Frontend cập nhật UI ngay lập tức
+    // 7. Lưu thông báo vào DB và bắn Socket đến admin_hub
+    const notif = await Notification.create({
+      type: "payment_success",
+      title: "💳 Thanh toán thành công!",
+      message: `${tableNameStr} vừa thanh toán ${order.total?.toLocaleString('vi-VN')}đ qua chuyển khoản`,
+      referenceId: payment._id,
+    });
+
     if (io) {
-      io.emit("order-paid", { orderId: order._id, paymentStatus: "paid" });
-      io.emit("order-updated", order);
+      io.to("admin_hub").emit("new_notification", notif);
+      io.to("admin_hub").emit("order-paid", { orderId: order._id, paymentStatus: "paid" });
+      io.to("admin_hub").emit("order-updated", order);
       io.emit("tables-updated", await Table.find());
     }
 

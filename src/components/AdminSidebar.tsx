@@ -17,7 +17,9 @@ import {
   LogOut,
   ExternalLink,
   ChevronRight,
-  X
+  X,
+  HandCoins,
+  Bell
 } from 'lucide-react';
 import { useAuth } from '../AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -36,6 +38,7 @@ export const AdminSidebar = ({ isOpen, onClose }: AdminSidebarProps) => {
   const menuItems = [
     { icon: LayoutDashboard, label: 'Dashboard', path: '/admin' },
     { icon: Grid, label: 'Quản lý bàn', path: '/admin/tables' },
+    { icon: Bell, label: 'Thông báo', path: '/admin/notifications' },
     { icon: Tags, label: 'Danh mục', path: '/admin/categories' },
     { icon: UtensilsCrossed, label: 'Quản lý menu', path: '/admin/menu' },
     { icon: CalendarDays, label: 'Thực đơn tuần', path: '/admin/weekly-menu' },
@@ -43,6 +46,7 @@ export const AdminSidebar = ({ isOpen, onClose }: AdminSidebarProps) => {
     { icon: History, label: 'Lịch sử đơn', path: '/admin/order-history' },
     { icon: ShoppingCart, label: 'Đơn hàng', path: '/admin/orders' },
     { icon: CreditCard, label: 'Thanh toán', path: '/admin/payments' },
+    // { icon: HandCoins, label: 'Yêu cầu thanh toán', path: '/admin/payment-requests' },
     { icon: Landmark, label: 'Ngân hàng', path: '/admin/bank-accounts' },
     { icon: UserIcon, label: 'Nhân viên', path: '/admin/users' },
     { icon: BarChart3, label: 'Báo cáo', path: '/admin/reports' },
@@ -51,7 +55,7 @@ export const AdminSidebar = ({ isOpen, onClose }: AdminSidebarProps) => {
 
   const secondaryItems = [
     { icon: ChefHat, label: 'Màn hình Bếp', path: '/kitchen' },
-    { icon: ExternalLink, label: 'Xem Trang chủ', path: '/' },
+    // { icon: ExternalLink, label: 'Xem Trang chủ', path: '/' },
   ];
 
   const sidebarContent = (
@@ -136,7 +140,7 @@ export const AdminSidebar = ({ isOpen, onClose }: AdminSidebarProps) => {
         <button
           onClick={() => {
             logout();
-            navigate('/login');
+            navigate('/auth/login');
           }}
           className="w-full flex items-center justify-center gap-2.5 px-4 py-3.5 bg-danger text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-danger/90 transition-all shadow-lg shadow-danger/20"
         >

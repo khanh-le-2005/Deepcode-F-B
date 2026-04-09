@@ -6,7 +6,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search, Plus, Minus, ShoppingCart, Table2,
   Trash2, ChevronRight, Settings, Scan,
-  History, CreditCard, Save, ChevronUp, ChevronDown
+  History, CreditCard, Save, ChevronUp, ChevronDown,
+  LogOut, HandCoins
 } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { useAuth } from '../../AuthContext';
@@ -30,7 +31,7 @@ export const StaffPOSPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [cart, setCart] = useState<StaffCartItem[]>([]);
   const [submitting, setSubmitting] = useState(false);
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
   const selectedTable = tables.find(t => t.id === selectedTableId || (t as any)._id === selectedTableId);
 
@@ -77,7 +78,7 @@ export const StaffPOSPage = () => {
     setSubmitting(true);
     try {
       await axios.post('/api/payments', {
-        orderId: activeSession._id,
+        orderId: activeSession._id || activeSession.id,
         amount: activeSession.total,
         method: 'Tiền mặt'
       });
@@ -116,9 +117,9 @@ export const StaffPOSPage = () => {
   };
 
   const categories = useMemo(() => {
-      const uniqueCategories = Array.from(
-        new Set(
-          menu
+    const uniqueCategories = Array.from(
+      new Set(
+        menu
           .map(item => getMenuItemCategoryName(item).trim())
           .filter(Boolean)
       )
@@ -224,6 +225,19 @@ export const StaffPOSPage = () => {
             );
           })}
         </div>
+
+        <div className="mt-auto flex flex-col gap-8 pb-4">
+          <button
+            onClick={() => navigate('/admin/payment-requests')}
+            className="flex flex-col items-center gap-1 group"
+            title="Yêu cầu thanh toán"
+          >
+            <div className="p-3 rounded-2xl text-orange-500 bg-orange-50 hover:bg-orange-100 transition-all duration-300">
+              <HandCoins className="w-6 h-6" />
+            </div>
+            <span className="text-[10px] font-bold text-orange-500">Thanh toán</span>
+          </button>
+        </div>
       </aside>
 
       {/* NỘI DUNG CHÍNH (GIỮA) */}
@@ -256,6 +270,13 @@ export const StaffPOSPage = () => {
             </div>
             <button className="p-3 bg-white rounded-2xl shadow-sm text-gray-400 hover:text-[#ff6b6b] transition-colors">
               <Settings className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => { logout?.(); navigate('/auth/login'); }}
+              className="p-3 bg-rose-50 text-rose-500 rounded-2xl shadow-sm hover:bg-rose-500 hover:text-white transition-all duration-300"
+              title="Đăng xuất"
+            >
+              <LogOut className="w-5 h-5" />
             </button>
           </div>
         </header>

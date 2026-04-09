@@ -2,150 +2,113 @@ import { Order } from '../models/Order.js';
 import { Table } from '../models/Table.js';
 
 class StatsService {
-  async getOverview(start, end) {
-    const orders = await Order.find({
-      createdAt: { $gte: start, $lte: end }
-    }).lean();
+  async getStats() {
+    const orders = await Order.find().sort({ createdAt: -1 });
+    const tables = await Table.find();
+    
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    const todayOrders = orders.filter(o => o.createdAt && o.createdAt.toISOString().startsWith(todayStr));
+    const revenue = todayOrders.filter(o => o.status === 'paid').reduce((acc, o) => acc + o.total, 0);
+    const activeTables = tables.filter(t => t.status === 'occupied').length;
+    const pendingOrders = orders.filter(o => o.status === 'pending' || o.status === 'cooking').length;
 
-    const tables = await Table.find().lean();
-    
-    const paidOrders = orders.filter(o => o.paymentStatus === 'paid');
-    const totalRevenue = paidOrders.reduce((acc, o) => acc + o.total, 0);
-    const totalOrders = paidOrders.length;
-    const averageOrderValue = totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0;
-    
-    let totalItems = 0;
-    let cancelledItems = 0;
+    const dailyRevenueMap = {};
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().split('T')[0];
+      const dayName = d.toLocaleDateString('vi-VN', { weekday: 'short' });
+      dailyRevenueMap[dateStr] = { name: dayName, value: 0 };
+    }
+
     orders.forEach(o => {
-      if (o.status !== 'cancelled') {
-        o.items.forEach(item => {
-          totalItems += item.quantity;
-          if (item.status === 'cancelled') cancelledItems += item.quantity;
-        });
+      if (o.status === 'paid' && o.createdAt) {
+        const dateStr = o.createdAt.toISOString().split('T')[0];
+        if (dailyRevenueMap[dateStr]) dailyRevenueMap[dateStr].value += o.total;
       }
     });
-    
-    const cancelledItemRatio = totalItems > 0 ? Number(((cancelledItems / totalItems) * 100).toFixed(2)) : 0;
-    
-    // Đếm số ID bàn duy nhất có order trong quãng thời gian này (bàn đã phục vụ)
-    const servedTablesSet = new Set(orders.filter(o => o.status === 'completed' || o.paymentStatus === 'paid').map(o => o.tableId));
-    const tablesServed = servedTablesSet.size;
-
-    return {
-      totalRevenue,
-      totalOrders,
-      averageOrderValue,
-      cancelledItemRatio,
-      tablesServed
-    };
-  }
-
-  async getRevenueChart(start, end, groupBy) {
-    const orders = await Order.find({
-      createdAt: { $gte: start, $lte: end },
-      paymentStatus: 'paid'
-    }).lean();
-
-    const map = {};
-    
-    orders.forEach(o => {
-      const date = new Date(o.createdAt);
-      let key = '';
-      if (groupBy === 'day') {
-        key = date.toISOString().split('T')[0]; // YYYY-MM-DD
-      } else if (groupBy === 'week') {
-        const day = date.getDay();
-        const diff = date.getDate() - day + (day == 0 ? -6:1);
-        const startOfWeek = new Date(date.setDate(diff));
-        key = startOfWeek.toISOString().split('T')[0];
-      } else if (groupBy === 'month') {
-        key = date.toISOString().substring(0, 7); // YYYY-MM
-      } else {
-        key = date.toISOString().split('T')[0];
-      }
-
-      if (!map[key]) map[key] = { revenue: 0, orders: 0 };
-      map[key].revenue += o.total;
-      map[key].orders += 1;
-    });
-
-    return Object.keys(map).sort().map(label => ({
-      label,
-      revenue: map[label].revenue,
-      orders: map[label].orders
-    }));
-  }
-
-  async getTopItems(start, end, limit) {
-    const orders = await Order.find({
-      createdAt: { $gte: start, $lte: end }
-    }).lean();
 
     const itemSales = {};
     orders.forEach(o => {
       if (o.status !== 'cancelled') {
         o.items.forEach(item => {
-          if (item.status !== 'cancelled') {
-            if (!itemSales[item.menuItemId]) {
-              itemSales[item.menuItemId] = { name: item.name, totalQuantitySold: 0, totalRevenue: 0 };
-            }
-            itemSales[item.menuItemId].totalQuantitySold += item.quantity;
-            itemSales[item.menuItemId].totalRevenue += item.totalPrice;
-          }
+          if (!itemSales[item.name]) itemSales[item.name] = 0;
+          itemSales[item.name] += item.quantity;
         });
       }
     });
+    const topItems = Object.keys(itemSales)
+      .map(name => ({ name, sales: itemSales[name], trend: '+0%' }))
+      .sort((a, b) => b.sales - a.sales)
+      .slice(0, 4);
 
-    const topList = Object.keys(itemSales).map(id => ({
-      menuItemId: id,
-      name: itemSales[id].name,
-      totalQuantitySold: itemSales[id].totalQuantitySold,
-      totalRevenue: itemSales[id].totalRevenue
-    })).sort((a, b) => b.totalQuantitySold - a.totalQuantitySold).slice(0, limit);
+    const monthlyRevenueMap = {};
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date();
+      d.setMonth(d.getMonth() - i);
+      const monthStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const monthName = `T${d.getMonth() + 1}`;
+      monthlyRevenueMap[monthStr] = { name: monthName, value: 0 };
+    }
 
-    return topList;
-  }
+    orders.forEach(o => {
+      if (o.status === 'paid' && o.createdAt) {
+        const monthStr = o.createdAt.toISOString().substring(0, 7);
+        if (monthlyRevenueMap[monthStr]) monthlyRevenueMap[monthStr].value += o.total;
+      }
+    });
 
-  async getKitchenPerformance(start, end) {
-    const orders = await Order.find({
-      createdAt: { $gte: start, $lte: end }
-    }).lean();
-
-    let totalCookingTimeMin = 0;
-    let totalItemsCooked = 0;
-    let pendingApprovalItems = 0;
-    let longestWaitTimeMin = 0;
-
-    const now = new Date();
-
+    const categorySales = {};
+    let totalCategorySales = 0;
     orders.forEach(o => {
       if (o.status !== 'cancelled') {
         o.items.forEach(item => {
-          if (item.status === 'pending_approval') {
-            pendingApprovalItems += item.quantity;
-            const waitTime = (now.getTime() - new Date(o.createdAt).getTime()) / 60000;
-            if (waitTime > longestWaitTimeMin) longestWaitTimeMin = waitTime;
-          } else if (item.status === 'served') {
-            totalItemsCooked += item.quantity;
-            if (item.actionAt) {
-              const cookTime = (new Date(item.actionAt).getTime() - new Date(o.createdAt).getTime()) / 60000;
-              if (cookTime > 0) {
-                totalCookingTimeMin += cookTime * item.quantity;
-              }
-            }
-          }
+          const cat = item.category || 'Khác';
+          if (!categorySales[cat]) categorySales[cat] = 0;
+          categorySales[cat] += item.quantity;
+          totalCategorySales += item.quantity;
         });
       }
     });
+    const categoryData = Object.keys(categorySales).map(name => ({
+      name,
+      value: totalCategorySales > 0 ? Math.round((categorySales[name] / totalCategorySales) * 100) : 0
+    }));
 
-    const averageCookingTimeMin = totalItemsCooked > 0 ? Number((totalCookingTimeMin / totalItemsCooked).toFixed(2)) : 0;
-    longestWaitTimeMin = Number(longestWaitTimeMin.toFixed(2));
+    const paidOrders = orders.filter(o => o.status === 'paid');
+    const averageOrderValue = paidOrders.length > 0 
+      ? Math.round(paidOrders.reduce((acc, o) => acc + o.total, 0) / paidOrders.length)
+      : 0;
+
+    let totalServiceTime = 0;
+    let serviceTimeCount = 0;
+    paidOrders.forEach(o => {
+      if (o.createdAt && o.updatedAt) {
+        const diffMs = o.updatedAt.getTime() - o.createdAt.getTime();
+        const diffMins = Math.round(diffMs / 60000);
+        if (diffMins > 0 && diffMins < 300) {
+          totalServiceTime += diffMins;
+          serviceTimeCount++;
+        }
+      }
+    });
+    const averageServiceTime = serviceTimeCount > 0 ? Math.round(totalServiceTime / serviceTimeCount) : 0;
+
+    const returnRate = orders.length > 0 ? Math.min(85, Math.round((orders.length / (tables.length || 1)) * 15)) : 0;
 
     return {
-      averageCookingTimeMin,
-      totalItemsCooked,
-      pendingApprovalItems,
-      longestWaitTimeMin
+      revenue,
+      orderCount: todayOrders.length,
+      activeTables,
+      pendingOrders,
+      dailyRevenue: Object.values(dailyRevenueMap),
+      topItems,
+      monthlyRevenue: Object.values(monthlyRevenueMap),
+      categoryData,
+      averageOrderValue,
+      averageServiceTime,
+      returnRate
     };
   }
 }

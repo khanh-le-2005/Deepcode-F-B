@@ -191,3 +191,16 @@ export interface DashboardStats {
   averageServiceTime: number;
   returnRate: number;
 }
+// ─────────────────────────────────────────────────
+// Notifications
+// ─────────────────────────────────────────────────
+export interface Notification {
+  _id?: string;
+  id: string; // Sử dụng id từ transform toJSON/toObject của Mongoose
+  type: 'new_order' | 'payment_success' | 'system_alert';
+  title: string;
+  message: string;
+  referenceId?: string;
+  isRead: boolean;
+  createdAt: string;
+}

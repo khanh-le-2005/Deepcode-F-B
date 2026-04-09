@@ -27,6 +27,7 @@ import bankAccountRoutes from "./backend/src/routes/bankAccountRoutes.js";
 import categoryRoutes from "./backend/src/routes/categoryRoutes.js";
 import weeklyMenuRoutes from "./backend/src/routes/weeklyMenuRoutes.js";
 import userRoutes from "./backend/src/routes/userRoutes.js";
+import notificationRoutes from "./backend/src/routes/notificationRoutes.js";
 import { seedInitialData } from "./backend/src/config/setup.js";
 
 async function startServer() {
@@ -124,6 +125,7 @@ async function startServer() {
   app.use("/api/bank-accounts", bankAccountRoutes);
   app.use("/api/stats", statsRoutes);
   app.use("/api/users", userRoutes);
+  app.use("/api/notifications", notificationRoutes);
 
   // Global Error Handler
   app.use((err, req, res, next) => {
@@ -170,9 +172,17 @@ async function startServer() {
   }
 
   io.on("connection", (socket) => {
-    console.log("A user connected");
+    console.log("A user connected:", socket.id);
+    
+    socket.on("setup_user", (role) => {
+      if (["admin", "staff", "chef"].includes(role)) {
+        socket.join("admin_hub");
+        console.log(`✅ Socket ${socket.id} joined admin_hub as ${role}`);
+      }
+    });
+
     socket.on("disconnect", () => {
-      console.log("User disconnected");
+      console.log("User disconnected:", socket.id);
     });
   });
 

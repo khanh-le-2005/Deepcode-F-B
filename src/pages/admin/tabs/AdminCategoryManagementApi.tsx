@@ -170,9 +170,10 @@ export const AdminCategoryManagement = () => {
       setEditingCategory(null);
       setForm(emptyForm());
       await fetchCategories();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to save category:', error);
-      toast.error('Không thể lưu danh mục vào database.');
+      const apiMessage = error?.response?.data?.error?.message || error?.response?.data?.message;
+      toast.error(apiMessage || 'Không thể lưu danh mục vào database.');
     }
   };
 
@@ -182,9 +183,10 @@ export const AdminCategoryManagement = () => {
       await axios.delete(`/api/categories/${category.id}`);
       toast.success('Đã xoá danh mục.');
       await fetchCategories();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to delete category:', error);
-      toast.error('Không thể xoá danh mục khỏi database.');
+      const apiMessage = error?.response?.data?.error?.message || error?.response?.data?.message;
+      toast.error(apiMessage || 'Không thể xoá danh mục khỏi database.');
     }
   };
 
@@ -200,9 +202,10 @@ export const AdminCategoryManagement = () => {
       await axios.put(`/api/categories/${category.id}`, body, { headers: { 'Content-Type': 'multipart/form-data' } });
       toast.info('Đã cập nhật trạng thái danh mục.');
       await fetchCategories();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to toggle category status:', error);
-      toast.error('Không thể đổi trạng thái danh mục trong database.');
+      const apiMessage = error?.response?.data?.error?.message || error?.response?.data?.message;
+      toast.error(apiMessage || 'Không thể đổi trạng thái danh mục trong database.');
     }
   };
 
@@ -333,9 +336,9 @@ export const AdminCategoryManagement = () => {
                       </div>
 
                       <div className="flex flex-col items-end gap-2">
-                        <div className="rounded-full bg-slate-950 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-white">
+                        {/* <div className="rounded-full bg-slate-950 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-white">
                           ID {category.id}
-                        </div>
+                        </div> */}
                         <div className="flex flex-wrap justify-end gap-2">
                           <button
                             onClick={() => openEdit(category)}

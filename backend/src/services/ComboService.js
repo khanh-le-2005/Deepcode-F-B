@@ -3,17 +3,11 @@ import { BadRequestError, NotFoundError } from '../utils/AppError.js';
 
 class ComboService {
   async getCombos() {
-    return Combo.find().populate({
-      path: 'menuItemIds',
-      populate: { path: 'categoryId', select: 'name slug image status' }
-    });
+    return Combo.find().populate('menuItemIds');
   }
 
   async getComboById(id) {
-    const combo = await Combo.findById(id).populate({
-      path: 'menuItemIds',
-      populate: { path: 'categoryId', select: 'name slug image status' }
-    });
+    const combo = await Combo.findById(id).populate('menuItemIds');
     if (!combo) throw new NotFoundError('Combo not found');
     return combo;
   }
@@ -30,10 +24,7 @@ class ComboService {
   }
 
   async updateCombo(id, data) {
-    const combo = await Combo.findByIdAndUpdate(id, data, { new: true }).populate({
-      path: 'menuItemIds',
-      populate: { path: 'categoryId', select: 'name slug image status' }
-    });
+    const combo = await Combo.findByIdAndUpdate(id, data, { new: true }).populate('menuItemIds');
     if (!combo) throw new NotFoundError('Combo not found');
     return combo;
   }

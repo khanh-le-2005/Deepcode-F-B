@@ -6,7 +6,7 @@ const PUBLIC_PATHS = [
   // --- AUTH ---
   '/api/auth/login',
   '/api/auth/register',
-  '/api/auth/refresh-token',
+  '/api/auth/refresh',    // Làm mới access token bằng refresh token
   '/api/auth/logout',
 
   // --- TÀI NGUYÊN CÔNG KHAI ---
@@ -34,22 +34,30 @@ const PUBLIC_PATHS = [
 
 // Middleware xác thực JWT
 export const jwtAuthenticationFilter = async (req, res, next) => {
-  try {
-    // 1. Luôn thử parse token nếu có Header Authorization (dù public hay private)
-    //    → Staff gọi public route vẫn có req.user đầy đủ để authorize() hoạt động
-    const authHeader = req.headers.authorization;
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      const token = authHeader.split(' ')[1];
-      const decoded = JwtUtil.verifyAccessToken(token);
-      
-      if (decoded && decoded.id) {
-        // Query database trực tiếp bằng id để lấy thông tin mới nhất
+  // 1. Luôn thử parse token nếu có Header Authorization (dù public hay private)
+  //    → Staff gọi public route vẫn có req.user đầy đủ để authorize() hoạt động
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.split(' ')[1];
+    const decoded = JwtUtil.verifyToken(token);
+    
+    if (decoded && decoded.id) {
+      // Truy vấn database để xác nhận quyền và sự tồn tại của user (bảo mật hơn)
+      try {
         const user = await User.findById(decoded.id).select('-password');
         if (user) {
-          req.user = user; 
+          req.user = {
+            id: user._id,
+            role: user.role,
+            email: user.email,
+            name: user.name
+          };
         }
+      } catch (error) {
+        console.error("JWT Auth DB Error:", error.message);
       }
     }
+  }
 
   // 2. Kiểm tra nếu là đường dẫn Public → cho qua dù có token hay không
   const isPublic = PUBLIC_PATHS.some(path => req.originalUrl.startsWith(path));
@@ -59,13 +67,10 @@ export const jwtAuthenticationFilter = async (req, res, next) => {
 
   // 3. Route Private → BẮT BUỘC phải có token hợp lệ
   if (!req.user) {
-    return res.status(401).json({ error: 'Unauthorized: Trạng thái phiên đăng nhập không hợp lệ hoặc đã bị khóa.' });
+    return res.status(401).json({ error: 'Unauthorized: No token provided' });
   }
 
   next();
-  } catch (err) {
-    next(err);
-  }
 };
 
 // Middleware phân quyền theo Role

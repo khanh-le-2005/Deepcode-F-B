@@ -3,10 +3,15 @@ import { AdminSidebar } from './AdminSidebar';
 import { useAuth } from '../AuthContext';
 import { Bell, Search, Calendar, Menu, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
+import { useSocket } from '../contexts/SocketContext';
+import { NotificationDropdown } from './NotificationDropdown';
+import { cn } from '../lib/cn';
 
 export const AdminLayout = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
+  const { unreadCount } = useSocket();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 
   const today = new Date().toLocaleDateString('vi-VN', {
     weekday: 'long',
@@ -65,10 +70,27 @@ export const AdminLayout = ({ children }: { children: ReactNode }) => {
               />
             </div>
 
-            <button className="relative p-2 text-gray-400 hover:text-brand transition-colors">
-              <Bell className="w-5 h-5 lg:w-6 h-6" />
-              <span className="absolute top-2 right-2 w-2 h-2 bg-danger rounded-full border-2 border-white"></span>
-            </button>
+            <div className="relative">
+              <button 
+                onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+                className={cn(
+                  "relative p-2 rounded-xl transition-all",
+                  isNotificationsOpen ? "bg-brand/10 text-brand" : "text-gray-400 hover:text-brand bg-gray-50"
+                )}
+              >
+                <Bell className="w-5 h-5 lg:w-6 h-6" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[20px] h-5 bg-danger text-white text-[10px] font-black flex items-center justify-center rounded-full border-2 border-white px-1">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
+              </button>
+              
+              <NotificationDropdown 
+                isOpen={isNotificationsOpen} 
+                onClose={() => setIsNotificationsOpen(false)} 
+              />
+            </div>
 
             <div className="h-9 w-9 lg:h-10 lg:w-10 rounded-full bg-slate-900 flex items-center justify-center text-white font-black text-xs border-2 border-brand/20 shrink-0">
               {user?.name?.charAt(0).toUpperCase() || 'A'}

@@ -5,7 +5,8 @@ import {
   ShoppingCart, Utensils, AlertCircle, Timer, Coffee,
   Sun, Moon // Thêm icon cho mode
 } from 'lucide-react';
-import axios from '@/src/lib/axiosClient';
+import axiosInstance from '@/src/lib/axiosClient';
+import axios from 'axios';
 import { io } from 'socket.io-client';
 import { useNavigate } from 'react-router-dom';
 import { Order, OrderItem } from '../../types';
@@ -13,9 +14,10 @@ import { useAuth } from '../../AuthContext';
 import { Button } from '../../components/Button';
 import { cn } from '../../lib/cn';
 
-const socket = io();
+import { useSocket } from '../../contexts/SocketContext';
 
 export const KitchenDisplay = () => {
+  const { socket } = useSocket();
   const [orders, setOrders] = useState<Order[]>([]);
   const [tableNameMap, setTableNameMap] = useState<Record<string, string>>({});
   const [isDark, setIsDark] = useState(true); // State quản lý mode
@@ -25,7 +27,7 @@ export const KitchenDisplay = () => {
   // --- GIỮ NGUYÊN LOGIC NGHIỆP VỤ ---
   const handleAuthFailure = () => {
     logout();
-    navigate('/login', { replace: true });
+    navigate('/auth/login', { replace: true });
   };
 
   useEffect(() => {
@@ -62,7 +64,7 @@ export const KitchenDisplay = () => {
   }, []);
 
   const fetchTables = () => {
-    axios.get('/api/tables')
+    axiosInstance.get('/api/tables')
       .then(res => {
         const map: Record<string, string> = {};
         (res.data || []).forEach((t: any) => {
@@ -75,7 +77,7 @@ export const KitchenDisplay = () => {
   };
 
   const fetchOrders = () => {
-    axios.get('/api/orders')
+    axiosInstance.get('/api/orders')
       .then(res => {
         const activeOrders = (res.data || []).filter((o: Order) => {
           if (o.status !== 'active') return false;
@@ -94,7 +96,7 @@ export const KitchenDisplay = () => {
 
   const approveAllItems = async (orderId: string) => {
     try {
-      await axios.put(`/api/orders/${orderId}/approve-all`);
+      await axiosInstance.put(`/api/orders/${orderId}/approve-all`);
       fetchOrders();
     } catch (err) {
       if (axios.isAxiosError(err) && err.response?.status === 401) {
@@ -106,7 +108,7 @@ export const KitchenDisplay = () => {
 
   const updateItemStatus = async (orderId: string, itemId: string, status: OrderItem['status']) => {
     try {
-      await axios.put(`/api/orders/${orderId}/item/${itemId}/status`, { status });
+      await axiosInstance.put(`/api/orders/${orderId}/item/${itemId}/status`, { status });
       fetchOrders();
     } catch (err) {
       if (axios.isAxiosError(err) && err.response?.status === 401) {
@@ -162,7 +164,7 @@ export const KitchenDisplay = () => {
             {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
           </button>
 
-          <div className={cn("w-[1px] h-8 mx-2", isDark ? "bg-white/10" : "bg-slate-200")} />
+          <div className={cn("w-px h-8 mx-2", isDark ? "bg-white/10" : "bg-slate-200")} />
 
           <Button
             variant="ghost"
@@ -176,8 +178,22 @@ export const KitchenDisplay = () => {
             Sơ đồ bàn
           </Button>
           
+          <Button
+            variant="ghost"
+            onClick={() => navigate('/admin')}
+            className={cn(
+              "rounded-xl h-12 px-5 transition-all",
+              isDark ? "text-slate-400 hover:text-white hover:bg-white/5" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+            )}
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Admin
+          </Button>
+
+          <div className={cn("w-px h-8 mx-2", isDark ? "bg-white/10" : "bg-slate-200")} />
+
           <button
-            onClick={() => { logout(); navigate('/login'); }}
+            onClick={() => { logout(); navigate('/auth/login'); }}
             className="h-12 w-12 flex items-center justify-center rounded-xl bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white transition-all duration-300"
           >
             <LogOut className="w-5 h-5" />

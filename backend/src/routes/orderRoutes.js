@@ -23,8 +23,6 @@ router.post("/counter", authorize(["staff", "admin"]), orderController.createCou
 
 router.put("/:sessionId/approve-all", authorize(["staff", "admin", "chef"]), orderController.approveAllItems);
 router.put("/:sessionId/item/:itemId/status", authorize(["staff", "admin", "chef"]), orderController.updateItemStatus);
-router.post("/:id/complete", authorize(["staff", "admin"]), orderController.completeOrder); // Chốt đơn, đóng phiên & giải phóng bàn
-
 
 // FIX #1: PUT/DELETE toàn bộ order giờ yêu cầu token, ngăn khách xóa bill người khác
 router.put("/:id", authorize(["staff", "admin"]), orderController.updateOrder);

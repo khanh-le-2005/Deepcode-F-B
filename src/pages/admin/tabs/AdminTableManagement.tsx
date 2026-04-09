@@ -225,7 +225,7 @@ export const AdminTableManagement = () => {
                 <p className="text-gray-400 font-bold text-xs uppercase tracking-widest mt-3">Mã QR Gọi Món</p>
               </div>
 
-              <div className="bg-white p-10 rounded-[3rem] shadow-card border border-gray-100 inline-block mx-auto mb-10 group relative transition-transform hover:scale-105 duration-500">
+              <div className="bg-white p-10 rounded-[3rem] shadow-card border border-gray-100 mx-auto mb-10 group relative transition-transform hover:scale-105 duration-500 flex items-center justify-center">
                 <QRCodeSVG 
                   value={`${getPublicAppUrl()}/table/${selectedQR.slug || selectedQR.id}`} 
                   size={240}

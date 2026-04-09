@@ -192,7 +192,7 @@ export const AdminOrderManagement = () => {
                         <h4 className="text-xl font-bold font-serif text-gray-900">Bàn {tableNameMap[order.tableId] || order.tableId}</h4>
                         <div className="flex items-center gap-2 mt-1">
                           <span className={cn(
-                            "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-[0.15em] border",
+                            "inline-flex items-center justify-center px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-[0.15em] border whitespace-nowrap",
                             getStatusColor(order.status)
                           )}>
                             {getStatusLabel(order.status)}

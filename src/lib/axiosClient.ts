@@ -34,58 +34,19 @@ axiosClient.interceptors.request.use(
   }
 );
 
-// Response interceptor: Tự động Refresh Token khi gặp lỗi 401
+// Response interceptor: Đơn giản hóa để khớp với Backend (không có Refresh Token)
 axiosClient.interceptors.response.use(
   (response) => response,
-  async (error) => {
-    const originalRequest = error.config;
+  (error) => {
     const status = error?.response?.status;
 
-    // Chỉ thử refresh nếu lỗi là 401 (Unauthorized) và không ở trang login
-    if (status === 401 && !originalRequest._retry && !originalRequest.url?.includes('/auth/login')) {
-      if (isRefreshing) {
-        return new Promise((resolve, reject) => {
-          failedQueue.push({ resolve, reject });
-        })
-          .then((token) => {
-            originalRequest.headers.Authorization = `Bearer ${token}`;
-            return axiosClient(originalRequest);
-          })
-          .catch((err) => Promise.reject(err));
-      }
-
-      originalRequest._retry = true;
-      isRefreshing = true;
-
-      try {
-        // Gọi API cấp lại Access Token mới (Backend đọc Refresh Token từ Cookie)
-        const response = await axios.post(
-          `${axiosClient.defaults.baseURL}/api/auth/refresh-token`,
-          {},
-          { withCredentials: true }
-        );
-
-        const { accessToken } = response.data;
-        localStorage.setItem('qr_dine_access_token', accessToken);
-        
-        axiosClient.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
-        originalRequest.headers.Authorization = `Bearer ${accessToken}`;
-
-        processQueue(null, accessToken);
-        return axiosClient(originalRequest);
-      } catch (refreshError) {
-        processQueue(refreshError, null);
-        
-        // Refresh thất bại -> Xoá sạch session và đá về Login
+    // Nếu gặp lỗi 401 (Unauthorized) ở các trang bảo mật -> Yêu cầu đăng nhập lại
+    if (status === 401) {
+      const isAuthPage = window.location.pathname.startsWith('/auth/login');
+      if (!isAuthPage && (window.location.pathname.startsWith('/admin') || window.location.pathname.startsWith('/staff') || window.location.pathname.startsWith('/kitchen'))) {
         localStorage.removeItem('qr_dine_access_token');
         localStorage.removeItem('qr_dine_user');
-        
-        if (window.location.pathname.startsWith('/admin') || window.location.pathname.startsWith('/staff') || window.location.pathname.startsWith('/kitchen')) {
-          window.location.href = '/auth/login?expired=true';
-        }
-        return Promise.reject(refreshError);
-      } finally {
-        isRefreshing = false;
+        window.location.href = '/auth/login?expired=true';
       }
     }
 

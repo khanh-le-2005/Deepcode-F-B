@@ -17,13 +17,15 @@ import { useTableValidation } from '../../hooks/useTableValidation';
 import { useCart } from '../../contexts/CartContext';
 import { getMenuItemCategoryName, getMenuItemId, getMenuItemImageUrl } from '../../lib/menuHelpers';
 
-const socket = io();
+import { useSocket } from '../../contexts/SocketContext';
 
 export const MenuPage = () => {
+  const { socket } = useSocket();
   const { tableId } = useParams();
   const [menu, setMenu] = useState<MenuItem[]>([]);
   const { cart, addToCart, removeFromCart, updateQuantity, totalPrice, totalItems, clearCart } = useCart();
   const [selectedCategory, setSelectedCategory] = useState('Tất cả');
+  const [searchTerm, setSearchTerm] = useState('');
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [toastItem, setToastItem] = useState<{ name: string, image: string } | null>(null);
@@ -102,9 +104,11 @@ export const MenuPage = () => {
 
   const visibleMenu = menu;
   const categories = ['Tất cả', ...new Set(visibleMenu.map(item => getMenuItemCategoryName(item)))];
-  const filteredMenu = selectedCategory === 'Tất cả'
-    ? visibleMenu
-    : visibleMenu.filter(item => getMenuItemCategoryName(item) === selectedCategory);
+  const filteredMenu = visibleMenu.filter(item => {
+    const matchesCategory = selectedCategory === 'Tất cả' || getMenuItemCategoryName(item) === selectedCategory;
+    const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesCategory && matchesSearch;
+  });
 
   const getItemImageUrl = (item: MenuItem): string => getMenuItemImageUrl(item);
 
@@ -201,6 +205,8 @@ export const MenuPage = () => {
         tableId={tableId}
         totalItems={displayTotalItems}
         onCartClick={() => setIsCartOpen(true)}
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
       />
 
       <section className="relative h-[300px] md:h-[400px] bg-[#111] flex flex-col items-center justify-center overflow-hidden">
@@ -211,7 +217,7 @@ export const MenuPage = () => {
         <div className="relative z-20 text-center px-4">
           <h2 className="text-5xl md:text-7xl font-black text-white mb-4 tracking-tight uppercase italic" style={{ fontFamily: "'Playfair Display', serif" }}>Sản Phẩm</h2>
           <div className="flex items-center justify-center gap-3 text-sm md:text-base font-bold uppercase tracking-[0.2em]">
-            <span className="text-gray-200 hover:text-red-600 transition-colors cursor-pointer" onClick={() => navigate('/')}>Trang chủ</span>
+            {/* <span className="text-gray-200 hover:text-red-600 transition-colors cursor-pointer" onClick={() => navigate('/')}>Trang chủ</span> */}
             <span className="text-red-600 text-xl font-black">»</span>
             <span className="text-red-600">Thực đơn {tableId ? `(Bàn ${tableId})` : '(Giao hàng)'}</span>
           </div>

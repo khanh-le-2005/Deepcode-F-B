@@ -312,7 +312,7 @@ export const AdminOrderHistory = () => {
                           <span className="text-lg font-black text-brand">{Number(order.total || 0).toLocaleString()}đ</span>
                         </td>
                         <td className="px-8 py-6">
-                          <span className="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-gray-50 text-gray-600 border border-gray-100">
+                          <span className="inline-flex items-center justify-center px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-gray-50 text-gray-600 border border-gray-100 whitespace-nowrap">
                             {order.paymentStatus === 'paid' ? 'Đã thu' : order.paymentStatus}
                           </span>
                         </td>
@@ -326,7 +326,7 @@ export const AdminOrderHistory = () => {
                           </div>
                         </td>
                         <td className="px-8 py-6">
-                          <span className={cn("px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border", statusColor(order.status))}>
+                          <span className={cn("inline-flex items-center justify-center px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border whitespace-nowrap", statusColor(order.status))}>
                             {statusLabel(order.status)}
                           </span>
                         </td>
@@ -420,7 +420,7 @@ export const AdminOrderHistory = () => {
                           </div>
                         </td>
                         <td className="px-8 py-6">
-                           <span className={cn("px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border", getPStatusColor(payment.status))}>
+                           <span className={cn("inline-flex items-center justify-center px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border whitespace-nowrap", getPStatusColor(payment.status))}>
                             {getPStatusLabel(payment.status)}
                           </span>
                         </td>

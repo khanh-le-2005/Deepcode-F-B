@@ -1,98 +1,46 @@
-import { User } from "../models/User.js";
-import JwtUtil from "./JwtUtil.js";
-import { UnauthorizedError } from "../utils/AppError.js";
-import bcrypt from "bcryptjs";
+import { User } from '../models/User.js';
+import JwtUtil from './JwtUtil.js';
+import { UnauthorizedError } from '../utils/AppError.js';
 
 class AuthService {
   async authenticateUser(email, password) {
     const user = await User.findOne({ email });
-    if (!user) {
-      throw new UnauthorizedError("Email hoặc mật khẩu không chính xác");
+    if (!user || !(await user.comparePassword(password))) {
+      throw new UnauthorizedError('Email hoặc mật khẩu không chính xác');
     }
-
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      throw new UnauthorizedError("Email hoặc mật khẩu không chính xác");
-    }
-
+    
     const userObj = user.toObject();
     delete userObj.password;
-    delete userObj.refreshTokens;
 
     const payload = {
       id: user._id,
+      role: user.role,
+      email: user.email,
+      name: user.name
     };
 
-    // Tạo 2 loại token
-    const accessToken = JwtUtil.generateAccessToken(payload);
-    const refreshToken = JwtUtil.generateRefreshToken({ id: user._id });
+    const token = JwtUtil.generateToken(payload);
+    const refreshToken = JwtUtil.generateRefreshToken(payload);
 
-    // Lưu Refresh Token vào Database
-    user.refreshTokens.push(refreshToken);
-    await user.save();
-
-    return { user: userObj, accessToken, refreshToken };
+    return { user: userObj, token, refreshToken };
   }
 
-  async refreshAccessToken(oldRefreshToken) {
-    if (!oldRefreshToken) {
-      throw new UnauthorizedError("Refresh Token không tồn tại");
-    }
-
-    // 1. Giải mã kiểm tra token còn hạn không
-    const decoded = JwtUtil.verifyRefreshToken(oldRefreshToken);
+  async refreshAccessToken(refreshToken) {
+    const decoded = JwtUtil.verifyRefreshToken(refreshToken);
     if (!decoded) {
-      // Nếu token hết hạn, xoá token rác trong DB
-      await User.updateOne(
-        { refreshTokens: oldRefreshToken },
-        { $pull: { refreshTokens: oldRefreshToken } },
-      );
-      throw new UnauthorizedError(
-        "Refresh Token đã hết hạn hoặc không hợp lệ. Vui lòng đăng nhập lại.",
-      );
+      throw new UnauthorizedError('Refresh token không hợp lệ hoặc đã hết hạn');
     }
 
-    // 2. Tìm User có chứa mã refresh token này không (Chống token bị thu hồi nhưng vẫn cố xài)
-    const user = await User.findOne({
-      _id: decoded.id,
-      refreshTokens: oldRefreshToken,
-    });
+    const user = await User.findById(decoded.id);
     if (!user) {
-      // Cảnh báo bảo mật: Ai đó đang dùng token cũ đã bị thu hồi -> Xoá sạch mọi token của user này
-      await User.updateOne(
-        { _id: decoded.id },
-        { $set: { refreshTokens: [] } },
-      );
-      throw new UnauthorizedError(
-        "Bảo mật: Phát hiện dấu hiệu bất thường, yêu cầu đăng nhập lại.",
-      );
+      throw new UnauthorizedError('Tài khoản không tồn tại');
     }
 
-    // 3. Xoay vòng Token (Cấp token mới, xoá token cũ)
-    const payload = {
-      id: user._id,
-    };
+    const payload = { id: user._id, role: user.role, email: user.email, name: user.name };
+    const newToken = JwtUtil.generateToken(payload);
+    const newRefreshToken = JwtUtil.generateRefreshToken(payload);
 
-    const newAccessToken = JwtUtil.generateAccessToken(payload);
-    const newRefreshToken = JwtUtil.generateRefreshToken({ id: user._id });
-
-    // Cập nhật lại mảng token trong DB
-    user.refreshTokens = user.refreshTokens.filter(
-      (t) => t !== oldRefreshToken,
-    );
-    user.refreshTokens.push(newRefreshToken);
-    await user.save();
-
-    return { newAccessToken, newRefreshToken };
-  }
-
-  async logoutUser(refreshToken) {
-    if (refreshToken) {
-      await User.updateOne(
-        { refreshTokens: refreshToken },
-        { $pull: { refreshTokens: refreshToken } },
-      );
-    }
+    return { token: newToken, refreshToken: newRefreshToken };
   }
 }
 

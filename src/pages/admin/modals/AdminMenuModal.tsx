@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import React from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { X, Upload, Image as ImageIcon, Plus, Trash2 } from 'lucide-react';
 import axios from '@/src/lib/axiosClient';
 import { MenuItem, MenuItemOption, MenuItemAddon, Category } from '../../../types';
@@ -44,6 +44,142 @@ export const AdminMenuModal = ({
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // --- Image Suggestion Logic ---
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [galleryImageIds, setGalleryImageIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (item) {
+      const ids = item.images || [];
+      setGalleryImageIds(ids);
+      const existingImages = ids.map((imageId) => `/api/images/${imageId}`);
+      setFormData({
+        name: item.name,
+        price: item.price,
+        categoryId: getCategoryId(item.categoryId),
+        description: item.description,
+        status: item.status,
+        previewImages: existingImages,
+        options: item.options ?? [],
+        addons: item.addons ?? [],
+      });
+      setSelectedFiles([]);
+    } else {
+      setFormData({
+        name: '',
+        price: 0,
+        categoryId: '',
+        description: '',
+        status: 'available',
+        previewImages: [],
+        options: [],
+        addons: [],
+      });
+      setSelectedFiles([]);
+      setGalleryImageIds([]);
+    }
+  }, [item, isOpen]);
+
+  useEffect(() => {
+    if (!formData.name.trim() || formData.name.length < 2 || item) {
+      setSuggestions([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const res = await axios.get(`/api/images/suggest?keyword=${encodeURIComponent(formData.name)}`);
+        if (res.data?.success) {
+          setSuggestions(res.data.data || []);
+        }
+      } catch (err) {
+        console.error("Image suggestion error:", err);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 800);
+
+    return () => clearTimeout(timer);
+  }, [formData.name, item]);
+
+  const selectSuggestedImage = (img: any) => {
+    const imgId = img._id || img.id;
+    if (galleryImageIds.includes(imgId)) return;
+    
+    setGalleryImageIds(prev => [...prev, imgId]);
+    setFormData(prev => ({
+      ...prev,
+      previewImages: [...prev.previewImages, `/api/images/${imgId}`]
+    }));
+    setSuggestions([]);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    if (files.length + galleryImageIds.length > 5) {
+      alert('Tối đa 5 ảnh cho mỗi món.');
+      return;
+    }
+
+    const validFiles = files.filter((file) => (file as File).type.startsWith('image/')) as File[];
+    setSelectedFiles(prev => [...prev, ...validFiles]);
+
+    Promise.all(
+      validFiles.map(file => new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+        reader.readAsDataURL(file);
+      }))
+    ).then(previews => {
+      setFormData(prev => ({ ...prev, previewImages: [...prev.previewImages, ...previews] }));
+    });
+  };
+
+  const removePreview = (index: number) => {
+    setFormData(prev => {
+      const newPreviews = [...prev.previewImages];
+      newPreviews.splice(index, 1);
+      return { ...prev, previewImages: newPreviews };
+    });
+
+    // Nếu ảnh là từ gallery, xoá khỏi IDs
+    const totalGallery = galleryImageIds.length;
+    if (index < totalGallery) {
+      setGalleryImageIds(prev => prev.filter((_, i) => i !== index));
+    } else {
+      // Nếu là file upload, xoá khỏi selectedFiles
+      setSelectedFiles(prev => prev.filter((_, i) => i !== (index - totalGallery)));
+    }
+  };
+
+  // --- Options helpers ---
+  const addOption = () => setFormData(prev => ({ ...prev, options: [...prev.options, { name: '', priceExtra: 0 }] }));
+  const updateOption = (i: number, field: keyof MenuItemOption, val: string | number) =>
+    setFormData(prev => { const o = [...prev.options]; o[i] = { ...o[i], [field]: val }; return { ...prev, options: o }; });
+  const removeOption = (i: number) => setFormData(prev => ({ ...prev, options: prev.options.filter((_, idx) => idx !== i) }));
+
+  // --- Addons helpers ---
+  const addAddon = () => setFormData(prev => ({ ...prev, addons: [...prev.addons, { name: '', priceExtra: 0 }] }));
+  const updateAddon = (i: number, field: keyof MenuItemAddon, val: string | number) =>
+    setFormData(prev => { const a = [...prev.addons]; a[i] = { ...a[i], [field]: val }; return { ...prev, addons: a }; });
+  const removeAddon = (i: number) => setFormData(prev => ({ ...prev, addons: prev.addons.filter((_, idx) => idx !== i) }));
+
+  const handleSave = () => {
+    const { previewImages, ...rest } = formData;
+    const cleanedData = {
+      ...rest,
+      // Gửi kèm mảng IDs ảnh từ thư viện
+      images: galleryImageIds,
+      options: rest.options.filter(o => o.name.trim() !== ''),
+      addons: rest.addons.filter(a => a.name.trim() !== ''),
+    };
+    onSave(cleanedData, selectedFiles.length > 0 ? selectedFiles : null);
+  };
+
   useEffect(() => {
     axios.get('/api/categories')
       .then((res) => {
@@ -73,92 +209,6 @@ export const AdminMenuModal = ({
       .catch((error) => console.error('Failed to fetch categories:', error));
   }, []);
 
-  useEffect(() => {
-    if (item) {
-      const existingImages = item.images?.map((imageId) => `/api/images/${imageId}`) ?? [];
-      setFormData({
-        name: item.name,
-        price: item.price,
-        categoryId: getCategoryId(item.categoryId),
-        description: item.description,
-        status: item.status,
-        previewImages: existingImages.length > 0 ? existingImages : (item.images?.[0] ? [getMenuItemImageUrl(item)] : []),
-        options: item.options ?? [],
-        addons: item.addons ?? [],
-      });
-      setSelectedFiles([]);
-    } else {
-      setFormData({
-        name: '',
-        price: 0,
-        categoryId: '',
-        description: '',
-        status: 'available',
-        previewImages: [],
-        options: [],
-        addons: [],
-      });
-      setSelectedFiles([]);
-    }
-  }, [item, isOpen]);
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    if (files.length === 0) return;
-
-    if (files.length > 5) {
-      alert('Tối đa 5 ảnh cho mỗi món.');
-      return;
-    }
-
-    const validFiles = files.filter((file) => (file as File).type.startsWith('image/')) as File[];
-    if (validFiles.length !== files.length) {
-      alert('Vui lòng chọn file hình ảnh.');
-      return;
-    }
-
-    const tooLarge = validFiles.find((file: File) => file.size > 5 * 1024 * 1024);
-    if (tooLarge) {
-      alert('Ảnh quá lớn! Vui lòng chọn ảnh dưới 5MB.');
-      return;
-    }
-
-    setSelectedFiles(validFiles);
-
-    Promise.all(
-      validFiles.map(file => new Promise<string>((resolve) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(typeof reader.result === 'string' ? reader.result : '');
-        reader.readAsDataURL(file);
-      }))
-    ).then(previewImages => {
-      setFormData(prev => ({ ...prev, previewImages }));
-    });
-  };
-
-  // --- Options helpers ---
-  const addOption = () => setFormData(prev => ({ ...prev, options: [...prev.options, { name: '', priceExtra: 0 }] }));
-  const updateOption = (i: number, field: keyof MenuItemOption, val: string | number) =>
-    setFormData(prev => { const o = [...prev.options]; o[i] = { ...o[i], [field]: val }; return { ...prev, options: o }; });
-  const removeOption = (i: number) => setFormData(prev => ({ ...prev, options: prev.options.filter((_, idx) => idx !== i) }));
-
-  // --- Addons helpers ---
-  const addAddon = () => setFormData(prev => ({ ...prev, addons: [...prev.addons, { name: '', priceExtra: 0 }] }));
-  const updateAddon = (i: number, field: keyof MenuItemAddon, val: string | number) =>
-    setFormData(prev => { const a = [...prev.addons]; a[i] = { ...a[i], [field]: val }; return { ...prev, addons: a }; });
-  const removeAddon = (i: number) => setFormData(prev => ({ ...prev, addons: prev.addons.filter((_, idx) => idx !== i) }));
-
-  const handleSave = () => {
-    const { previewImages, ...rest } = formData;
-    // Lọc bỏ options/addons chưa điền tên để tránh lỗi validation backend
-    const cleanedData = {
-      ...rest,
-      options: rest.options.filter(o => o.name.trim() !== ''),
-      addons: rest.addons.filter(a => a.name.trim() !== ''),
-    };
-    onSave(cleanedData, selectedFiles.length > 0 ? selectedFiles : null);
-  };
-
   if (!isOpen) return null;
 
   return (
@@ -179,7 +229,7 @@ export const AdminMenuModal = ({
 
         <div className="p-8 space-y-6 max-h-[70vh] overflow-y-auto">
           {/* Tên món */}
-          <div className="space-y-2">
+          <div className="space-y-2 relative">
             <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Tên món</label>
             <input
               type="text"
@@ -188,6 +238,34 @@ export const AdminMenuModal = ({
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-amber-500/20"
             />
+            
+            {/* Image Suggestions Grid */}
+            <AnimatePresence>
+              {suggestions.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-100 rounded-3xl shadow-2xl z-50 p-4"
+                >
+                  <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-3 px-1">Gợi ý từ thư viện</p>
+                  <div className="grid grid-cols-4 gap-2">
+                    {suggestions.map((img, i) => (
+                      <div
+                        key={img._id || i}
+                        onClick={() => selectSuggestedImage(img)}
+                        className="aspect-square rounded-xl overflow-hidden cursor-pointer hover:ring-2 hover:ring-amber-500 transition-all group relative"
+                      >
+                        <img src={`/api/images/${img._id}`} alt={img.displayName} className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white">
+                          <Plus className="w-5 h-5" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -219,30 +297,26 @@ export const AdminMenuModal = ({
 
           {/* Upload ảnh */}
           <div className="space-y-2">
-            <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Hình ảnh</label>
-            <div
-              onClick={() => fileInputRef.current?.click()}
-              className="relative w-full h-40 bg-gray-50 border-2 border-dashed border-gray-200 rounded-3xl flex flex-col items-center justify-center cursor-pointer hover:bg-gray-100 hover:border-amber-400 transition-all overflow-hidden group"
-            >
-              <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" multiple className="hidden" />
-              {formData.previewImages.length > 0 ? (
-                <>
-                  <div className="w-full h-full grid grid-cols-2 gap-1 p-1">
-                    {formData.previewImages.slice(0, 4).map((preview, index) => (
-                      <img key={index} src={preview} alt={`Preview ${index + 1}`} className="w-full h-full object-cover rounded-2xl" />
-                    ))}
-                  </div>
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <div className="flex items-center gap-2 text-white font-bold text-sm">
-                      <Upload className="w-5 h-5" /> Thay đổi ảnh ({formData.previewImages.length})
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <div className="flex flex-col items-center gap-2 text-gray-400">
-                  <div className="p-3 bg-white rounded-2xl shadow-sm"><ImageIcon className="w-6 h-6" /></div>
-                  <span className="text-sm font-bold">Nhấn để tải ảnh lên</span>
-                  <span className="text-[10px] font-bold uppercase tracking-widest">Tối đa 5 ảnh</span>
+            <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Hình ảnh ({formData.previewImages.length}/5)</label>
+            <div className="grid grid-cols-3 gap-2 mb-2">
+              {formData.previewImages.map((preview, index) => (
+                <div key={index} className="relative aspect-square group">
+                  <img src={preview} alt="Preview" className="w-full h-full object-cover rounded-2xl border border-gray-100" />
+                  <button
+                    onClick={() => removePreview(index)}
+                    className="absolute -top-1 -right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+              {formData.previewImages.length < 5 && (
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="aspect-square bg-gray-50 border-2 border-dashed border-gray-200 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:bg-gray-100 hover:border-amber-400 transition-all"
+                >
+                  <Plus className="w-6 h-6 text-gray-300" />
+                  <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" multiple className="hidden" />
                 </div>
               )}
             </div>

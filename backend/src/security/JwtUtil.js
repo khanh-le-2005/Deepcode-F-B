@@ -1,38 +1,31 @@
-import jwt from "jsonwebtoken";
-import { env } from "../config/env.js";
+import jwt from 'jsonwebtoken';
 
-const ACCESS_TOKEN_SECRET = env.JWT_ACCESS_SECRET;
-const REFRESH_TOKEN_SECRET = env.JWT_REFRESH_SECRET;
-
-// Báo lỗi ngay nếu quên file .env
-if (!ACCESS_TOKEN_SECRET || !REFRESH_TOKEN_SECRET) {
-  console.error(
-    "❌ FATAL ERROR: JWT Secret chưa được cấu hình trong file .env!",
-  );
-  process.exit(1);
-}
+const ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || 'access-secret-fallback';
+const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'refresh-secret-fallback';
 
 class JwtUtil {
-  generateAccessToken(payload) {
-    return jwt.sign(payload, ACCESS_TOKEN_SECRET, { expiresIn: "15m" });
+  // Access Token: sống 1 giờ
+  generateToken(payload) {
+    return jwt.sign(payload, ACCESS_SECRET, { expiresIn: '1h' });
   }
 
+  // Refresh Token: sống 7 ngày
   generateRefreshToken(payload) {
-    return jwt.sign(payload, REFRESH_TOKEN_SECRET, { expiresIn: "1d" });
+    return jwt.sign({ id: payload.id }, REFRESH_SECRET, { expiresIn: '7d' });
   }
 
-  verifyAccessToken(token) {
+  verifyToken(token) {
     try {
-      return jwt.verify(token, ACCESS_TOKEN_SECRET);
-    } catch (error) {
+      return jwt.verify(token, ACCESS_SECRET);
+    } catch {
       return null;
     }
   }
 
   verifyRefreshToken(token) {
     try {
-      return jwt.verify(token, REFRESH_TOKEN_SECRET);
-    } catch (error) {
+      return jwt.verify(token, REFRESH_SECRET);
+    } catch {
       return null;
     }
   }

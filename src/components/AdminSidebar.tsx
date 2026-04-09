@@ -38,7 +38,6 @@ export const AdminSidebar = ({ isOpen, onClose }: AdminSidebarProps) => {
   const menuItems = [
     { icon: LayoutDashboard, label: 'Dashboard', path: '/admin' },
     { icon: Grid, label: 'Quản lý bàn', path: '/admin/tables' },
-    { icon: Bell, label: 'Thông báo', path: '/admin/notifications' },
     { icon: Tags, label: 'Danh mục', path: '/admin/categories' },
     { icon: UtensilsCrossed, label: 'Quản lý menu', path: '/admin/menu' },
     { icon: CalendarDays, label: 'Thực đơn tuần', path: '/admin/weekly-menu' },
@@ -50,6 +49,7 @@ export const AdminSidebar = ({ isOpen, onClose }: AdminSidebarProps) => {
     { icon: Landmark, label: 'Ngân hàng', path: '/admin/bank-accounts' },
     { icon: UserIcon, label: 'Nhân viên', path: '/admin/users' },
     { icon: BarChart3, label: 'Báo cáo', path: '/admin/reports' },
+    { icon: Bell, label: 'Thông báo', path: '/admin/notifications' },
     { icon: Settings, label: 'Cài đặt', path: '/admin/settings' },
   ];
 

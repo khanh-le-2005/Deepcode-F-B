@@ -182,6 +182,14 @@ export const AdminWeeklyMenuManagement = () => {
   const selectedMenuItems = menuItems.filter(item => form.menuItems.includes(item.id || item._id || ''));
   const selectedItemCount = form.menuItems.length;
   const activeCount = weeklyMenus.filter(menu => menu.status === 'active').length;
+  const resolveMenuItemLabel = (item: string | { _id?: string; id?: string; name?: string; title?: string }) => {
+    if (typeof item === 'object' && item) {
+      return item.name || item.title || item._id || item.id || '';
+    }
+
+    const matchedItem = menuItems.find(menuItem => (menuItem.id || menuItem._id || '') === item);
+    return matchedItem?.name || matchedItem?.title || item;
+  };
 
   return (
     <div className="space-y-10 pb-12">
@@ -230,7 +238,7 @@ export const AdminWeeklyMenuManagement = () => {
         <AnimatePresence>
           {filteredMenus.map((menu, i) => {
             const menuId = menu.id || menu._id || '';
-            const itemNames = (menu.menuItems || []).map((item: any) => item?.name || item?.title || item).filter(Boolean);
+            const itemNames = (menu.menuItems || []).map(resolveMenuItemLabel).filter(Boolean);
             return (
               <motion.div
                 layout

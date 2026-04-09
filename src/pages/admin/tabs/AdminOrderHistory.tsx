@@ -304,8 +304,8 @@ export const AdminOrderHistory = () => {
                         </td>
                         <td className="px-8 py-6">
                           <div className="space-y-1">
-                            <p className="text-sm font-bold text-gray-800">{order.tableName || 'Chưa xác định'}</p>
-                            <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">{order.tableId}</p>
+                            <p className="text-sm font-bold text-gray-800">{"Bàn " + order.tableName || 'Chưa xác định'}</p>
+                            {/* <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">{"bàn " + order.tableName}</p> */}
                           </div>
                         </td>
                         <td className="px-8 py-6">

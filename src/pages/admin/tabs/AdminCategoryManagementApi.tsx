@@ -401,9 +401,6 @@ export const AdminCategoryManagement = () => {
                 <h3 className="mt-2 text-2xl font-black text-slate-900 font-serif">
                   {editingCategory ? 'Chỉnh sửa danh mục' : 'Tạo danh mục mới'}
                 </h3>
-                <p className="mt-2 text-sm leading-6 text-gray-500">
-                  Dùng đúng `POST/PUT /api/categories` của backend, có upload ảnh danh mục.
-                </p>
               </div>
               <button
                 onClick={() => {

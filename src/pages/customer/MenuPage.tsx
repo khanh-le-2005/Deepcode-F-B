@@ -29,6 +29,7 @@ export const MenuPage = () => {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [toastItem, setToastItem] = useState<{ name: string, image: string } | null>(null);
+  const [selectedOptionsMap, setSelectedOptionsMap] = useState<Record<string, any>>({});
   const navigate = useNavigate();
   const { status } = useTableValidation(tableId);
 
@@ -112,7 +113,70 @@ export const MenuPage = () => {
 
   const getItemImageUrl = (item: MenuItem): string => getMenuItemImageUrl(item);
 
+  const handleQuickAdd = async (item: MenuItem) => {
+    const itemId = getMenuItemId(item);
+    const selectedOption = selectedOptionsMap[itemId];
+
+    if (tableId) {
+      try {
+        const response = await axios.post('/api/orders', {
+          tableId,
+          items: [{
+            menuItemId: itemId,
+            name: item.name,
+            basePrice: item.price,
+            quantity: 1,
+            selectedOption,
+            selectedAddons: [],
+            image: getItemImageUrl(item),
+            category: getMenuItemCategoryName(item),
+          }]
+        });
+        if (response.data) {
+          setActiveSession(response.data);
+        } else {
+          await fetchActiveSession();
+        }
+        setToastItem({ name: item.name, image: getItemImageUrl(item) });
+        setTimeout(() => setToastItem(null), 3000);
+      } catch (err) {
+        console.error("Failed to add to shared cart", err);
+        const apiMessage = axiosLib.isAxiosError(err) ? err.response?.data?.error?.message || err.response?.data?.message : null;
+        alert(apiMessage || "Lỗi khi thêm món vào giỏ bàn. Vui lòng thử lại!");
+      }
+    } else {
+      const unitPrice = Number(item.price) + Number(selectedOption?.priceExtra || 0);
+      addToCart({
+        menuItemId: itemId,
+        name: item.name,
+        basePrice: item.price,
+        quantity: 1,
+        selectedOption,
+        selectedAddons: [],
+        totalPrice: unitPrice,
+        status: 'in_cart',
+        image: getItemImageUrl(item),
+        category: getMenuItemCategoryName(item),
+      } as any);
+      setToastItem({ name: item.name, image: getItemImageUrl(item) });
+      setTimeout(() => setToastItem(null), 3000);
+    }
+  };
+
+  const toggleCardOption = (menuItemId: string, option: any) => {
+    setSelectedOptionsMap(prev => ({
+      ...prev,
+      [menuItemId]: prev[menuItemId]?.name === option.name ? null : option
+    }));
+  };
+
   const handleAddToCart = async (item: MenuItem) => {
+    // Nếu món có options hoặc addons, bắt buộc qua trang detail để chọn
+    if (item.options?.length > 0 || item.addons?.length > 0) {
+      navigate(tableId ? `/table/${tableId}/menu/${item.id}` : `/menu/${item.id}`);
+      return;
+    }
+
     if (tableId) {
       try {
         const response = await axios.post('/api/orders', {
@@ -207,6 +271,9 @@ export const MenuPage = () => {
         onCartClick={() => setIsCartOpen(true)}
         searchTerm={searchTerm}
         onSearchChange={setSearchTerm}
+        categories={categories}
+        selectedCategory={selectedCategory}
+        onCategoryChange={setSelectedCategory}
       />
 
       <section className="relative h-[300px] md:h-[400px] bg-[#111] flex flex-col items-center justify-center overflow-hidden">
@@ -224,29 +291,8 @@ export const MenuPage = () => {
         </div>
       </section>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-16 flex flex-col lg:grid lg:grid-cols-12 gap-8 lg:gap-10">
-        <aside className="w-full lg:col-span-3 space-y-8 lg:space-y-10">
-          <div>
-            <h3 className="text-xl font-bold border-b-2 border-red-600 pb-2 mb-6 uppercase italic" style={{ fontFamily: "serif" }}>Danh mục món</h3>
-            <ul className="space-y-4">
-              {menu.length > 0 && categories.map(cat => (
-                <li
-                  key={cat}
-                  onClick={() => setSelectedCategory(cat)}
-                  className={cn("flex justify-between items-center cursor-pointer font-bold transition-colors group", selectedCategory === cat ? "text-red-600" : "text-gray-600 hover:text-red-600")}
-                >
-                  <span className="flex items-center gap-2">
-                    <ChevronRight className={cn("w-4 h-4 opacity-0 group-hover:opacity-100", selectedCategory === cat && "opacity-100")} />
-                    {cat}
-                  </span>
-                  <span className="text-xs text-gray-400">({visibleMenu.filter(i => cat === 'Tất cả' || getMenuItemCategoryName(i) === cat).length})</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </aside>
-
-        <div className="w-full lg:col-span-9">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-16">
+        <div className="w-full">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8 sm:mb-10 text-xs sm:text-sm font-bold text-gray-500 uppercase tracking-widest">
             <p>Hiển thị 1–{filteredMenu.length} trong tổng số {visibleMenu.length} món</p>
           </div>
@@ -269,17 +315,58 @@ export const MenuPage = () => {
                     <img src={getItemImageUrl(item)} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt={item.name} />
                   </div>
 
-                  <h3 className="text-base sm:text-xl font-bold text-gray-900 group-hover:text-red-600 transition-colors mb-1 sm:mb-2 italic cursor-pointer line-clamp-1" style={{ fontFamily: "'Playfair Display', serif" }} onClick={() => navigate(tableId ? `/table/${tableId}/menu/${item.id}` : `/menu/${item.id}`)}>
-                    {item.name}
+                  <h3 className="text-base sm:text-lg font-bold text-gray-900 group-hover:text-red-600 transition-colors mb-0.5 sm:mb-1 italic cursor-pointer line-clamp-1" style={{ fontFamily: "'Playfair Display', serif" }} onClick={() => navigate(tableId ? `/table/${tableId}/menu/${item.id}` : `/menu/${item.id}`)}>
+                    {item.name} {selectedOptionsMap[getMenuItemId(item)]?.name}
                   </h3>
-                  <div className="text-sm sm:text-lg font-bold text-red-600 mb-3 sm:mb-4" style={{ fontFamily: "'Playfair Display', serif" }}>
-                    {item.price.toLocaleString()}đ
+                  
+                  <div className="flex flex-col items-center gap-2 mb-3 sm:mb-4">
+                    <div className="text-sm sm:text-base font-black text-red-600 italic" style={{ fontFamily: "'Playfair Display', serif" }}>
+                      {(item.price + Number(selectedOptionsMap[getMenuItemId(item)]?.priceExtra || 0)).toLocaleString()}đ
+                    </div>
+                    
+                    {/* Size Selection Pill Buttons */}
+                    {item.options && item.options.length > 0 && (
+                      <div className="flex gap-1.5 mt-1">
+                        {item.options.map((opt: any) => {
+                          const isSelected = selectedOptionsMap[getMenuItemId(item)]?.name === opt.name;
+                          return (
+                            <button
+                              key={opt.name}
+                              onClick={(e) => { e.stopPropagation(); toggleCardOption(getMenuItemId(item), opt); }}
+                              className={cn(
+                                "px-2.5 py-1 rounded-full text-[12px] font-black uppercase tracking-tighter border transition-all",
+                                isSelected 
+                                  ? "bg-red-600 text-white border-red-600 shadow-sm" 
+                                  : "bg-gray-50 text-gray-400 border-gray-100 hover:border-gray-300"
+                              )}
+                              >
+                                {opt.name} {opt.priceExtra > 0 && `(+${opt.priceExtra.toLocaleString()}đ)`}
+                              </button>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
 
-                  <button onClick={(e) => { e.stopPropagation(); handleAddToCart(item); }} className="w-full mt-auto bg-red-600 text-white py-2 sm:py-2.5 rounded-xl font-bold text-[10px] sm:text-xs uppercase tracking-widest transition-all hover:shadow-lg flex items-center justify-center gap-2 border border-gray-200 hover:border-red-600 group/btn">
-                    <ShoppingBag className="w-3 h-3 sm:w-4 sm:h-4 group-hover/btn:scale-110 transition-transform" />
-                    Đặt món
-                  </button>
+                  <div className="w-full mt-auto space-y-2">
+                    {(item.options?.length > 0 || item.addons?.length > 0) && (
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); navigate(tableId ? `/table/${tableId}/menu/${item.id}` : `/menu/${item.id}`); }} 
+                        className="w-full py-2 sm:py-2.5 rounded-xl font-bold text-[10px] sm:text-xs uppercase tracking-widest transition-all hover:shadow-lg flex items-center justify-center gap-2 border border-gray-200 bg-white text-gray-900 group/btn"
+                      >
+                        <ShoppingBag className="w-3 h-3 sm:w-4 sm:h-4 group-hover/btn:scale-110 transition-transform" />
+                        Tuỳ chọn
+                      </button>
+                    )}
+                    
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); handleQuickAdd(item); }} 
+                      className="w-full py-2 sm:py-2.5 rounded-xl font-bold text-[10px] sm:text-xs uppercase tracking-widest transition-all hover:shadow-lg flex items-center justify-center gap-2 bg-red-600 text-white border border-transparent group/btn"
+                    >
+                      <ShoppingBag className="w-3 h-3 sm:w-4 sm:h-4 group-hover/btn:scale-110 transition-transform" />
+                      {(item.options?.length > 0 || item.addons?.length > 0) ? "Đặt nhanh" : "Đặt món"}
+                    </button>
+                  </div>
                 </motion.div>
               ))}
             </div>
@@ -338,7 +425,17 @@ export const MenuPage = () => {
                             <img src={item.image ?? ''} className="w-20 h-20 rounded-2xl object-cover" alt="" />
                             <div className="flex-1">
                               <h4 className="font-bold italic text-lg" style={{ fontFamily: "'Playfair Display', serif" }}>{item.name}</h4>
-                              <p className="text-red-600 font-bold">{(item.totalPrice / item.quantity).toLocaleString()}đ</p>
+                              
+                              {(item.selectedOption || (item.selectedAddons && item.selectedAddons.length > 0)) && (
+                                <div className="mt-1 space-y-0.5">
+                                  {item.selectedOption && <p className="text-[15px] text-gray-500 italic">• {item.selectedOption.name}</p>}
+                                  {item.selectedAddons?.map((addon: any, addonIdx: number) => (
+                                    <p key={addonIdx} className="text-[15px] text-gray-500 italic">• {addon.name}</p>
+                                  ))}
+                                </div>
+                              )}
+
+                              <p className="text-red-600 font-bold mt-1 text-base">{(item.totalPrice / item.quantity).toLocaleString()}đ</p>
                               <div className="flex items-center gap-4 mt-2">
                                 <div className="flex items-center border border-gray-200 rounded-lg bg-white overflow-hidden">
                                   {tableId ? (
@@ -374,6 +471,16 @@ export const MenuPage = () => {
                             <img src={item.image ?? ''} className="w-16 h-16 rounded-2xl object-cover" alt="" />
                             <div className="flex-1">
                               <h4 className="font-bold italic text-base" style={{ fontFamily: "'Playfair Display', serif" }}>{item.name}</h4>
+                              
+                              {(item.selectedOption || (item.selectedAddons && item.selectedAddons.length > 0)) && (
+                                <div className="mt-0.5 space-y-0.5 mb-1">
+                                  {item.selectedOption && <p className="text-[9px] text-gray-400 italic">• {item.selectedOption.name}</p>}
+                                  {item.selectedAddons?.map((addon: any, addonIdx: number) => (
+                                    <p key={addonIdx} className="text-[9px] text-gray-400 italic">• {addon.name}</p>
+                                  ))}
+                                </div>
+                              )}
+
                               <div className="flex justify-between items-center mt-1">
                                 <p className="text-gray-500 font-medium text-xs">SL: <span className="font-bold text-[#111]">{item.quantity}</span></p>
                                 <span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-[8px] font-black uppercase tracking-widest">{item.status}</span>

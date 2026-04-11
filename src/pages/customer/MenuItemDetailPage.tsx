@@ -40,9 +40,7 @@ export const MenuItemDetailPage = () => {
     axios.get('/api/menu').then(res => {
       const foundItem = res.data.find((i: MenuItem) => getMenuItemId(i) === itemId);
       setItem(foundItem || null);
-      if (foundItem?.options?.length > 0) {
-        setSelectedOption(foundItem.options[0]); // Mặc định chọn cái đầu tiên
-      }
+      // Removed auto-selection of first option
       setLoading(false);
     }).catch(() => {
       setLoading(false);
@@ -76,8 +74,8 @@ export const MenuItemDetailPage = () => {
       name: item.name,
       basePrice: item.price,
       quantity: quantity,
-      selectedOption,
-      selectedAddons,
+      ...(selectedOption ? { selectedOption } : {}),
+      selectedAddons: selectedAddons || [],
       image: getMenuItemImageUrl(item),
       category: getMenuItemCategoryName(item),
     }];
@@ -89,21 +87,26 @@ export const MenuItemDetailPage = () => {
           tableId,
           items: itemsToAdd
         });
-        alert(`Đã thêm ${quantity} ${item.name} vào giỏ bàn ${tableId}!`);
+        toast.success(`Đã thêm ${quantity} ${item.name} vào giỏ bàn ${tableId}!`);
         await fetchActiveSession();
         navigate(`/table/${tableId}/menu`);
       } catch (err: any) {
         console.error("Failed to add to shared cart", err);
-        alert(err.response?.data?.message || "Lỗi khi thêm món vào giỏ bàn. Vui lòng thử lại!");
+        const apiMessage = err.response?.data?.error?.message || err.response?.data?.message;
+        toast.error(apiMessage || "Lỗi khi thêm món vào giỏ bàn. Vui lòng thử lại!");
       }
     } else {
       // Local Cart cho Delivery
+      const unitPrice = Number(item.price) + 
+                        Number(selectedOption?.priceExtra || 0) + 
+                        selectedAddons.reduce((sum, addon) => sum + Number(addon.priceExtra || 0), 0);
+      
       addToCart({
         ...itemsToAdd[0],
-        totalPrice: (item.price + (selectedOption?.priceExtra || 0) + selectedAddons.reduce((a,c) => a+c.priceExtra,0)) * quantity,
+        totalPrice: unitPrice * quantity,
         status: 'in_cart',
-      });
-      alert(`Đã thêm ${quantity} ${item.name} vào giỏ hàng!`);
+      } as any);
+      toast.success(`Đã thêm ${quantity} ${item.name} vào giỏ hàng!`);
       navigate('/menu');
     }
   };
@@ -186,7 +189,11 @@ export const MenuItemDetailPage = () => {
               </p>
 
               <div className="text-4xl md:text-5xl font-black text-red-600 mb-8" style={{ fontFamily: "'Playfair Display', serif" }}>
-                {item.price.toLocaleString()}đ
+                {(
+                  Number(item.price || 0) + 
+                  Number(selectedOption?.priceExtra || 0) + 
+                  selectedAddons.reduce((sum, a) => sum + Number(a.priceExtra || 0), 0)
+                ).toLocaleString()}đ
               </div>
 
               {/* Options Selection */}
@@ -197,7 +204,7 @@ export const MenuItemDetailPage = () => {
                     {item.options.map((opt) => (
                       <button
                         key={opt.name}
-                        onClick={() => setSelectedOption(opt)}
+                        onClick={() => setSelectedOption(selectedOption?.name === opt.name ? null : opt)}
                         className={`px-5 py-3 rounded-2xl font-bold border-2 transition-all ${
                           selectedOption?.name === opt.name
                             ? 'border-red-600 bg-red-600 text-white shadow-lg shadow-red-200'

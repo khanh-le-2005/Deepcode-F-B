@@ -258,9 +258,26 @@ export const AdminOrderManagement = () => {
                     <div className="space-y-4 max-h-[200px] overflow-y-auto no-scrollbar pr-2">
                       {order.items.map((item, idx) => (
                         <div key={idx} className="flex items-center justify-between group">
-                          <div className="flex items-center gap-3">
-                            <div className="w-1.5 h-1.5 bg-brand rounded-full opacity-40 group-hover:opacity-100 group-hover:scale-125 transition-all" />
-                            <p className="font-bold text-gray-800 text-sm">{item.name}</p>
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-3">
+                              <div className="w-1.5 h-1.5 bg-brand rounded-full opacity-40 group-hover:opacity-100 group-hover:scale-125 transition-all" />
+                              <p className="font-bold text-gray-800 text-sm">{item.name}</p>
+                            </div>
+                            {/* Options & Addons display for Kitchen */}
+                            {(item.selectedOption || (item.selectedAddons && item.selectedAddons.length > 0)) && (
+                              <div className="ml-5 flex flex-wrap gap-2">
+                                {item.selectedOption && (
+                                  <span className="text-[9px] font-black bg-slate-100 text-slate-500 px-2 py-0.5 rounded uppercase tracking-tighter">
+                                    Size: {item.selectedOption.name}
+                                  </span>
+                                )}
+                                {item.selectedAddons?.map((addon: any, aIdx: number) => (
+                                  <span key={aIdx} className="text-[9px] font-black bg-amber-50 text-amber-600 px-2 py-0.5 rounded uppercase tracking-tighter">
+                                    + {addon.name}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                           </div>
                           <div className="flex items-center gap-4">
                             <span className="text-[10px] font-black text-gray-400 uppercase">x{item.quantity}</span>

@@ -2,7 +2,6 @@ import { Payment } from "../models/Payment.js";
 import { Order } from "../models/Order.js";
 import { Table } from "../models/Table.js";
 import { BankAccount } from "../models/BankAccount.js";
-import { Notification } from "../models/Notification.js";
 import paymentGateway from "../utils/paymentGatewayClient.js";
 import { NotFoundError, BadRequestError, ServiceUnavailableError } from "../utils/AppError.js";
 
@@ -46,11 +45,7 @@ class PaymentService {
     payment = await payment.save();
 
     // Cập nhật ngày chốt đơn và ai là người thu tiền
-    const updateData = { 
-      paymentStatus: "paid", 
-      status: "completed", // Đóng vòng đời phục vụ
-      completedAt: new Date() 
-    };
+    const updateData = { status: "paid", completedAt: new Date() };
     if (user) {
       updateData.completedBy = user.id;
       updateData.completedByName = user.name;
@@ -154,18 +149,10 @@ class PaymentService {
       status: "success",
     });
 
-    // 7. Lưu thông báo vào DB và bắn Socket đến admin_hub
-    const notif = await Notification.create({
-      type: "payment_success",
-      title: "💳 Thanh toán thành công!",
-      message: `${tableNameStr} vừa thanh toán ${order.total?.toLocaleString('vi-VN')}đ qua chuyển khoản`,
-      referenceId: payment._id,
-    });
-
+    // 7. Bắn Socket cho Frontend cập nhật UI ngay lập tức
     if (io) {
-      io.to("admin_hub").emit("new_notification", notif);
-      io.to("admin_hub").emit("order-paid", { orderId: order._id, paymentStatus: "paid" });
-      io.to("admin_hub").emit("order-updated", order);
+      io.emit("order-paid", { orderId: order._id, paymentStatus: "paid" });
+      io.emit("order-updated", order);
       io.emit("tables-updated", await Table.find());
     }
 

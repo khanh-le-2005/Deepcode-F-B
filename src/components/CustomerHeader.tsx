@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Search, ShoppingBag, ChevronLeft, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import { cn } from "../lib/cn";
 
 interface CustomerHeaderProps {
   tableId?: string;
@@ -10,6 +11,9 @@ interface CustomerHeaderProps {
   showBackButton?: boolean;
   searchTerm?: string;
   onSearchChange?: (value: string) => void;
+  categories?: string[];
+  selectedCategory?: string;
+  onCategoryChange?: (category: string) => void;
 }
 
 export const CustomerHeader = ({
@@ -19,10 +23,25 @@ export const CustomerHeader = ({
   showBackButton = false,
   searchTerm = "",
   onSearchChange,
+  categories = [],
+  selectedCategory = "Tất cả",
+  onCategoryChange,
 }: CustomerHeaderProps) => {
   const navigate = useNavigate();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isCategoryOpen, setIsCategoryOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsCategoryOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   useEffect(() => {
     if (isSearchOpen && inputRef.current) {
@@ -65,9 +84,51 @@ export const CustomerHeader = ({
                   >
                     PIZZAN
                   </h1>
-                  <nav className="hidden md:flex gap-6 text-sm font-bold uppercase tracking-widest">
-                    {/* <p className="text-red-600">Trang chủ</p> */}
+                  <nav className="hidden md:flex gap-6 text-sm font-bold uppercase tracking-widest items-center">
                     <p className="text-white">Thực đơn</p>
+                    
+                    {categories.length > 0 && (
+                      <div className="relative" ref={dropdownRef}>
+                        <button 
+                          onClick={() => setIsCategoryOpen(!isCategoryOpen)}
+                          className={cn(
+                            "flex items-center gap-1.5 transition-colors hover:text-red-600",
+                            isCategoryOpen ? "text-red-600" : "text-gray-400"
+                          )}
+                        >
+                          Danh mục {selectedCategory !== "Tất cả" && `: ${selectedCategory}`}
+                          <ChevronLeft className={cn("w-4 h-4 transition-transform", isCategoryOpen ? "rotate-90" : "-rotate-90")} />
+                        </button>
+
+                        <AnimatePresence>
+                          {isCategoryOpen && (
+                            <motion.div
+                              initial={{ opacity: 0, y: 10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: 10 }}
+                              className="absolute top-full left-0 mt-4 w-64 bg-[#1a1a1a] border border-white/10 rounded-2xl shadow-2xl p-4 space-y-1 block"
+                            >
+                              {categories.map(cat => (
+                                <button
+                                  key={cat}
+                                  onClick={() => {
+                                    onCategoryChange?.(cat);
+                                    setIsCategoryOpen(false);
+                                  }}
+                                  className={cn(
+                                    "w-full text-left px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-between group",
+                                    selectedCategory === cat ? "bg-red-600 text-white" : "text-gray-400 hover:bg-white/5 hover:text-white"
+                                  )}
+                                >
+                                  {cat}
+                                  {selectedCategory === cat && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
+                                </button>
+                              ))}
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    )}
                   </nav>
                 </div>
               )}
@@ -126,6 +187,28 @@ export const CustomerHeader = ({
           )}
         </AnimatePresence>
       </div>
+
+      {/* Mobile Categories Scroll */}
+      {!isSearchOpen && categories.length > 0 && (
+        <div className="md:hidden border-t border-white/5 bg-[#111] py-3 overflow-x-auto no-scrollbar scroll-smooth">
+          <div className="flex gap-2 px-4 min-w-max">
+            {categories.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => onCategoryChange?.(cat)}
+                className={cn(
+                  "px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all",
+                  selectedCategory === cat
+                    ? "bg-red-600 text-white shadow-lg shadow-red-600/20"
+                    : "bg-white/5 text-gray-400 border border-white/10"
+                )}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </header>
   );
 };

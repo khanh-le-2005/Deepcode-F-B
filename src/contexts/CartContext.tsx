@@ -29,13 +29,29 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
 
   const addToCart = (newItem: OrderItem) => {
     setCart(prev => {
-      const existing = prev.find(i => i.menuItemId === newItem.menuItemId);
-      if (existing) {
-        return prev.map(i => 
-          i.menuItemId === newItem.menuItemId 
-            ? { ...i, quantity: i.quantity + newItem.quantity, totalPrice: (i.quantity + newItem.quantity) * i.basePrice } 
-            : i
-        );
+      // Tìm món trùng ID, trùng Option và trùng tập hợp Addons
+      const existingIdx = prev.findIndex(i => 
+        i.menuItemId === newItem.menuItemId && 
+        JSON.stringify(i.selectedOption) === JSON.stringify(newItem.selectedOption) &&
+        JSON.stringify(i.selectedAddons) === JSON.stringify(newItem.selectedAddons)
+      );
+
+      if (existingIdx > -1) {
+        const updatedCart = [...prev];
+        const item = updatedCart[existingIdx];
+        const newQuantity = item.quantity + newItem.quantity;
+        
+        // Tính lại giá dựa trên (basePrice + extras) * newQuantity
+        const unitExtras = (item.selectedOption?.priceExtra || 0) + 
+                           item.selectedAddons.reduce((sum, a) => sum + (a.priceExtra || 0), 0);
+        const newTotalPrice = (item.basePrice + unitExtras) * newQuantity;
+
+        updatedCart[existingIdx] = { 
+          ...item, 
+          quantity: newQuantity, 
+          totalPrice: newTotalPrice 
+        };
+        return updatedCart;
       }
       return [...prev, newItem];
     });
@@ -49,7 +65,11 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     setCart(prev => prev.map(i => {
       if (i.menuItemId === menuItemId) {
         const newQ = Math.max(1, i.quantity + delta);
-        return { ...i, quantity: newQ, totalPrice: newQ * i.basePrice };
+        const unitExtras = (i.selectedOption?.priceExtra || 0) + 
+                           i.selectedAddons.reduce((sum, a) => sum + (a.priceExtra || 0), 0);
+        const newTotalPrice = (i.basePrice + unitExtras) * newQ;
+        
+        return { ...i, quantity: newQ, totalPrice: newTotalPrice };
       }
       return i;
     }));

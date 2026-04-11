@@ -27,7 +27,6 @@ import bankAccountRoutes from "./backend/src/routes/bankAccountRoutes.js";
 import categoryRoutes from "./backend/src/routes/categoryRoutes.js";
 import weeklyMenuRoutes from "./backend/src/routes/weeklyMenuRoutes.js";
 import userRoutes from "./backend/src/routes/userRoutes.js";
-import notificationRoutes from "./backend/src/routes/notificationRoutes.js";
 import { seedInitialData } from "./backend/src/config/setup.js";
 
 async function startServer() {
@@ -125,7 +124,6 @@ async function startServer() {
   app.use("/api/bank-accounts", bankAccountRoutes);
   app.use("/api/stats", statsRoutes);
   app.use("/api/users", userRoutes);
-  app.use("/api/notifications", notificationRoutes);
 
   // Global Error Handler
   app.use((err, req, res, next) => {

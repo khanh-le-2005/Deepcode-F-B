@@ -15,6 +15,7 @@ export const AdminMenuManagement = () => {
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
+  const [activeWeeklyMenu, setActiveWeeklyMenu] = useState<any | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Tất cả');
   const [confirmConfig, setConfirmConfig] = useState<{
@@ -33,11 +34,21 @@ export const AdminMenuManagement = () => {
 
   useEffect(() => {
     fetchMenu();
+    fetchActiveWeeklyMenu();
   }, []);
+
+  const fetchActiveWeeklyMenu = async () => {
+    try {
+      const res = await axios.get('/api/weekly-menu/active');
+      setActiveWeeklyMenu(res.data);
+    } catch (err) {
+      console.error("Failed to fetch active weekly menu:", err);
+    }
+  };
 
   const fetchMenu = () => {
     // Weekly Menu v2: Admin fetches ALL items (including unpublished ones)
-    axios.get('/api/menu/admin/all')
+    axios.get('/api/menu')
       .then(res => {
         if (Array.isArray(res.data)) {
           setMenu(res.data);
@@ -121,40 +132,71 @@ export const AdminMenuManagement = () => {
 
   const handlePublishWeekly = async () => {
     if (selectedItemIds.length === 0) return;
+    if (!activeWeeklyMenu) {
+      toast.error("Không tìm thấy thực đơn tuần nào đang active. Vui lòng tạo/kích hoạt thực đơn tuần trong tab 'Thực đơn tuần' trước.");
+      return;
+    }
+
     try {
-      await axios.patch('/api/menu/publish-weekly', { itemIds: selectedItemIds });
-      toast.success(`Đã xuất bán ${selectedItemIds.length} món cho tuần tới!`);
+      const currentItemIds = (activeWeeklyMenu.menuItems || []).map((m: any) => m._id || m.id || m);
+      const newItemIds = [...new Set([...currentItemIds, ...selectedItemIds])];
+      
+      await axios.put(`/api/weekly-menu/${activeWeeklyMenu._id || activeWeeklyMenu.id}`, {
+        menuItems: newItemIds
+      });
+      
+      toast.success(`Đã xuất bán ${selectedItemIds.length} món cho tuần hiện tại!`);
       setSelectedItemIds([]);
-      fetchMenu();
+      fetchActiveWeeklyMenu();
     } catch (err) {
+      console.error("Failed to publish weekly items:", err);
       toast.error("Xuất bản thất bại");
     }
   };
 
   const handleUnpublish = async (id: string) => {
-    if (!confirm("Bạn có chắc muốn gỡ món này khỏi thực đơn tuần?")) return;
+    if (!activeWeeklyMenu) return;
+    if (!confirm("Bạn có chắc muốn gỡ món này khỏi thực đơn tuần hiện tại?")) return;
+    
     try {
-      await axios.patch(`/api/menu/${id}/unpublish`);
+      const currentItemIds = (activeWeeklyMenu.menuItems || []).map((m: any) => m._id || m.id || m);
+      const newItemIds = currentItemIds.filter((itemId: string) => itemId !== id);
+      
+      await axios.put(`/api/weekly-menu/${activeWeeklyMenu._id || activeWeeklyMenu.id}`, {
+        menuItems: newItemIds
+      });
+      
       toast.info("Đã gỡ món khỏi thực đơn tuần");
-      fetchMenu();
+      fetchActiveWeeklyMenu();
     } catch (err) {
+      console.error("Failed to unpublish item:", err);
       toast.error("Gỡ bỏ thất bại");
     }
   };
 
   const handleRenew = async (id: string) => {
+    if (!activeWeeklyMenu) return;
     try {
-      await axios.patch('/api/menu/publish-weekly', { itemIds: [id] });
-      toast.success("Đã gia hạn thêm 7 ngày cho món này!");
-      fetchMenu();
+      // For "Renew", we just ensure it's in the list. 
+      // Backend automatically handles the endDate for the whole WeeklyMenu object.
+      const currentItemIds = (activeWeeklyMenu.menuItems || []).map((m: any) => m._id || m.id || m);
+      if (!currentItemIds.includes(id)) {
+        const newItemIds = [...currentItemIds, id];
+        await axios.put(`/api/weekly-menu/${activeWeeklyMenu._id || activeWeeklyMenu.id}`, {
+          menuItems: newItemIds
+        });
+      }
+      toast.success("Món ăn đã được đảm bảo có trong thực đơn tuần hiện tại!");
+      fetchActiveWeeklyMenu();
     } catch (err) {
-      toast.error("Gia hạn thất bại");
+      toast.error("Thao tác thất bại");
     }
   };
 
   const isPublished = (item: MenuItem) => {
-    if (!item.availableUntil) return false;
-    return new Date(item.availableUntil) > new Date();
+    if (!activeWeeklyMenu) return false;
+    const itemId = getMenuItemId(item);
+    return (activeWeeklyMenu.menuItems || []).some((m: any) => (m._id || m.id || m) === itemId);
   };
 
   const menuArray = Array.isArray(menu) ? menu : [];

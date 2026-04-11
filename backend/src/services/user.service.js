@@ -1,6 +1,7 @@
 // src/services/user.service.js
 import { User } from "../models/User.js";
 import { BadRequestError } from "../utils/AppError.js";
+import bcrypt from "bcryptjs";
 
 class UserService {
   // 1. THÊM MỚI (Đã làm ở trên)
@@ -10,9 +11,10 @@ class UserService {
     const existingUser = await User.findOne({ email });
     if (existingUser) throw new BadRequestError("Email này đã được sử dụng");
 
+    const hashedPassword = await bcrypt.hash(password, 10);
     const newUser = await User.create({
       email,
-      password,
+      password: hashedPassword,
       name,
       role: role || "staff",
     });
@@ -39,18 +41,21 @@ class UserService {
         throw new BadRequestError("Email này đã được người khác sử dụng");
     }
 
-    // 3.2 Password hashing is now handled automatically by User model pre-save hook
+    // 3.2 Nếu cập nhật mật khẩu, phải mã hóa lại
+    if (updateData.password) {
+      updateData.password = await bcrypt.hash(updateData.password, 10);
+    }
 
-    // 3.3 Cập nhật bằng .save() để kích hoạt pre-save hook (hashing)
-    const user = await User.findById(userId);
-    if (!user) throw new BadRequestError("Không tìm thấy người dùng này");
+    // 3.3 Cập nhật và trả về user mới (loại bỏ password)
+    const updatedUser = await User.findByIdAndUpdate(userId, updateData, {
+      new: true, // Trả về document sau khi update
+      runValidators: true,
+    }).select("-password");
 
-    Object.assign(user, updateData);
-    await user.save();
+    if (!updatedUser)
+      throw new BadRequestError("Không tìm thấy người dùng này");
 
-    const result = user.toObject();
-    delete result.password;
-    return result;
+    return updatedUser;
   }
 
   // 4. XÓA USER

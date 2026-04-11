@@ -49,18 +49,14 @@ export const createOrder = catchAsync(async (req, res) => {
   res.status(201).json(session);
 });
 
-export const calculatePrice = catchAsync(async (req, res) => {
-  const result = await OrderService.calculatePrice(req.body.items);
-  res.json(result);
-});
-
 export const createCounterOrder = catchAsync(async (req, res) => {
   const session = await OrderService.createCounterOrder(req.body, req.io);
   res.status(201).json(session);
 });
 
 export const checkoutCart = catchAsync(async (req, res) => {
-  const session = await OrderService.checkoutCart(req.params.sessionId, req.io);
+  const { paymentMethod } = req.body;
+  const session = await OrderService.checkoutCart(req.params.sessionId, paymentMethod, req.io);
   res.json({ message: "Cart sent to kitchen successfully", session });
 });
 
@@ -68,18 +64,6 @@ export const deleteOrderItem = catchAsync(async (req, res) => {
   const session = await OrderService.deleteOrderItem(
     req.params.sessionId,
     req.params.itemId,
-    req.io
-  );
-  res.json(session);
-});
-
-export const updateOrderItemQuantity = catchAsync(async (req, res) => {
-  const { sessionId, itemId } = req.params;
-  const { delta } = req.body;
-  const session = await OrderService.updateOrderItemQuantity(
-    sessionId,
-    itemId,
-    Number(delta),
     req.io
   );
   res.json(session);

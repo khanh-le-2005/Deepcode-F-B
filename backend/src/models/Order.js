@@ -21,9 +21,12 @@ const orderItemSchema = new mongoose.Schema({
   // Trạng thái theo luồng mới: giỏ hàng -> chờ duyệt -> đang nấu -> đã phục vụ -> hủy
   status: {
     type: String,
-    enum: ["in_cart", "pending_approval", "cooking", "served", "cancelled"],
+    enum: ["in_cart", "awaiting_payment", "pending_approval", "cooking", "served", "cancelled"],
     default: "in_cart",
   },
+
+  // Đánh dấu món này đã trả tiền hay chưa (Dùng cho Thanh toán trước)
+  isPaid: { type: Boolean, default: false },
 
   // Lưu vết: Nhân viên nào đã thao tác xác nhận/đổi trạng thái món này, và vào lúc nào
   actionBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
@@ -46,10 +49,17 @@ const orderSchema = new mongoose.Schema(
       default: "active",
     },
 
+    // 1.5 PHƯƠNG THỨC THANH TOÁN (Lần cuối chọn)
+    paymentMethod: {
+      type: String,
+      enum: ["cash", "transfer", "none"],
+      default: "none",
+    },
+
     // 2. TRẠNG THÁI TÀI CHÍNH (Tiền bạc) - THÊM MỚI VÀO ĐÂY
     paymentStatus: {
       type: String,
-      enum: ["unpaid", "paid", "refunded"],
+      enum: ["unpaid", "partially_paid", "paid", "refunded"],
       default: "unpaid",
     },
 

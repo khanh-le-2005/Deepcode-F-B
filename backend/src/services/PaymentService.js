@@ -2,6 +2,7 @@ import { Payment } from "../models/Payment.js";
 import { Order } from "../models/Order.js";
 import { Table } from "../models/Table.js";
 import { BankAccount } from "../models/BankAccount.js";
+import { Notification } from "../models/Notification.js";
 import paymentGateway from "../utils/paymentGatewayClient.js";
 import { NotFoundError, BadRequestError, ServiceUnavailableError } from "../utils/AppError.js";
 
@@ -45,16 +46,34 @@ class PaymentService {
     payment = await payment.save();
 
     // Cập nhật ngày chốt đơn và ai là người thu tiền
-    const updateData = { status: "paid", completedAt: new Date() };
+    const updateData = { 
+      paymentStatus: "paid", 
+      status: "completed", // Đóng vòng đời phục vụ
+      completedAt: new Date() 
+    };
     if (user) {
       updateData.completedBy = user.id;
       updateData.completedByName = user.name;
     }
 
-    // Đóng Order (Phiên)
-    const order = await Order.findByIdAndUpdate(orderId, updateData, {
-      new: true,
+    // Đóng Order (Phiên) & Đánh dấu tất cả món đã trả tiền
+    const order = await Order.findById(orderId);
+    if (!order) throw new NotFoundError("Order không tồn tại");
+
+    order.items.forEach(item => {
+      if (!item.isPaid && item.status !== 'cancelled') {
+        item.isPaid = true;
+      }
     });
+
+    order.paymentStatus = "paid";
+    order.status = "completed";
+    order.completedAt = new Date();
+    if (user) {
+      order.completedBy = user.id;
+      order.completedByName = user.name;
+    }
+    await order.save();
 
     // Giải phóng Bàn (chuyển bàn về trạng thái 'empty')
     if (order) {
@@ -115,15 +134,28 @@ class PaymentService {
       return true;
     }
 
-    // 3. Đóng đơn hàng & ghi nhận thanh toán
-    order.paymentStatus = "paid";
-    order.status = "completed";
-    order.completedAt = new Date();
-    order.completedByName = "Hệ thống tự động (MBBank Auto)";
+    // 3. Kích hoạt các món đang chờ thanh toán (Prepaid flow)
+    let hasActivatedItems = false;
+    order.items.forEach((item) => {
+      if (item.status === "awaiting_payment") {
+        item.status = "pending_approval";
+        item.isPaid = true;
+        hasActivatedItems = true;
+      }
+    });
+
+    // Cập nhật trạng thái tài chính của Order
+    const allPaid = order.items.every(item => item.isPaid || item.status === 'in_cart');
+    order.paymentStatus = allPaid ? "paid" : "partially_paid";
+
+    // KHÔNG đóng đơn hàng ở đây nếu vẫn còn trong vòng đời phục vụ
+    // order.status = "completed"; 
+    // order.completedAt = new Date();
+    
     await order.save();
 
-    // 4. Giải phóng bàn về trạng thái trống
-    await Table.findByIdAndUpdate(order.tableId, { status: "empty" });
+    // 4. Giải phóng bàn CHỈ KHI đơn hàng thực sự kết thúc (Manual handle elsewhere or if explicitly requested)
+    // await Table.findByIdAndUpdate(order.tableId, { status: "empty" });
 
     // 5. Lấy thông tin bàn để ghi lịch sử
     const orderData = await Order.findById(orderId).populate("tableId");
@@ -149,10 +181,18 @@ class PaymentService {
       status: "success",
     });
 
-    // 7. Bắn Socket cho Frontend cập nhật UI ngay lập tức
+    // 7. Lưu thông báo vào DB và bắn Socket đến admin_hub
+    const notif = await Notification.create({
+      type: "payment_success",
+      title: "💳 Thanh toán thành công!",
+      message: `${tableNameStr} vừa thanh toán ${order.total?.toLocaleString('vi-VN')}đ qua chuyển khoản`,
+      referenceId: payment._id,
+    });
+
     if (io) {
-      io.emit("order-paid", { orderId: order._id, paymentStatus: "paid" });
-      io.emit("order-updated", order);
+      io.to("admin_hub").emit("new_notification", notif);
+      io.to("admin_hub").emit("order-paid", { orderId: order._id, paymentStatus: "paid" });
+      io.to("admin_hub").emit("order-updated", order);
       io.emit("tables-updated", await Table.find());
     }
 

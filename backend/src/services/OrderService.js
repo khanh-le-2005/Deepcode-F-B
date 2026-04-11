@@ -1,6 +1,7 @@
 import { Order } from "../models/Order.js";
 import { Table } from "../models/Table.js";
 import { Payment } from "../models/Payment.js";
+import { Notification } from "../models/Notification.js";
 import mongoose from "mongoose";
 import crypto from "crypto";
 import { NotFoundError, BadRequestError } from "../utils/AppError.js";
@@ -135,59 +136,20 @@ class OrderService {
     }
 
     if (io) {
-      io.emit("new-order", session);
+      // Lưu thông báo vào DB
+      const notif = await Notification.create({
+        type: "new_order",
+        title: "🛒 Đơn hàng mới!",
+        message: `Bàn ${session.tableName || "?"} vừa gọi thêm món`,
+        referenceId: session._id,
+      });
+
+      // Chỉ bắn vào room admin_hub (staff/admin đã login)
+      io.to("admin_hub").emit("new_notification", notif);
+      io.to("admin_hub").emit("new-order", session);
       io.emit("tables-updated", await Table.find());
     }
     return session;
-  }
-
-  async calculatePrice(items) {
-    if (!items || items.length === 0) {
-      return { items: [], totalCartPrice: 0 };
-    }
-
-    let totalCartPrice = 0;
-    const calculatedItems = items.map((item) => {
-      const basePrice = item.basePrice || item.price || 0;
-      let itemPrice = Number(basePrice);
-      
-      let optionExtra = 0;
-      let addonExtra = 0;
-
-      if (item.selectedOption && item.selectedOption.priceExtra) {
-        optionExtra = Number(item.selectedOption.priceExtra);
-        itemPrice += optionExtra;
-      }
-
-      if (item.selectedAddons && item.selectedAddons.length > 0) {
-        item.selectedAddons.forEach((addon) => {
-          if (addon.priceExtra) {
-            const extra = Number(addon.priceExtra);
-            addonExtra += extra;
-            itemPrice += extra;
-          }
-        });
-      }
-
-      const quantity = Number(item.quantity || 1);
-      const totalPrice = itemPrice * quantity;
-      
-      totalCartPrice += totalPrice;
-
-      return {
-        ...item,
-        calculated: {
-          basePrice: Number(basePrice),
-          itemPricePerUnit: itemPrice, // Giá 1 món sau khi cộng option/addon
-          optionExtra,
-          addonExtra,
-          quantity,
-          totalPrice // Tổng giá trị của mục này (sau khi nhân quantity)
-        }
-      };
-    });
-
-    return { calculatedItems, totalCartPrice };
   }
 
   async createCounterOrder(data, io) {
@@ -283,21 +245,53 @@ class OrderService {
     }
 
     if (io) {
-      io.emit("new-order", session);
+      // Lưu thông báo vào DB
+      const notif = await Notification.create({
+        type: "new_order",
+        title: "🛒 Gọi món tại quầy!",
+        message: `Nhân viên vừa tạo đơn${session.tableName ? ` cho ${session.tableName}` : " mang đi"}`,
+        referenceId: session._id,
+      });
+
+      io.to("admin_hub").emit("new_notification", notif);
+      io.to("admin_hub").emit("new-order", session);
       io.emit("order-updated", session);
       io.emit("tables-updated", await Table.find());
     }
     return session;
   }
 
-  async checkoutCart(sessionId, io) {
+  async checkoutCart(sessionId, paymentMethod = "cash", io) {
+    const targetStatus = paymentMethod === "transfer" ? "awaiting_payment" : "pending_approval";
+
     const session = await Order.findOneAndUpdate(
       { _id: sessionId, "items.status": "in_cart" },
-      { $set: { "items.$[elem].status": "pending_approval" } },
-      { arrayFilters: [{ "elem.status": "in_cart" }], new: true },
+      { 
+        $set: { 
+          "items.$[elem].status": targetStatus,
+          paymentMethod: paymentMethod
+        } 
+      },
+      { 
+        arrayFilters: [{ "elem.status": "in_cart" }], 
+        new: true 
+      },
     );
     if (!session) throw new NotFoundError("Session not found or Cart is empty");
-    if (io) io.emit("order-updated", session);
+    
+    if (io) {
+      if (targetStatus === "pending_approval") {
+        // Thông báo cho bếp ngay nếu là Tiền Mặt
+        const notif = await Notification.create({
+          type: "new_order",
+          title: "🛒 Đơn hàng mới (Tiền mặt)!",
+          message: `Bàn ${session.tableName || "?"} vừa gửi đơn mới`,
+          referenceId: session._id,
+        });
+        io.to("admin_hub").emit("new_notification", notif);
+      }
+      io.emit("order-updated", session);
+    }
     return session;
   }
 
@@ -324,41 +318,6 @@ class OrderService {
     return session;
   }
 
-
-  async updateOrderItemQuantity(sessionId, itemId, delta, io) {
-    const session = await Order.findById(sessionId);
-    if (!session) throw new NotFoundError("Session not found");
-
-    const itemIndex = session.items.findIndex(
-      (item) => item._id.toString() === itemId,
-    );
-    if (itemIndex === -1) throw new NotFoundError("Item not found");
-
-    const item = session.items[itemIndex];
-    if (item.status !== "in_cart" && item.status !== "pending_approval") {
-      throw new BadRequestError("Chỉ có thể thay đổi số lượng món khi đang trong giỏ hoặc chờ duyệt");
-    }
-
-    const pricePerUnit = item.totalPrice / item.quantity;
-    const newQuantity = item.quantity + delta;
-
-    if (newQuantity <= 0) {
-      // Giảm về 0 thì tự động xoá
-      session.total -= item.totalPrice;
-      session.items.splice(itemIndex, 1);
-    } else {
-      // Cập nhật giá
-      item.quantity = newQuantity;
-      const newTotalPrice = pricePerUnit * newQuantity;
-      session.total += (newTotalPrice - item.totalPrice);
-      item.totalPrice = newTotalPrice;
-    }
-
-    await session.save();
-    
-    if (io) io.emit("order-updated", session);
-    return session;
-  }
 
   async updateItemStatus(sessionId, itemId, status, io, user = null) {
     const updateFields = { "items.$.status": status };
@@ -441,7 +400,7 @@ class OrderService {
 
   async getKitchenOrders() {
     return await Order.find({
-      status: "active", // Vẫn là active (bàn đang hoạt động)
+      status: "active",
       "items.status": { $in: ["pending_approval", "cooking", "served"] },
     });
   }

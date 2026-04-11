@@ -50,31 +50,19 @@ app.use(
   }),
 );
 
-// Specific Rate Limiters for sensitive endpoints
-
-// 1. Auth Limiter: Protect against brute-force (Login)
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 20, // 20 attempts per 15 mins
-  message: { error: "Quá nhiều lần đăng nhập sai. Vui lòng thử lại sau 15 phút." },
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 1000,
+  message: { error: "Too many requests from this IP, please try again later." },
   validate: { xForwardedForHeader: false },
 });
-app.use("/api/auth/login", authLimiter);
+app.use("/api/", limiter);
 
-// 2. Weekly Menu Limiter: Protect public menu from excessive crawling
-const weeklyMenuLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  max: 60, // 60 requests per minute
-  message: { error: "Yêu cầu quá thường xuyên. Vui lòng đợi 1 phút." },
-  validate: { xForwardedForHeader: false },
-});
-app.use("/api/weekly-menu/active", weeklyMenuLimiter);
-
-// 3. Order Limiter: Protect against spam orders
+// FIX #8: Rate limiter riêng khắt hơn cho API công khai nhạy cảm
 const orderLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  max: 30, // 30 requests per minute
-  message: { error: "Quá nhiều request đặt hàng. Vui lòng thử lại sau 1 phút." },
+  windowMs: 60 * 1000, // 1 phút
+  max: 30, // Tối đa 30 request/phút/IP
+  message: { error: "Quá nhiều request. Vui lòng thử lại sau 1 phút." },
   validate: { xForwardedForHeader: false },
 });
 app.use("/api/orders", orderLimiter);

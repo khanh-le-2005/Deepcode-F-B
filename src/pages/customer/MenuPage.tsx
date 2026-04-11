@@ -348,17 +348,7 @@ export const MenuPage = () => {
                     )}
                   </div>
 
-                  <div className="w-full mt-auto space-y-2">
-                    {(item.options?.length > 0 || item.addons?.length > 0) && (
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); navigate(tableId ? `/table/${tableId}/menu/${item.id}` : `/menu/${item.id}`); }} 
-                        className="w-full py-2 sm:py-2.5 rounded-xl font-bold text-[10px] sm:text-xs uppercase tracking-widest transition-all hover:shadow-lg flex items-center justify-center gap-2 border border-gray-200 bg-white text-gray-900 group/btn"
-                      >
-                        <ShoppingBag className="w-3 h-3 sm:w-4 sm:h-4 group-hover/btn:scale-110 transition-transform" />
-                        Tuỳ chọn
-                      </button>
-                    )}
-                    
+                  <div className="w-full mt-auto space-y-2">                    
                     <button 
                       onClick={(e) => { e.stopPropagation(); handleQuickAdd(item); }} 
                       className="w-full py-2 sm:py-2.5 rounded-xl font-bold text-[10px] sm:text-xs uppercase tracking-widest transition-all hover:shadow-lg flex items-center justify-center gap-2 bg-red-600 text-white border border-transparent group/btn"

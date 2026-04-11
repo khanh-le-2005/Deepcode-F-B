@@ -235,7 +235,7 @@ export const KitchenDisplay = () => {
                       <div>
                         <span className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em]">BÀN</span>
                         <h2 className={cn("text-4xl font-serif italic font-black leading-tight", isDark ? "text-white" : "text-slate-900")}>
-                          {tableNameMap[order.tableId] || order.tableId}
+                          {tableNameMap[order.tableName] || order.tableName}
                         </h2>
                       </div>
                       <div className="text-right">

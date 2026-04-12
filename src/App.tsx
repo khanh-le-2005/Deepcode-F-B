@@ -17,6 +17,7 @@ import { LoginPage } from './pages/auth/LoginPage';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
 import { KitchenDisplay } from './pages/kitchen/KitchenDisplay';
 import { StaffPOSPage } from './pages/staff/StaffPOSPage';
+import OrangeDrinkKiosk from './pages/customer/OrangeDrinkKiosk';
 
 function App() {
   return (
@@ -35,6 +36,7 @@ function App() {
             <Route path="/table/:tableId/menu/:itemId" element={<MenuItemDetailPage />} />
             <Route path="/table/:tableId/tracking" element={<OrderTrackingPage />} />
             <Route path="/table/:tableId/success" element={<SuccessPage />} />
+            <Route path="/kiosk" element={<OrangeDrinkKiosk />} />
 
             {/* Admin Routes (Protected) */}
             <Route
@@ -66,12 +68,13 @@ function App() {
             />
 
             {/* Customer Delivery Routes (Unified later) */}
-            <Route path="/" element={<WelcomePage />} />
+            <Route path="/" element={<OrangeDrinkKiosk />} />
             <Route path="/menu" element={<MenuPage />} />
             <Route path="/menu/:itemId" element={<MenuItemDetailPage />} />
             <Route path="/checkout" element={<CheckoutPage />} />
             <Route path="/tracking/:orderId" element={<OrderTrackingPage />} />
             <Route path="/success" element={<SuccessPage />} />
+
 
             {/* Default Route */}
             {/* <Route path="*" element={<Navigate to="/table/1" replace />} /> */}

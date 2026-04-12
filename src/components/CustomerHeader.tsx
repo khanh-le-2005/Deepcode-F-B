@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Search, ShoppingBag, ChevronLeft, X } from "lucide-react";
+import { Search, ShoppingBag, ChevronLeft, X, Menu } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "../lib/cn";
@@ -30,6 +30,7 @@ export const CustomerHeader = ({
   const navigate = useNavigate();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -55,7 +56,7 @@ export const CustomerHeader = ({
   };
 
   return (
-    <header className="bg-[#111] text-white sticky top-0 z-100 overflow-hidden">
+    <header className="bg-[#111] text-white sticky top-0 z-[1000] overflow-visible border-b border-white/5">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 sm:h-20 flex items-center justify-between relative">
         <AnimatePresence mode="wait">
           {!isSearchOpen ? (
@@ -78,11 +79,20 @@ export const CustomerHeader = ({
                 </button>
               ) : (
                 <div className="flex items-center gap-4 xl:gap-8">
-                  <h1
-                    className="text-2xl sm:text-3xl font-black italic tracking-tighter text-red-600"
-                    style={{ fontFamily: "'Playfair Display', serif" }}
+                  {/* Mobile Menu Trigger */}
+                  <button 
+                    onClick={() => setIsMobileMenuOpen(true)}
+                    className="md:hidden p-1 hover:text-red-600 transition-colors"
                   >
-                    PIZZAN
+                    <Menu className="w-6 h-6" />
+                  </button>
+
+                  <h1
+                    className="text-2xl sm:text-3xl font-black italic tracking-tighter text-red-600 cursor-pointer"
+                    style={{ fontFamily: "'Playfair Display', serif" }}
+                    onClick={() => navigate(tableId ? `/table/${tableId}/menu` : "/menu")}
+                  >
+                    BTEC
                   </h1>
                   <nav className="hidden md:flex gap-6 text-sm font-bold uppercase tracking-widest items-center">
                     <p className="text-white">Thực đơn</p>
@@ -106,7 +116,7 @@ export const CustomerHeader = ({
                               initial={{ opacity: 0, y: 10 }}
                               animate={{ opacity: 1, y: 0 }}
                               exit={{ opacity: 0, y: 10 }}
-                              className="absolute top-full left-0 mt-4 w-64 bg-[#1a1a1a] border border-white/10 rounded-2xl shadow-2xl p-4 space-y-1 block"
+                              className="absolute top-full left-0 mt-4 w-64 bg-[#1a1a1a] border border-white/10 rounded-2xl shadow-2xl p-4 space-y-1 block z-50"
                             >
                               {categories.map(cat => (
                                 <button
@@ -188,27 +198,62 @@ export const CustomerHeader = ({
         </AnimatePresence>
       </div>
 
-      {/* Mobile Categories Scroll */}
-      {!isSearchOpen && categories.length > 0 && (
-        <div className="md:hidden border-t border-white/5 bg-[#111] py-3 overflow-x-auto no-scrollbar scroll-smooth">
-          <div className="flex gap-2 px-4 min-w-max">
-            {categories.map((cat) => (
-              <button
-                key={cat}
-                onClick={() => onCategoryChange?.(cat)}
-                className={cn(
-                  "px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all",
-                  selectedCategory === cat
-                    ? "bg-red-600 text-white shadow-lg shadow-red-600/20"
-                    : "bg-white/5 text-gray-400 border border-white/10"
-                )}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Mobile Category Drawer */}
+      <AnimatePresence>
+        {isMobileMenuOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[1100]"
+            />
+            <motion.div
+              initial={{ x: "-100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "-100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              className="fixed inset-y-0 left-0 w-4/5 max-w-sm bg-[#111] z-[1200] shadow-2xl flex flex-col"
+            >
+              <div className="p-6 border-b border-white/5 flex items-center justify-between">
+                <h2 className="text-xl font-bold italic text-red-600" style={{ fontFamily: "'Playfair Display', serif" }}>PIZZAN Menu</h2>
+                <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 text-gray-400 hover:text-white">
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              
+              <div className="flex-1 overflow-y-auto p-6">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 mb-6">Chọn Danh Mục</p>
+                <div className="space-y-2">
+                  {categories.map(cat => (
+                    <button
+                      key={cat}
+                      onClick={() => {
+                        onCategoryChange?.(cat);
+                        setIsMobileMenuOpen(false);
+                      }}
+                      className={cn(
+                        "w-full text-left px-5 py-4 rounded-2xl text-sm font-bold transition-all flex items-center justify-between",
+                        selectedCategory === cat 
+                          ? "bg-red-600 text-white shadow-lg shadow-red-600/20" 
+                          : "text-gray-400 hover:bg-white/5 hover:text-white"
+                      )}
+                    >
+                      {cat}
+                      {selectedCategory === cat && <div className="w-2 h-2 bg-white rounded-full" />}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="p-6 border-t border-white/5 text-center">
+                <p className="text-[10px] text-gray-600 font-bold uppercase tracking-widest">© 2026 PIZZAN RESTAURANT</p>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </header>
   );
 };

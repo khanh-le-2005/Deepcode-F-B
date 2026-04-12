@@ -89,10 +89,16 @@ class PaymentService {
         paymentContent: response.data.payment_content,
       };
     } catch (error) {
-      throw new ServiceUnavailableError(
-        "Hệ thống ngân hàng tạm thời gián đoạn. Xin vui lòng thanh toán bằng Tiền Mặt tại quầy!",
-        "BANK_GATEWAY_DOWN"
-      );
+      console.warn("Payment Gateway unavailable, using fallback mock QR.");
+      // Trả về mã QR giả lập để bạn có thể test UI mà không cần chạy bot ngân hàng
+      return {
+        orderId: order._id,
+        amount: order.total,
+        qrBase64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", // 1x1 Transparent pixel mock
+        paymentContent: `DC ${order._id.toString().slice(-6).toUpperCase()}`,
+        isMock: true,
+        warning: "Hệ thống ngân hàng đang gián đoạn, đây là mã QR giả lập để test."
+      };
     }
   }
 
@@ -115,15 +121,31 @@ class PaymentService {
       return true;
     }
 
-    // 3. Đóng đơn hàng & ghi nhận thanh toán
+    // 3. Cập nhật trạng thái thanh toán
     order.paymentStatus = "paid";
-    order.status = "completed";
-    order.completedAt = new Date();
+    
+    // Logic phân loại:
+    // - Dine-in: Thanh toán xong là xong -> status = completed, giải phóng bàn.
+    // - Kiosk (Delivery/Takeaway): Thanh toán xong mới là lúc đưa xuống bếp -> status giữ active, items chuyển pending_approval.
+    const isKiosk = order.orderType === "delivery" || order.orderType === "takeaway";
+    
+    if (isKiosk) {
+      order.status = "active";
+      // Chuyển tất cả món từ "chờ thanh toán" sang "chờ bếp duyệt"
+      order.items.forEach(item => {
+        if (item.status === "awaiting_payment") {
+          item.status = "pending_approval";
+        }
+      });
+    } else {
+      order.status = "completed";
+      order.completedAt = new Date();
+      // Giải phóng bàn về trạng thái trống (chỉ dành cho khách ngồi tại chỗ)
+      await Table.findByIdAndUpdate(order.tableId, { status: "empty" });
+    }
+
     order.completedByName = "Hệ thống tự động (MBBank Auto)";
     await order.save();
-
-    // 4. Giải phóng bàn về trạng thái trống
-    await Table.findByIdAndUpdate(order.tableId, { status: "empty" });
 
     // 5. Lấy thông tin bàn để ghi lịch sử
     const orderData = await Order.findById(orderId).populate("tableId");

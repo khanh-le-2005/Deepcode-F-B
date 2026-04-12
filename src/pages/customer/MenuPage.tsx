@@ -23,7 +23,7 @@ export const MenuPage = () => {
   const { socket } = useSocket();
   const { tableId } = useParams();
   const [menu, setMenu] = useState<MenuItem[]>([]);
-  const { cart, addToCart, removeFromCart, updateQuantity, totalPrice, totalItems, clearCart } = useCart();
+  const { cart, addToCart, removeFromCart, updateQuantity, getUniqueCartKey, totalPrice, totalItems, clearCart } = useCart();
   const [selectedCategory, setSelectedCategory] = useState('Tất cả');
   const [searchTerm, setSearchTerm] = useState('');
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -439,13 +439,13 @@ export const MenuPage = () => {
                                     </>
                                   ) : (
                                     <>
-                                      <button className="px-3 py-1 hover:bg-red-50 hover:text-red-600 font-bold" onClick={() => updateQuantity(item.menuItemId, -1)}>-</button>
+                                      <button className="px-3 py-1 hover:bg-red-50 hover:text-red-600 font-bold" onClick={() => updateQuantity(getUniqueCartKey(item), -1)}>-</button>
                                       <span className="px-4 font-bold">{item.quantity}</span>
-                                      <button className="px-3 py-1 hover:bg-red-50 hover:text-red-600 font-bold" onClick={() => updateQuantity(item.menuItemId, 1)}>+</button>
+                                      <button className="px-3 py-1 hover:bg-red-50 hover:text-red-600 font-bold" onClick={() => updateQuantity(getUniqueCartKey(item), 1)}>+</button>
                                     </>
                                   )}
                                 </div>
-                                <Trash2 className="w-4 h-4 text-gray-300 cursor-pointer hover:text-red-600" onClick={() => tableId ? handleRemoveTableCartItem(item._id || item.menuItemId) : removeFromCart(item.menuItemId)} />
+                                <Trash2 className="w-4 h-4 text-gray-300 cursor-pointer hover:text-red-600" onClick={() => tableId ? handleRemoveTableCartItem(item._id || item.menuItemId) : removeFromCart(getUniqueCartKey(item))} />
                               </div>
                             </div>
                           </div>

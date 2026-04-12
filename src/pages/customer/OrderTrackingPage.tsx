@@ -162,7 +162,7 @@ export const OrderTrackingPage = () => {
 
   const steps = [
     { id: 'pending', label: 'Chờ nhận đơn', icon: Clock, color: 'text-blue-500', bg: 'bg-blue-500' },
-    { id: 'cooking', label: 'Đang nấu', icon: ChefHat, color: 'text-amber-500', bg: 'bg-amber-500' },
+    { id: 'cooking', label: 'Đang làm', icon: ChefHat, color: 'text-amber-500', bg: 'bg-amber-500' },
     { id: 'done', label: 'Xong món', icon: CheckCircle2, color: 'text-emerald-500', bg: 'bg-emerald-500' },
   ];
 
@@ -176,6 +176,7 @@ export const OrderTrackingPage = () => {
 
   // Tính index step hiện tại
   const currentStepIndex = steps.findIndex(s => s.id === overallStatus);
+  const isPaid = order.paymentStatus === 'paid' || order.status === 'completed' || order.status === 'paid';
 
   const handleRequestPayment = async () => {
     try {
@@ -355,16 +356,25 @@ export const OrderTrackingPage = () => {
               </h3>
               <p className="text-emerald-500/80 font-bold mt-2 text-sm uppercase tracking-widest">Chúc quý khách ngon miệng.</p>
 
-              <button
-                onClick={handleRequestPayment}
-                disabled={isGeneratingQr || cashRequestSent}
-                className="mt-6 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-60 disabled:cursor-not-allowed text-white px-8 py-4 rounded-xl font-black uppercase tracking-widest transition-transform shadow-xl w-full sm:w-auto"
-              >
-                {isGeneratingQr ? 'Đang tạo mã...' : 'Thanh Toán Chuyển Trước'}
-              </button>
-              
+              {!isPaid && (
+                <button
+                  onClick={handleRequestPayment}
+                  disabled={isGeneratingQr || cashRequestSent}
+                  className="mt-6 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-60 disabled:cursor-not-allowed text-white px-8 py-4 rounded-xl font-black uppercase tracking-widest transition-transform shadow-xl w-full sm:w-auto"
+                >
+                  {isGeneratingQr ? 'Đang tạo mã...' : 'Thanh Toán Chuyển Trước'}
+                </button>
+              )}
+                
               <div className="mt-6">
-                {cashRequestSent ? (
+                {isPaid ? (
+                  <div className="bg-emerald-50 border border-emerald-100 p-6 rounded-2xl flex flex-col items-center justify-center gap-3">
+                    <div className="w-12 h-12 bg-emerald-500 rounded-full flex items-center justify-center shadow-lg shadow-emerald-500/30">
+                      <CheckCircle2 className="w-6 h-6 text-white" />
+                    </div>
+                    <span className="text-emerald-700 font-black uppercase tracking-widest text-sm">Đơn hàng đã được thanh toán</span>
+                  </div>
+                ) : cashRequestSent ? (
                   <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-2xl flex items-center justify-center gap-3">
                     <CheckCircle2 className="w-5 h-5 text-emerald-500" />
                     <span className="text-emerald-700 font-bold text-sm">Đã gửi yêu cầu tính tiền mặt</span>

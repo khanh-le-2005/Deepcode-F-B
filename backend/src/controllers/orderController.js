@@ -1,4 +1,5 @@
 import OrderService from "../services/OrderService.js";
+import PaymentService from "../services/PaymentService.js";
 import { catchAsync } from "../utils/catchAsync.js";
 import { NotFoundError } from "../utils/AppError.js";
 
@@ -51,6 +52,32 @@ export const createOrder = catchAsync(async (req, res) => {
 
 export const createCounterOrder = catchAsync(async (req, res) => {
   const session = await OrderService.createCounterOrder(req.body, req.io);
+  res.status(201).json(session);
+});
+
+export const createKioskOrder = catchAsync(async (req, res) => {
+  const clientIp = req.headers["x-forwarded-for"] || req.socket.remoteAddress || "unknown";
+  
+  const session = await OrderService.createKioskOrder(req.body, clientIp, req.io);
+  
+  // Nếu là đơn chuyển khoản, bắt buộc phải tạo được QR mới cho đặt đơn
+  if (req.body.paymentMethod === "transfer") {
+    try {
+      const qrData = await PaymentService.generatePaymentQR(session._id);
+      return res.status(201).json({
+        ...session.toObject(),
+        qrData
+      });
+    } catch (qrErr) {
+      // Xóa đơn vừa tạo vì không thể thanh toán (tránh đơn rác)
+      await OrderService.deleteOrder(session._id, req.io);
+      
+      // Chuyển tiếp lỗi ngân hàng để thông báo cho khách chuyển sang Tiền mặt
+      throw qrErr;
+    }
+  }
+
+  // Đơn tiền mặt trả về bình thường
   res.status(201).json(session);
 });
 

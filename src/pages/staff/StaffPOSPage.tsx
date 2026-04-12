@@ -7,7 +7,7 @@ import {
   Search, Plus, Minus, ShoppingCart, Table2,
   Trash2, ChevronRight, Settings, Scan,
   History, CreditCard, Save, ChevronUp, ChevronDown,
-  LogOut, HandCoins
+  LogOut, HandCoins, CheckCircle2, AlertCircle
 } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { useAuth } from '../../AuthContext';
@@ -197,6 +197,12 @@ export const StaffPOSPage = () => {
       setSubmitting(false);
     }
   };
+
+  const isOrderDone = useMemo(() => {
+    if (!activeSession || !activeSession.items || activeSession.items.length === 0) return false;
+    // Kiểm tra tất cả món trong đơn đã được phục vụ (served) hoặc bị huỷ (cancelled) chưa
+    return activeSession.items.every((i: any) => i.status === 'served' || i.status === 'cancelled');
+  }, [activeSession]);
 
   // --- UI THEO ẢNH MẪU ---
   return (
@@ -443,26 +449,45 @@ export const StaffPOSPage = () => {
                 disabled={submitting || !selectedTableId}
                 className="w-full bg-[#111] hover:bg-slate-800 disabled:opacity-50 text-white rounded-2xl py-4 font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-lg"
               >
-                {activeSession ? 'Cập nhật món cho bếp' : 'Gửi đơn xuống bếp'}
+                {activeSession ? 'Gửi món xuống bếp' : 'Gửi đơn xuống bếp'}
               </button>
             )}
 
             {activeSession && (
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={handleManualPayment}
-                  disabled={submitting}
-                  className="bg-[#27ae60] hover:bg-[#219150] disabled:opacity-50 text-white rounded-2xl py-4 font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-lg shadow-green-100"
-                >
-                  <CreditCard className="w-4 h-4" /> Tiền mặt
-                </button>
-                <button
-                  onClick={handleMockPayment}
-                  disabled={submitting}
-                  className="bg-brand hover:brightness-110 disabled:opacity-50 text-white rounded-2xl py-4 font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-lg shadow-amber-100"
-                >
-                  <Save className="w-4 h-4" /> Xác nhận CK
-                </button>
+              <div className="space-y-3">
+                {!isOrderDone && (
+                  <div className="flex items-center gap-2 p-4 bg-amber-50 rounded-2xl border border-amber-100 mb-2">
+                    <AlertCircle className="w-5 h-5 text-amber-500 animate-pulse" />
+                    <p className="text-[10px] font-black uppercase text-amber-600 tracking-widest leading-tight">
+                      Nhân viên vui lòng ấn gửi món xuống bếp 
+                    </p>
+                  </div>
+                )}
+                
+                {isOrderDone && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      onClick={handleManualPayment}
+                      disabled={submitting}
+                      className="bg-[#27ae60] hover:bg-[#219150] disabled:opacity-50 text-white rounded-2xl py-4 font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-lg shadow-green-100"
+                    >
+                      <CreditCard className="w-4 h-4" /> Tiền mặt
+                    </button>
+                    {/* <button
+                      onClick={handleMockPayment}
+                      disabled={submitting}
+                      className="bg-brand hover:brightness-110 disabled:opacity-50 text-white rounded-2xl py-4 font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-lg shadow-amber-100"
+                    >
+                      <Save className="w-4 h-4" /> Xác nhận CK
+                    </button> */}
+                  </div>
+                )}
+
+                {isOrderDone && (
+                  <div className="flex items-center justify-center gap-2 text-emerald-600 font-black text-[10px] uppercase tracking-[0.2em] py-2">
+                    <CheckCircle2 className="w-4 h-4" /> Đã xong tất cả món
+                  </div>
+                )}
               </div>
             )}
           </div>

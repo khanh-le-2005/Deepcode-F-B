@@ -100,11 +100,29 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const handleNewNotification = (notif: Notification) => {
-    // 1. Hiện Toast
-    toast.info(notif.title, {
-      position: 'top-right',
-      autoClose: 5000,
-    });
+    // Lấy thông tin order từ backend (vừa được thêm vào payload) để tự build câu message
+    // Thay vì để backend format câu "Bàn x vừa đặt món..."
+    // @ts-ignore
+    if (notif.orderItems && notif.orderItems.length > 0) {
+      // @ts-ignore
+      const items = notif.orderItems as any[];
+      let itemsText = items.map(i => `${i.quantity}x ${i.name}`).join(', ');
+      if (itemsText.length > 80) itemsText = itemsText.substring(0, 77) + '...';
+      // @ts-ignore
+      notif.message = `Bàn ${notif.tableName || 'mang đi'} vừa gọi: ${itemsText}`;
+    }
+
+    // 1. Hiện Toast (Giờ hiển thị cả nội dung cho rõ ràng)
+    toast.info(
+      <div>
+        <p style={{ fontWeight: 'bold', marginBottom: '4px' }}>{notif.title}</p>
+        <p style={{ fontSize: '13px', lineHeight: '1.4' }}>{notif.message}</p>
+      </div>, 
+      {
+        position: 'top-right',
+        autoClose: 5000,
+      }
+    );
 
     // 2. Phát âm thanh (Tài liệu v3.1 mục 13)
     const audio = new Audio('/souldeffect/yippeeeeeeeeeeeeee.mp3');

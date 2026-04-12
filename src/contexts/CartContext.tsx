@@ -4,8 +4,9 @@ import { OrderItem } from '../types';
 interface CartContextType {
   cart: OrderItem[];
   addToCart: (item: OrderItem) => void;
-  removeFromCart: (menuItemId: string) => void;
-  updateQuantity: (menuItemId: string, delta: number) => void;
+  removeFromCart: (uniqueKey: string) => void;
+  updateQuantity: (uniqueKey: string, delta: number) => void;
+  getUniqueCartKey: (item: OrderItem) => string;
   clearCart: () => void;
   totalPrice: number;
   totalItems: number;
@@ -27,23 +28,27 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     localStorage.setItem('gomoto_cart', JSON.stringify(cart));
   }, [cart]);
 
+  const getUniqueCartKey = (item: OrderItem) => {
+    const optionName = item.selectedOption?.name || 'none';
+    const sortedAddons = (item.selectedAddons || [])
+      .map(a => a.name)
+      .sort()
+      .join('|');
+    return `${item.menuItemId}-${optionName}-${sortedAddons}`;
+  };
+
   const addToCart = (newItem: OrderItem) => {
     setCart(prev => {
-      // Tìm món trùng ID, trùng Option và trùng tập hợp Addons
-      const existingIdx = prev.findIndex(i => 
-        i.menuItemId === newItem.menuItemId && 
-        JSON.stringify(i.selectedOption) === JSON.stringify(newItem.selectedOption) &&
-        JSON.stringify(i.selectedAddons) === JSON.stringify(newItem.selectedAddons)
-      );
+      const newKey = getUniqueCartKey(newItem);
+      const existingIdx = prev.findIndex(i => getUniqueCartKey(i) === newKey);
 
       if (existingIdx > -1) {
         const updatedCart = [...prev];
         const item = updatedCart[existingIdx];
         const newQuantity = item.quantity + newItem.quantity;
         
-        // Tính lại giá dựa trên (basePrice + extras) * newQuantity
         const unitExtras = (item.selectedOption?.priceExtra || 0) + 
-                           item.selectedAddons.reduce((sum, a) => sum + (a.priceExtra || 0), 0);
+                           (item.selectedAddons || []).reduce((sum, a) => sum + (a.priceExtra || 0), 0);
         const newTotalPrice = (item.basePrice + unitExtras) * newQuantity;
 
         updatedCart[existingIdx] = { 
@@ -57,16 +62,16 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
-  const removeFromCart = (menuItemId: string) => {
-    setCart(prev => prev.filter(i => i.menuItemId !== menuItemId));
+  const removeFromCart = (uniqueKey: string) => {
+    setCart(prev => prev.filter(i => getUniqueCartKey(i) !== uniqueKey));
   };
 
-  const updateQuantity = (menuItemId: string, delta: number) => {
+  const updateQuantity = (uniqueKey: string, delta: number) => {
     setCart(prev => prev.map(i => {
-      if (i.menuItemId === menuItemId) {
+      if (getUniqueCartKey(i) === uniqueKey) {
         const newQ = Math.max(1, i.quantity + delta);
         const unitExtras = (i.selectedOption?.priceExtra || 0) + 
-                           i.selectedAddons.reduce((sum, a) => sum + (a.priceExtra || 0), 0);
+                           (i.selectedAddons || []).reduce((sum, a) => sum + (a.priceExtra || 0), 0);
         const newTotalPrice = (i.basePrice + unitExtras) * newQ;
         
         return { ...i, quantity: newQ, totalPrice: newTotalPrice };
@@ -81,7 +86,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   const totalItems = cart.reduce((acc, item) => acc + item.quantity, 0);
 
   return (
-    <CartContext.Provider value={{ cart, addToCart, removeFromCart, updateQuantity, clearCart, totalPrice, totalItems }}>
+    <CartContext.Provider value={{ cart, addToCart, removeFromCart, updateQuantity, getUniqueCartKey, clearCart, totalPrice, totalItems }}>
       {children}
     </CartContext.Provider>
   );

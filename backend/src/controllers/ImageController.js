@@ -35,3 +35,9 @@ export const getImage = catchAsync(async (req, res) => {
     res.status(500).json({ success: false, error: { message: "Error reading image stream" } });
   });
 });
+
+export const suggestImages = catchAsync(async (req, res) => {
+  const { keyword } = req.query;
+  const results = await ImageService.suggestImages(keyword);
+  res.json({ success: true, data: results });
+});

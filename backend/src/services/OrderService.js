@@ -241,6 +241,121 @@ class OrderService {
     return session;
   }
 
+  // =============================================
+  // KIOSK: Đặt Mang Về / Giao Hàng (Public API)
+  // Hỗ trợ: Tiền mặt (cash) và Chuyển khoản (transfer)
+  // =============================================
+  async createKioskOrder(data, clientIp, io) {
+    const {
+      orderType    = "dine_in",
+      paymentMethod = "cash",          // "cash" | "transfer"
+      customerInfo  = {},
+      items
+    } = data;
+
+    // ── VALIDATE BẮT BUỘC ──────────────────────────────────────────
+    if (!items || items.length === 0) {
+      throw new BadRequestError("Đơn hàng phải có ít nhất 1 món");
+    }
+
+    // Tên khách bắt buộc với mọi loại đơn Kiosk
+    if (!customerInfo.name?.trim()) {
+      throw new BadRequestError("Vui lòng nhập Tên khách hàng");
+    }
+
+    if (orderType === "delivery") {
+      if (!customerInfo.phone?.trim())           throw new BadRequestError("Đơn Giao hàng bắt buộc phải có Số điện thoại");
+      if (!customerInfo.deliveryAddress?.trim()) throw new BadRequestError("Đơn Giao hàng bắt buộc phải có Địa chỉ giao hàng");
+    }
+    if (orderType === "takeaway") {
+      if (!customerInfo.phone?.trim()) throw new BadRequestError("Đơn Mang về bắt buộc phải có Số điện thoại");
+    }
+    if (!["cash", "transfer"].includes(paymentMethod)) {
+      throw new BadRequestError("Phương thức thanh toán không hợp lệ (cash | transfer)");
+    }
+
+    // ── SINH BÀN ẢO ────────────────────────────────────────────────
+    let tableName;
+    if (orderType === "delivery") {
+      tableName = `Giao hàng - ${customerInfo.phone} - ${customerInfo.deliveryAddress}`;
+    } else if (orderType === "takeaway") {
+      tableName = `Mang về - ${customerInfo.phone}`;
+    } else {
+      tableName = data.tableName || `Tại quầy - ${new Date().getHours()}h${new Date().getMinutes()}`;
+    }
+
+    const slug = crypto.randomBytes(4).toString("hex");
+    const table = new Table({ name: tableName, status: "occupied", slug });
+    await table.save();
+    const tableIdStr = String(table._id);
+
+    // ── KIỂM TRA THỰC ĐƠN TUẦN ────────────────────────────────────
+    const activeMenu = await WeeklyMenuService.getActiveWeeklyMenu();
+    const allowedIds = activeMenu
+      ? activeMenu.menuItems.map(m => String(m._id || m))
+      : null;
+
+    // ── TÍNH GIÁ TỪNG MÓN ─────────────────────────────────────────
+    // Transfer (trả trước) → Items ở trạng thái awaiting_payment, BẾP CHƯA THẤY
+    // Cash (trả sau)       → Items ở trạng thái pending_approval,  BẾP THẤY NGAY
+    const itemStatus = paymentMethod === "transfer" ? "awaiting_payment" : "pending_approval";
+
+    let total = 0;
+    const newItems = items.map((item) => {
+      const basePrice   = item.basePrice || item.price || 0;
+      const menuItemId  = item.id || item.menuItemId || item._id;
+      const menuItemIdStr = String(menuItemId);
+
+      if (allowedIds && !allowedIds.includes(menuItemIdStr)) {
+        throw new BadRequestError(`Món '${item.name || menuItemIdStr}' chưa được xuất bán trong tuần này!`);
+      }
+
+      let itemPrice = Number(basePrice);
+      if (item.selectedOption?.priceExtra)  itemPrice += Number(item.selectedOption.priceExtra);
+      if (item.selectedAddons?.length > 0)  {
+        item.selectedAddons.forEach(a => { if (a.priceExtra) itemPrice += Number(a.priceExtra); });
+      }
+      const totalPrice = itemPrice * Number(item.quantity || 1);
+      total += totalPrice;
+
+      return {
+        ...item,
+        menuItemId: menuItemIdStr,
+        basePrice:  Number(basePrice),
+        totalPrice,
+        status:     itemStatus,
+      };
+    });
+
+    // ── TẠO ORDER ─────────────────────────────────────────────────
+    const sessionToken = crypto.randomBytes(16).toString("hex");
+    const session = await new Order({
+      tableId:       tableIdStr,
+      tableName,
+      sessionToken,
+      items:         newItems,
+      total,
+      status:        "active",
+      paymentStatus: "unpaid",
+      paymentMethod,            // "cash" hoặc "transfer"
+      orderType,
+      customerInfo,
+      clientIp: clientIp || null,  // Lưu IP người đặt
+    }).save();
+
+    // ── BẮN SOCKET ────────────────────────────────────────────────
+    // Chỉ báo Bếp nếu là tiền mặt (transfer thì chờ webhook xác nhận)
+    if (io) {
+      if (paymentMethod === "cash") {
+        io.emit("new-order", session);    // Chuông bếp
+      }
+      io.emit("order-updated", session);
+      io.emit("tables-updated", await Table.find());
+    }
+
+    return session;
+  }
+
   async checkoutCart(sessionId, io) {
     const session = await Order.findOneAndUpdate(
       { _id: sessionId, "items.status": "in_cart" },
@@ -273,6 +388,70 @@ class OrderService {
     
     if (io) io.emit("order-updated", session);
     return session;
+  }
+
+  async updateOrderItemQuantity(sessionId, itemId, delta, io) {
+    const session = await Order.findById(sessionId);
+    if (!session) throw new NotFoundError("Session not found");
+
+    const item = session.items.id(itemId);
+    if (!item) throw new NotFoundError("Item not found");
+
+    if (item.status !== "in_cart" && item.status !== "pending_approval") {
+      throw new BadRequestError("Không thể thay đổi số lượng món đang làm hoặc đã làm xong");
+    }
+
+    const pricePerUnit = item.totalPrice / (item.quantity || 1);
+    const newQuantity = (item.quantity || 1) + Number(delta);
+
+    if (newQuantity <= 0) {
+      // Remove item entirely 
+      session.total -= item.totalPrice;
+      session.items.pull(itemId);
+    } else {
+      // Update item quantity
+      item.quantity = newQuantity;
+      const newTotalPrice = pricePerUnit * newQuantity;
+      session.total = session.total - item.totalPrice + newTotalPrice;
+      item.totalPrice = newTotalPrice;
+    }
+
+    await session.save();
+    if (io) io.emit("order-updated", session);
+    return session;
+  }
+
+  async calculatePrice(data) {
+    if (!data.items || data.items.length === 0) {
+      return { calculatedItems: [], totalCartPrice: 0 };
+    }
+
+    let totalCartPrice = 0;
+    const calculatedItems = data.items.map((item) => {
+      const basePrice = item.basePrice || item.price || 0;
+      let itemPrice = Number(basePrice);
+
+      if (item.selectedOption && item.selectedOption.priceExtra) {
+        itemPrice += Number(item.selectedOption.priceExtra);
+      }
+      
+      if (item.selectedAddons && item.selectedAddons.length > 0) {
+        item.selectedAddons.forEach((addon) => {
+          if (addon.priceExtra) itemPrice += Number(addon.priceExtra);
+        });
+      }
+      
+      const totalPrice = itemPrice * Number(item.quantity || 1);
+      totalCartPrice += totalPrice;
+
+      return {
+        ...item,
+        unitPrice: itemPrice,
+        totalPrice
+      };
+    });
+
+    return { calculatedItems, totalCartPrice };
   }
 
 
@@ -321,6 +500,10 @@ class OrderService {
     // FIX #2: Xóa "cửa sau" tạo Payment thiếu chi tiết.
     // Việc tạo Payment phải đi qua PaymentService.processPayment() đúng luồng.
     // updateOrder() chỉ được phép đổi trạng thái + dọn bàn nếu completed/cancelled.
+    if (data.status === "completed" && !data.completedAt) {
+      data.completedAt = new Date();
+    }
+
     const session = await Order.findByIdAndUpdate(id, data, { new: true });
     if (!session) throw new NotFoundError("Session not found");
 

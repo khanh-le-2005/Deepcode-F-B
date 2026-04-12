@@ -21,7 +21,7 @@ const orderItemSchema = new mongoose.Schema({
   // Trạng thái theo luồng mới: giỏ hàng -> chờ duyệt -> đang nấu -> đã phục vụ -> hủy
   status: {
     type: String,
-    enum: ["in_cart", "pending_approval", "cooking", "served", "cancelled"],
+    enum: ["in_cart", "awaiting_payment", "pending_approval", "cooking", "served", "cancelled"],
     default: "in_cart",
   },
 
@@ -52,6 +52,31 @@ const orderSchema = new mongoose.Schema(
       enum: ["unpaid", "paid", "refunded"],
       default: "unpaid",
     },
+
+    // 3. LOẠI HÌNH PHỤC VỤ
+    orderType: {
+      type: String,
+      enum: ["dine_in", "takeaway", "delivery"],
+      default: "dine_in"
+    },
+
+    // 4. PHƯƠNG THỨC THANH TOÁN (Kiosk mặc định luôn là tiền mặt)
+    paymentMethod: {
+      type: String,
+      enum: ["cash", "transfer"],
+      default: "cash"
+    },
+
+    // 5. THÔNG TIN KHÁCH HÀNG (dành cho Takeaway & Delivery)
+    customerInfo: {
+      name:            { type: String },
+      phone:           { type: String },
+      deliveryAddress: { type: String }, // Text tự do: "Lớp 10A", "Phòng 203 Tòa B"...
+      note:            { type: String }  // Ghi chú thêm cho bếp/shipper
+    },
+
+    // 6. IP CỦA KHÁCH (để phần lịch sử/chống lạm dụng)
+    clientIp: { type: String },
 
     completedAt: { type: Date },
     completedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },

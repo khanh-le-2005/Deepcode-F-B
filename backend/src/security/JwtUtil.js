@@ -7,6 +7,10 @@ class JwtUtil {
     return jwt.sign(payload, JWT_SECRET, { expiresIn });
   }
 
+  generateRefreshToken(payload) {
+    return jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' });
+  }
+
   verifyToken(token) {
     try {
       return jwt.verify(token, JWT_SECRET);

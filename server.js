@@ -1,4 +1,4 @@
-﻿import express from "express";
+import express from "express";
 import "express-async-errors";
 import morgan from "morgan";
 import helmet from "helmet";
@@ -16,7 +16,7 @@ import { MenuItem } from "./backend/src/models/MenuItem.js";
 import { Table } from "./backend/src/models/Table.js";
 import { Order } from "./backend/src/models/Order.js";
 import { Payment } from "./backend/src/models/Payment.js";
-import { User } from "./backend/src/models/User.js";
+import { seedInitialData } from "./backend/src/config/setup.js";
 
 // Routes
 import menuRoutes from "./backend/src/routes/menuRoutes.js";
@@ -31,66 +31,12 @@ import bankAccountRoutes from "./backend/src/routes/bankAccountRoutes.js";
 import categoryRoutes from "./backend/src/routes/categoryRoutes.js";
 import weeklyMenuRoutes from "./backend/src/routes/weeklyMenuRoutes.js";
 import userRoutes from "./backend/src/routes/userRoutes.js";
-const slugify = (value) => {
-  return String(value || "")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .replace(/-+/g, "-");
-};
-
 async function startServer() {
   // Connect to MongoDB
   await connectDB();
 
-  // Seed initial data if empty
-  try {
-    const tableCount = await Table.countDocuments();
-    if (tableCount === 0) {
-      const initialTables = Array.from({ length: 12 }, (_, i) => ({
-        name: `Bàn ${i + 1}`,
-        slug: slugify(`Bàn ${i + 1}`),
-        status: "empty",
-      }));
-      await Table.insertMany(initialTables);
-      console.log("✅ Seeded initial tables");
-    }
-
-    const tablesMissingSlug = await Table.find({
-      $or: [{ slug: { $exists: false } }, { slug: "" }],
-    });
-    if (tablesMissingSlug.length > 0) {
-      await Promise.all(
-        tablesMissingSlug.map((t) =>
-          Table.findByIdAndUpdate(t._id, { slug: slugify(t.name) }),
-        ),
-      );
-      console.log("✅ Backfilled table slugs");
-    }
-
-    const userCount = await User.countDocuments();
-    if (userCount === 0) {
-      await User.insertMany([
-        {
-          email: "admin@gmail.com",
-          password: "123456",
-          role: "admin",
-          name: "Quản trị viên",
-        },
-        {
-          email: "staff@gmail.com",
-          password: "123456",
-          role: "staff",
-          name: "Nhân viên",
-        },
-      ]);
-      console.log("✅ Seeded initial users");
-    }
-  } catch (err) {
-    console.error("⚠️ Failed to seed initial data:", err.message);
-  }
+  // Seed initial data (Tables + Users) — handled by setup.js
+  await seedInitialData();
 
   const app = express();
   app.set("trust proxy", 1);

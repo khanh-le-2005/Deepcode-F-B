@@ -102,6 +102,20 @@ class ImageService {
       contentType: imageMeta.contentType
     };
   }
+
+  /**
+   * Suggest images based on keyword match in filename
+   * @param {string} keyword - Search keyword
+   * @returns {Promise<Array>} Array of image metadata (id + name)
+   */
+  async suggestImages(keyword) {
+    if (!keyword || keyword.trim().length === 0) return [];
+    const regex = new RegExp(keyword.trim(), 'i');
+    const results = await Image.find({ name: { $regex: regex } })
+      .select('_id name contentType')
+      .limit(10);
+    return results.map(img => ({ id: img._id, name: img.name }));
+  }
 }
 
 export default new ImageService();

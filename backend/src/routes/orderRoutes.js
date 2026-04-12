@@ -5,12 +5,15 @@ import { authorize } from "../security/SecurityMiddleware.js";
 const router = express.Router();
 
 // --- LUỒNG KHÁCH (Public - Không cần Token) ---
+router.post("/calculate-price", orderController.calculatePrice);             // API tính giá cho Frontend (Chuẩn 100% Backend)
+router.post("/kiosk", orderController.createKioskOrder);                     // Kiosk: Đặt Mang về / Giao hàng (Public - Tiền mặt)
+
 router.get("/table/:tableId/active-session", orderController.getActiveSession); // Khách quét QR kiểm tra bàn
 router.get("/:id/status", orderController.getOrderStatus);                      // Khách kiểm tra trạng thái bill
 router.post("/", orderController.createOrder);                                   // Khách thêm món vào giỏ
 router.post("/:sessionId/checkout", orderController.checkoutCart);               // Khách chốt giỏ gửi bếp
 router.delete("/:sessionId/item/:itemId", orderController.deleteOrderItem);      // Khách xóa món (khi đang ở in_cart)
-
+router.patch("/:sessionId/item/:itemId/quantity", orderController.updateOrderItemQuantity); // Khách tăng giảm số lượng
 // --- LUỒNG NHÂN VIÊN / ADMIN (Yêu cầu Token) ---
 router.get("/", authorize(["admin", "staff"]), orderController.getOrders);
 router.get("/history/all", authorize(["admin", "staff"]), orderController.getHistory);

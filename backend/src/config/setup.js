@@ -34,10 +34,12 @@ export async function seedInitialData() {
 
     const userCount = await User.countDocuments();
     if (userCount === 0) {
-      await User.insertMany([
+      for (const userData of [
         { email: "admin@gmail.com", password: "123456", role: "admin", name: "Quản trị viên" },
         { email: "staff@gmail.com", password: "123456", role: "staff", name: "Nhân viên" }
-      ]);
+      ]) {
+        await User.create(userData);
+      }
       console.log("✅ Seeded initial users");
     }
   } catch (err) {

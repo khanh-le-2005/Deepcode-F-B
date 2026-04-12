@@ -13,6 +13,7 @@ export const login = catchAsync(async (req, res) => {
   res.json({
     success: true,
     user: result.user,
-    token: result.token
+    token: result.token,
+    refreshToken: result.refreshToken
   });
 });

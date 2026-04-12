@@ -11,10 +11,10 @@ class UserService {
     const existingUser = await User.findOne({ email });
     if (existingUser) throw new BadRequestError("Email này đã được sử dụng");
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    // Không cần hash thủ công — pre('save') hook trong User.js sẽ tự hash
     const newUser = await User.create({
       email,
-      password: hashedPassword,
+      password,  // Truyền plain text, hook sẽ hash tự động
       name,
       role: role || "staff",
     });

@@ -95,6 +95,7 @@ Content-Type: application/json
 | `/api/orders/:id/checkout` | POST | ⚡ Public | Gửi bếp |
 | `/api/orders/:id/status` | GET | ⚡ Public | Kiểm tra trạng thái bill |
 | `/api/orders/:id/item/:itemId` | DELETE | ⚡ Public | Xóa món khỏi giỏ |
+| `/api/orders/kiosk` | POST | ⚡ Public | Đặt đơn Mang đi / Giao hàng |
 | `/api/orders` | GET | 🔐 Staff/Admin | - |
 | `/api/orders/counter` | POST | 🔐 Staff/Admin | Tạo đơn tại quầy POS |
 | `/api/orders/kitchen/all` | GET | 🔐 Staff/Admin/👨‍🍳 | Xem đơn bếp |
@@ -102,7 +103,7 @@ Content-Type: application/json
 | `/api/orders/:id/approve-all` | PUT | 🔐 Staff/Admin/👨‍🍳 | Bếp duyệt tất cả |
 | `/api/payments/generate-qr/:orderId` | POST | ⚡ Public | Tạo QR thanh toán |
 | `/api/payments/webhook` | POST | 🤖 Bot Python | - |
-| `/api/payments/mock` | POST | 🔐 Staff/Admin | Đóng bill tay |
+| `/api/payments/webhook-mock/:id` | POST | 👑 Admin | Giả lập tiền về (v3.1) |
 | `/api/payments` | POST | 🔐 Staff/Admin | Thu tiền mặt |
 | `/api/payments` | GET | 🔐 Staff/Admin | Lịch sử thanh toán |
 | `/api/bank-accounts/default` | GET | ⚡ Public | Lấy STK mặc định |
@@ -110,6 +111,7 @@ Content-Type: application/json
 | `/api/notifications` | GET | 🔐 Staff/Admin | Lấy danh sách thông báo + số chưa đọc |
 | `/api/notifications/mark-all-read` | PUT | 🔐 Staff/Admin | Đánh dấu tất cả đã đọc |
 | `/api/notifications/:id/read` | PUT | 🔐 Staff/Admin | Đánh dấu 1 thông báo đã đọc |
+| `/api/stats` | GET | 🔐 Staff/Admin | Dashboard (v3.1 - Yêu cầu Token) |
 
 ---
 
@@ -627,6 +629,43 @@ DELETE /api/combos/:id
 
 ---
 
+### 7.3 Đặt Đơn Kiosk (Mang về / Giao hàng) ⚡ Public
+
+Dành cho khách hàng đặt đơn tự do qua website hoặc máy Kiosk. Hỗ trợ thanh toán Tiền mặt (trả sau) hoặc Chuyển khoản (trả trước).
+
+```http
+POST /api/orders/kiosk
+```
+
+**Request Body:**
+```json
+{
+  "orderType": "delivery",        // "takeaway" | "delivery"
+  "paymentMethod": "transfer",    // "cash" | "transfer"
+  "customerInfo": {
+    "name": "Nguyễn Văn A",
+    "phone": "0909123456",
+    "deliveryAddress": "Lớp 12A - Tòa C",
+    "note": "Giao giờ ra chơi"
+  },
+  "items": [
+    {
+      "menuItemId": "65def001",
+      "name": "Lẩu Thái",
+      "basePrice": 250000,
+      "quantity": 1
+    }
+  ]
+}
+```
+
+**Phản hồi 201 (Thành công):**
+- Trả về đối tượng `Order`.
+- Nếu `paymentMethod = "transfer"`, trả về thêm trường `qrData` (gồm `qrBase64` và `paymentContent`) để khách quét luôn.
+- Nếu `paymentMethod = "cash"`, đơn sẽ được gửi thẳng vào Bếp với trạng thái `pending_approval`.
+
+---
+
 ## 8. Luồng Khách: Quét QR → Đặt Món (Orders)
 
 > 💡 **Toàn bộ section này là Public — không cần token.** Đây là luồng Frontend phục vụ khách hàng.
@@ -1019,11 +1058,19 @@ POST /api/payments
 
 ---
 
-### 10.4 Giả Lập Webhook (Test) 👑 Admin
+### 10.4 Giả Lập Webhook (Test Chuyển Khoản) 👑 Admin
+
+Dùng để giả lập tình huống ngân hàng đã nhận tiền và báo về server. Thường dùng trong giai đoạn phát triển hoặc kiểm tra luồng Kiosk.
 
 ```http
 POST /api/payments/webhook-mock/:orderId
 ```
+
+**Chức năng:**
+1.  Chuyển `paymentStatus` của đơn thành `paid`.
+2.  Chuyển trạng thái các món từ `awaiting_payment` sang `pending_approval`.
+3.  Phát chuông báo Bếp (Socket `new-order`).
+4.  Ghi nhận lịch sử thanh toán thành công.
 
 ---
 
@@ -1083,23 +1130,25 @@ GET /api/stats
   "activeTables": 3,
   "pendingOrders": 5,
   "dailyRevenue": [
-    { "date": "2026-04-01", "total": 800000 },
-    { "date": "2026-04-02", "total": 1200000 }
+    { "name": "Th 2", "value": 800000 }
   ],
-  "topItems": [
-    { "name": "Lẩu Thái", "count": 45, "revenue": 11250000 }
+  "orderTypeData": [
+    { "name": "Tại bàn", "value": 3500000 },
+    { "name": "Giao hàng", "value": 1000000 },
+    { "name": "Mang về", "value": 500000 }
   ],
-  "monthlyRevenue": [
-    { "month": "2026-04", "total": 15000000 }
-  ],
-  "categoryData": [
-    { "category": "Lẩu", "total": 8000000 }
+  "paymentMethodData": [
+    { "name": "Tiền mặt", "value": 2000000 },
+    { "name": "Chuyển khoản", "value": 3000000 }
   ],
   "averageOrderValue": 250000,
   "averageServiceTime": 15,
   "returnRate": 10
 }
 ```
+
+> [!NOTE]
+> `orderTypeData` và `paymentMethodData` là các chỉ số mới hỗ trợ quản lý doanh thu đa kênh (Giao hàng, Mang về).
 
 ---
 
@@ -1266,13 +1315,21 @@ export const useSocket = () => useContext(SocketContext);
 ```typescript
 {
   _id: string;                      // Session ID
-  tableId: string;                  // ObjectID của bàn
-  tableName: string;                // Tên bàn (lưu cứng khi tạo phiên)
-  sessionToken: string;             // Token nhận dạng phiên
-  total: number;                    // Tổng tiền (VNĐ)
+  tableId: string;                  // ObjectID hoặc ID Bàn Ảo
+  tableName: string;                // Tên bàn / Tên định danh (VD: "Giao hàng - 090...")
+  sessionToken: string;
+  total: number;
   status: "active" | "completed" | "cancelled";
   paymentStatus: "unpaid" | "partially_paid" | "paid" | "refunded";
   paymentMethod: "cash" | "transfer" | "none";
+  orderType: "dine_in" | "takeaway" | "delivery";
+  customerInfo: {
+    name: string;
+    phone?: string;
+    deliveryAddress?: string;
+    note?: string;
+  };
+  clientIp?: string;               // Lưu vết IP (chống spam Kiosk)
   completedAt?: Date;
   completedByName?: string;
   items: OrderItem[];

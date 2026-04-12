@@ -4,8 +4,13 @@ import { UnauthorizedError } from '../utils/AppError.js';
 
 class AuthService {
   async authenticateUser(email, password) {
-    const user = await User.findOne({ email, password });
+    const user = await User.findOne({ email });
     if (!user) {
+      throw new UnauthorizedError('Email hoặc mật khẩu không chính xác');
+    }
+    
+    const isMatch = await user.comparePassword(password);
+    if (!isMatch) {
       throw new UnauthorizedError('Email hoặc mật khẩu không chính xác');
     }
     
@@ -19,7 +24,12 @@ class AuthService {
       name: user.name
     });
 
-    return { user: userObj, token };
+    const refreshToken = JwtUtil.generateRefreshToken({
+      id: user._id,
+      role: user.role
+    });
+
+    return { user: userObj, token, refreshToken };
   }
 }
 

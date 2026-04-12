@@ -1,4 +1,5 @@
 import OrderService from "../services/OrderService.js";
+import PaymentService from "../services/PaymentService.js";
 import { catchAsync } from "../utils/catchAsync.js";
 import { NotFoundError } from "../utils/AppError.js";
 
@@ -54,6 +55,32 @@ export const createCounterOrder = catchAsync(async (req, res) => {
   res.status(201).json(session);
 });
 
+export const createKioskOrder = catchAsync(async (req, res) => {
+  const clientIp = req.headers["x-forwarded-for"] || req.socket.remoteAddress || "unknown";
+  
+  const session = await OrderService.createKioskOrder(req.body, clientIp, req.io);
+  
+  // Nếu là đơn chuyển khoản, bắt buộc phải tạo được QR mới cho đặt đơn
+  if (req.body.paymentMethod === "transfer") {
+    try {
+      const qrData = await PaymentService.generatePaymentQR(session._id);
+      return res.status(201).json({
+        ...session.toObject(),
+        qrData
+      });
+    } catch (qrErr) {
+      // Xóa đơn vừa tạo vì không thể thanh toán (tránh đơn rác)
+      await OrderService.deleteOrder(session._id, req.io);
+      
+      // Chuyển tiếp lỗi ngân hàng để thông báo cho khách chuyển sang Tiền mặt
+      throw qrErr;
+    }
+  }
+
+  // Đơn tiền mặt trả về bình thường
+  res.status(201).json(session);
+});
+
 export const checkoutCart = catchAsync(async (req, res) => {
   const session = await OrderService.checkoutCart(req.params.sessionId, req.io);
   res.json({ message: "Cart sent to kitchen successfully", session });
@@ -66,6 +93,18 @@ export const deleteOrderItem = catchAsync(async (req, res) => {
     req.io
   );
   res.json(session);
+});
+
+export const updateOrderItemQuantity = catchAsync(async (req, res) => {
+  const { sessionId, itemId } = req.params;
+  const { delta } = req.body;
+  const session = await OrderService.updateOrderItemQuantity(sessionId, itemId, delta, req.io);
+  res.json(session);
+});
+
+export const calculatePrice = catchAsync(async (req, res) => {
+  const result = await OrderService.calculatePrice(req.body);
+  res.json(result);
 });
 
 export const updateItemStatus = catchAsync(async (req, res) => {

@@ -1,4 +1,5 @@
 import JwtUtil from './JwtUtil.js';
+import { User } from '../models/User.js';
 
 // Danh sách các URL không cần token (Whitelist giống Spring Security permitAll)
 const PUBLIC_PATHS = [
@@ -32,14 +33,30 @@ const PUBLIC_PATHS = [
 ];
 
 // Middleware xác thực JWT
-export const jwtAuthenticationFilter = (req, res, next) => {
-  // 1. Luôn thử parse token nếu có Header Authorization (dù public hay private)
-  //    → Staff gọi public route vẫn có req.user đầy đủ để authorize() hoạt động
+export const jwtAuthenticationFilter = async (req, res, next) => {
+  // 1. Luôn thử parse token nếu có Header Authorization
   const authHeader = req.headers.authorization;
   if (authHeader && authHeader.startsWith('Bearer ')) {
     const token = authHeader.split(' ')[1];
     const decoded = JwtUtil.verifyToken(token);
-    if (decoded) req.user = decoded; // Set nếu hợp lệ, bỏ qua nếu token sai
+    
+    if (decoded) {
+      // Bổ sung: Kiểm tra "Online" - User có còn tồn tại trong DB không?
+      try {
+        const userExists = await User.findById(decoded.id).select('_id role');
+        if (userExists) {
+          req.user = { 
+            id: userExists._id, 
+            role: userExists.role,
+            ...decoded // Giữ lại email, name từ token để dùng nếu cần
+          }; 
+        } else {
+          req.user = null; // User đã bị xóa
+        }
+      } catch (err) {
+        req.user = null;
+      }
+    }
   }
 
   // 2. Kiểm tra nếu là đường dẫn Public → cho qua dù có token hay không
@@ -48,9 +65,9 @@ export const jwtAuthenticationFilter = (req, res, next) => {
     return next();
   }
 
-  // 3. Route Private → BẮT BUỘC phải có token hợp lệ
+  // 3. Route Private → BẮT BUỘC phải có token hợp lệ VÀ user tồn tại trong DB
   if (!req.user) {
-    return res.status(401).json({ error: 'Unauthorized: No token provided' });
+    return res.status(401).json({ error: 'Unauthorized: Invalid token or user no longer exists' });
   }
 
   next();

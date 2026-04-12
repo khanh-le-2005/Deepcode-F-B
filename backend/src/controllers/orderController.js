@@ -55,8 +55,7 @@ export const createCounterOrder = catchAsync(async (req, res) => {
 });
 
 export const checkoutCart = catchAsync(async (req, res) => {
-  const { paymentMethod } = req.body;
-  const session = await OrderService.checkoutCart(req.params.sessionId, paymentMethod, req.io);
+  const session = await OrderService.checkoutCart(req.params.sessionId, req.io);
   res.json({ message: "Cart sent to kitchen successfully", session });
 });
 
@@ -67,6 +66,18 @@ export const deleteOrderItem = catchAsync(async (req, res) => {
     req.io
   );
   res.json(session);
+});
+
+export const updateOrderItemQuantity = catchAsync(async (req, res) => {
+  const { sessionId, itemId } = req.params;
+  const { delta } = req.body;
+  const session = await OrderService.updateOrderItemQuantity(sessionId, itemId, delta, req.io);
+  res.json(session);
+});
+
+export const calculatePrice = catchAsync(async (req, res) => {
+  const result = await OrderService.calculatePrice(req.body);
+  res.json(result);
 });
 
 export const updateItemStatus = catchAsync(async (req, res) => {

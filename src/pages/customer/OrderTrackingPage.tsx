@@ -88,6 +88,7 @@ export const OrderTrackingPage = () => {
         if (currentId === data.orderId && data.paymentStatus === 'paid') {
           // toast.success("Thanh toán thành công! Cảm ơn bạn đã ghé thăm 🎉");
           setShowSuccessModal(true);
+          // Hỗ trợ cả 2 trạng thái 'paid' (từ quầy) và 'completed' (từ bank)
           return { ...prev, paymentStatus: 'paid', status: 'completed' } as Order;
         }
         return prev;
@@ -106,7 +107,8 @@ export const OrderTrackingPage = () => {
     if (status !== 'valid' || !order) return;
     
     // Nếu đã thanh toán rồi thì không poll nữa
-    if (order.paymentStatus === 'paid') return;
+    const isPaid = order.paymentStatus === 'paid' || order.status === 'completed' || order.status === 'paid';
+    if (isPaid) return;
 
     const currentOrderId = order.id || (order as any)._id;
     if (!currentOrderId) return;
@@ -114,7 +116,8 @@ export const OrderTrackingPage = () => {
     const pollInterval = setInterval(async () => {
       try {
         const res = await axios.get(`/api/orders/${currentOrderId}/status`);
-        if (res.data && res.data.paymentStatus === 'paid') {
+        const isActuallyPaid = res.data && (res.data.paymentStatus === 'paid' || res.data.status === 'completed' || res.data.status === 'paid');
+        if (isActuallyPaid) {
           setOrder(prev => ({ ...prev, ...res.data }));
           setShowSuccessModal(true);
           setPaymentQr(null);
@@ -335,13 +338,13 @@ export const OrderTrackingPage = () => {
                 </li>
               ))}
             </ul>
-            <div className="flex justify-between items-center pt-6 border-t border-gray-200 text-2xl font-black italic shadow-[0_-15px_15px_-15px_rgba(0,0,0,0.05)]" style={{ fontFamily: "'Playfair Display', serif" }}>
+          <div className="flex justify-between items-center pt-6 border-t border-gray-200 text-2xl font-black italic shadow-[0_-15px_15px_-15px_rgba(0,0,0,0.05)]" style={{ fontFamily: "'Playfair Display', serif" }}>
               <span className="text-gray-400 uppercase tracking-widest text-sm not-italic font-bold">Tổng cộng</span>
               <span className="text-red-600">{(order.total ?? 0).toLocaleString()}đ</span>
             </div>
           </div>
 
-          {overallStatus === 'done' && order.status === 'active' && (
+          {(overallStatus === 'done' || order.status === 'completed' || order.status === 'paid') && order.status !== 'cancelled' && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}

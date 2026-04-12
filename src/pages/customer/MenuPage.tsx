@@ -48,7 +48,9 @@ export const MenuPage = () => {
     if (!tableId) return;
     try {
       const res = await axios.get(`/api/orders/table/${tableId}/active-session`);
-      setActiveSession(res.data);
+      // Nếu đơn đã thanh toán hoặc hoàn tất thì coi như không còn session đặt món active
+      const isStillActive = res.data && res.data.status !== 'paid' && res.data.status !== 'completed' && res.data.paymentStatus !== 'paid';
+      setActiveSession(isStillActive ? res.data : null);
     } catch (error: any) {
       if (error.response?.status === 404) {
         setActiveSession(null);
@@ -75,7 +77,8 @@ export const MenuPage = () => {
     const handleOrderUpdate = (updatedOrder: Order) => {
       const slugify = (str?: string) => str ? String(str).toLowerCase().trim().replace(/[\s\W-]+/g, '-') : '';
       if (tableId && (updatedOrder.tableId === tableId || updatedOrder.tableId === slugify(tableId))) {
-        setActiveSession(updatedOrder.status === 'active' ? updatedOrder : null);
+        const isStillActive = updatedOrder.status === 'active' && updatedOrder.status !== 'paid' && updatedOrder.status !== 'completed' && updatedOrder.paymentStatus !== 'paid';
+        setActiveSession(isStillActive ? updatedOrder : null);
       }
     };
 

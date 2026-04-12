@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Search, Filter, Edit2, Trash2, Eye, EyeOff, Image as ImageIcon, UtensilsCrossed, ChevronRight, CheckCircle2, Clock, X } from 'lucide-react';
 import axios from '@/src/lib/axiosClient';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { MenuItem } from '../../../types';
 import { Button } from '../../../components/Button';
@@ -13,11 +14,10 @@ import { getMenuItemCategoryName, getMenuItemImageUrl, getMenuItemId } from '../
 export const AdminMenuManagement = () => {
   const [menu, setMenu] = useState<MenuItem[]>([]);
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [activeWeeklyMenu, setActiveWeeklyMenu] = useState<any | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Tất cả');
+  const navigate = useNavigate();
   const [confirmConfig, setConfirmConfig] = useState<{
     isOpen: boolean;
     title: string;
@@ -66,28 +66,8 @@ export const AdminMenuManagement = () => {
   };
 
   const handleSave = async (data: any, files: File[] | null) => {
-    try {
-      const formData = new FormData();
-      formData.append('data', JSON.stringify(data));
-      if (files && files.length > 0) {
-        files.slice(0, 5).forEach(file => formData.append('images', file));
-      }
-
-      const itemId = editingItem?._id || editingItem?.id;
-
-      if (editingItem) {
-        await axios.put(`/api/menu/${itemId}`, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-      } else {
-        await axios.post('/api/menu', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-      }
-      fetchMenu();
-      setIsModalOpen(false);
-      toast.success(editingItem ? 'Cập nhật món ăn thành công!' : 'Thêm món ăn mới thành công!');
-    } catch (err: any) {
-      console.error('Lỗi khi lưu:', err);
-      const apiMessage = err?.response?.data?.error?.message || err?.response?.data?.message;
-      toast.error(apiMessage || 'Không thể lưu món ăn!');
-    }
+    // This logic is now handled in the dedicated AdminMenuEditor page
+    fetchMenu();
   };
 
   const handleDelete = async (id: string) => {
@@ -220,10 +200,7 @@ export const AdminMenuManagement = () => {
           <Button
             variant="secondary"
             size="lg"
-            onClick={() => {
-              setEditingItem(null);
-              setIsModalOpen(true);
-            }}
+            onClick={() => navigate('/admin/menu/create')}
             className="bg-brand text-white hover:bg-brand-dark px-8 h-14 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-brand/20 border-none transition-all hover:-translate-y-1"
           >
             <Plus className="w-5 h-5 mr-2" /> Thêm món mới
@@ -366,10 +343,7 @@ export const AdminMenuManagement = () => {
                   {/* Quick Actions Overlay */}
                   <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover/card:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-3 backdrop-blur-[2px]">
                     <button
-                      onClick={() => {
-                        setEditingItem(item);
-                        setIsModalOpen(true);
-                      }}
+                      onClick={() => navigate(`/admin/menu/edit/${itemId}`)}
                       className="w-12 h-12 bg-white text-slate-900 rounded-2xl flex items-center justify-center shadow-2xl hover:scale-110 transition-transform active:scale-95"
                     >
                       <Edit2 className="w-5 h-5" />
@@ -433,12 +407,6 @@ export const AdminMenuManagement = () => {
         </div>
       )}
 
-      <AdminMenuModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSave={handleSave}
-        item={editingItem}
-      />
 
       <ConfirmModal
         isOpen={confirmConfig.isOpen}

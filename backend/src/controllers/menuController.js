@@ -55,6 +55,34 @@ export const updateMenuItem = catchAsync(async (req, res) => {
   res.json(item);
 });
 
+export const publishWeekly = catchAsync(async (req, res) => {
+  const { itemIds } = req.body;
+  if (!itemIds || !Array.isArray(itemIds) || itemIds.length === 0) {
+    return res.status(400).json({ error: "Tham số itemIds không được để trống" });
+  }
+
+  // Import WeeklyMenuService động để tránh vòng lặp dependencies nếu có
+  const { default: WeeklyMenuService } = await import('../services/WeeklyMenuService.js');
+
+  const now = new Date();
+  const nextWeek = new Date(now);
+  nextWeek.setDate(now.getDate() + 7);
+
+  const menu = await WeeklyMenuService.createWeeklyMenu({
+    title: `Thực đơn Xuất bản Siêu tốc - ${now.toLocaleDateString('vi-VN')}`,
+    startDate: now,
+    endDate: nextWeek,
+    menuItems: itemIds,
+    status: 'active'
+  }, req.io);
+
+  res.json({
+    success: true,
+    message: "Đã tạo lịch bán tuần mới thành công!",
+    weeklyMenu: menu
+  });
+});
+
 export const deleteMenuItem = catchAsync(async (req, res) => {
   await MenuService.deleteMenuItem(req.params.id, req.io);
   res.json({ message: 'Menu item deleted' });

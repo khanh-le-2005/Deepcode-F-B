@@ -4,6 +4,7 @@ import { AdminOverview } from './tabs/AdminOverview';
 import { AdminTableManagement } from './tabs/AdminTableManagement';
 import { AdminCategoryManagement } from './tabs/AdminCategoryManagementApi';
 import { AdminMenuManagement } from './tabs/AdminMenuManagement';
+import { AdminMenuEditor } from './tabs/AdminMenuEditor';
 import { AdminComboManagement } from './tabs/AdminComboManagement';
 import { AdminWeeklyMenuManagement } from './tabs/AdminWeeklyMenuManagement';
 import { AdminOrderHistory } from './tabs/AdminOrderHistory';
@@ -25,6 +26,8 @@ export const AdminDashboard = () => {
         <Route path="tables" element={<AdminTableManagement />} />
         <Route path="categories" element={<AdminCategoryManagement />} />
         <Route path="menu" element={<AdminMenuManagement />} />
+        <Route path="menu/create" element={<AdminMenuEditor />} />
+        <Route path="menu/edit/:id" element={<AdminMenuEditor />} />
         <Route path="combo" element={<AdminComboManagement />} />
         <Route path="weekly-menu" element={<AdminWeeklyMenuManagement />} />
         <Route path="order-history" element={<AdminOrderHistory />} />

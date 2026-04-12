@@ -8,11 +8,15 @@ import { Server } from "socket.io";
 import { createServer as createViteServer } from "vite";
 import path from "path";
 import cors from "cors";
-import cookieParser from "cookie-parser";
 import { jwtAuthenticationFilter } from "./backend/src/security/SecurityMiddleware.js";
 
 // MongoDB
 import { connectDB } from "./backend/src/config/db.js";
+import { MenuItem } from "./backend/src/models/MenuItem.js";
+import { Table } from "./backend/src/models/Table.js";
+import { Order } from "./backend/src/models/Order.js";
+import { Payment } from "./backend/src/models/Payment.js";
+import { seedInitialData } from "./backend/src/config/setup.js";
 
 // Routes
 import menuRoutes from "./backend/src/routes/menuRoutes.js";
@@ -27,63 +31,50 @@ import bankAccountRoutes from "./backend/src/routes/bankAccountRoutes.js";
 import categoryRoutes from "./backend/src/routes/categoryRoutes.js";
 import weeklyMenuRoutes from "./backend/src/routes/weeklyMenuRoutes.js";
 import userRoutes from "./backend/src/routes/userRoutes.js";
-import { seedInitialData } from "./backend/src/config/setup.js";
-
+import notificationRoutes from "./backend/src/routes/notificationRoutes.js";
 async function startServer() {
   // Connect to MongoDB
   await connectDB();
 
-  // Seed initial data if empty
+  // Seed initial data (Tables + Users) — handled by setup.js
   await seedInitialData();
 
   const app = express();
   app.set("trust proxy", 1);
-  app.use(cookieParser());
   const httpServer = createServer(app);
   const io = new Server(httpServer, {
     cors: {
       origin: [
         "http://localhost:8000",
         "http://localhost:8080",
-        "http://momangshow.vn", "https://momangshow.vn",
-        "http://www.momangshow.vn", "https://www.momangshow.vn",
-        "http://api.momangshow.vn", "https://api.momangshow.vn",
-        "http://admin.momangshow.vn", "https://admin.momangshow.vn",
-        "http://150.95.115.212:8080",
-        "http://150.95.115.212:8000",
-        "http://150.95.115.212",
+
         "http://localhost:3000",
         "http://localhost:3001",
         "https://pay.momangshow.vn/api",
-        "http://127.0.0.1:5500"
+        "http://127.0.0.1:5500",
       ],
-      credentials: true
+      credentials: true,
     },
   });
 
   const PORT = 3000;
 
   // Professional CORS Configuration
-  app.use(cors({
-    origin: [
-      "http://localhost:8000",
-      "http://localhost:8080",
-      "http://momangshow.vn", "https://momangshow.vn",
-      "http://www.momangshow.vn", "https://www.momangshow.vn",
-      "http://api.momangshow.vn", "https://api.momangshow.vn",
-      "http://admin.momangshow.vn", "https://admin.momangshow.vn",
-      "http://150.95.115.212:8080",
-      "http://150.95.115.212:8000",
-      "http://150.95.115.212",
-      "http://localhost:3000",
-      "http://localhost:3001",
-      "https://pay.momangshow.vn/api",
-      "http://127.0.0.1:5500"
-    ],
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: true
-  }));
+  app.use(
+    cors({
+      origin: [
+        "http://localhost:8000",
+        "http://localhost:8080",
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "https://pay.momangshow.vn/api",
+        "http://127.0.0.1:5500",
+      ],
+      methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+      allowedHeaders: ["Content-Type", "Authorization"],
+      credentials: true,
+    }),
+  );
 
   // Make io accessible to our router
   app.use((req, res, next) => {
@@ -95,19 +86,23 @@ async function startServer() {
   app.use("/api", jwtAuthenticationFilter);
 
   // Security Middlewares
-  app.use(helmet({
-    contentSecurityPolicy: false,
-  }));
+  app.use(
+    helmet({
+      contentSecurityPolicy: false,
+    }),
+  );
 
   const limiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 1000,
-    message: { error: "Too many requests from this IP, please try again later." },
-    validate: { xForwardedForHeader: false }
+max: 1000,
+    message: {
+      error: "Too many requests from this IP, please try again later.",
+    },
+    validate: { xForwardedForHeader: false },
   });
   app.use("/api/", limiter);
-  app.use(express.json({ limit: '50mb' }));
-  app.use(express.urlencoded({ limit: '50mb', extended: true }));
+  app.use(express.json({ limit: "50mb" }));
+  app.use(express.urlencoded({ limit: "50mb", extended: true }));
   app.use(morgan("dev"));
   // app.use(express.json());
 
@@ -124,7 +119,7 @@ async function startServer() {
   app.use("/api/bank-accounts", bankAccountRoutes);
   app.use("/api/stats", statsRoutes);
   app.use("/api/users", userRoutes);
-
+  app.use("/api/notifications", notificationRoutes);
   // Global Error Handler
   app.use((err, req, res, next) => {
     console.error(err.stack);
@@ -136,8 +131,11 @@ async function startServer() {
         error: {
           code: "VALIDATION_ERROR",
           message: "Dữ liệu không hợp lệ",
-          details: err.errors.map(e => ({ path: e.path, message: e.message }))
-        }
+          details: err.errors.map((e) => ({
+            path: e.path,
+            message: e.message,
+          })),
+        },
       });
     }
 
@@ -150,7 +148,7 @@ async function startServer() {
       error: {
         code: errorCode,
         message,
-      }
+      },
     });
   });
 
@@ -170,17 +168,9 @@ async function startServer() {
   }
 
   io.on("connection", (socket) => {
-    console.log("A user connected:", socket.id);
-    
-    socket.on("setup_user", (role) => {
-      if (["admin", "staff", "chef"].includes(role)) {
-        socket.join("admin_hub");
-        console.log(`✅ Socket ${socket.id} joined admin_hub as ${role}`);
-      }
-    });
-
+    console.log("A user connected");
     socket.on("disconnect", () => {
-      console.log("User disconnected:", socket.id);
+      console.log("User disconnected");
     });
   });
 

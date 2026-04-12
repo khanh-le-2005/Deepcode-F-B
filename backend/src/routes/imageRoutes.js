@@ -7,6 +7,9 @@ const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
 router.post('/', upload.single('file'), imageController.uploadImage);
+// QUAN TRỌNG: Route cụ thể phải đứng TRƯỚC route động /:id
+// Nếu không, Express sẽ hiểu "suggest" là một :id và gây lỗi 500
+router.get('/suggest', imageController.suggestImages);
 router.get('/:id', imageController.getImage);
 
 export default router;

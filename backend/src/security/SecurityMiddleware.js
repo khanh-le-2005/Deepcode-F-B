@@ -1,12 +1,11 @@
 import JwtUtil from './JwtUtil.js';
-import { User } from '../models/User.js';
 
 // Danh sách các URL không cần token (Whitelist giống Spring Security permitAll)
 const PUBLIC_PATHS = [
   // --- AUTH ---
   '/api/auth/login',
   '/api/auth/register',
-  '/api/auth/refresh',    // Làm mới access token bằng refresh token
+  '/api/auth/refresh-token',
   '/api/auth/logout',
 
   // --- TÀI NGUYÊN CÔNG KHAI ---
@@ -33,30 +32,14 @@ const PUBLIC_PATHS = [
 ];
 
 // Middleware xác thực JWT
-export const jwtAuthenticationFilter = async (req, res, next) => {
+export const jwtAuthenticationFilter = (req, res, next) => {
   // 1. Luôn thử parse token nếu có Header Authorization (dù public hay private)
   //    → Staff gọi public route vẫn có req.user đầy đủ để authorize() hoạt động
   const authHeader = req.headers.authorization;
   if (authHeader && authHeader.startsWith('Bearer ')) {
     const token = authHeader.split(' ')[1];
     const decoded = JwtUtil.verifyToken(token);
-    
-    if (decoded && decoded.id) {
-      // Truy vấn database để xác nhận quyền và sự tồn tại của user (bảo mật hơn)
-      try {
-        const user = await User.findById(decoded.id).select('-password');
-        if (user) {
-          req.user = {
-            id: user._id,
-            role: user.role,
-            email: user.email,
-            name: user.name
-          };
-        }
-      } catch (error) {
-        console.error("JWT Auth DB Error:", error.message);
-      }
-    }
+    if (decoded) req.user = decoded; // Set nếu hợp lệ, bỏ qua nếu token sai
   }
 
   // 2. Kiểm tra nếu là đường dẫn Public → cho qua dù có token hay không

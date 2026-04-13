@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Check, ClipboardList } from 'lucide-react';
 import axios from '@/src/lib/axiosClient';
@@ -9,16 +9,33 @@ import { useTableValidation } from '../../hooks/useTableValidation';
 
 export const SuccessPage = () => {
   const { tableId } = useParams();
+  const [searchParams] = useSearchParams();
+  const orderId = searchParams.get('orderId');
   const navigate = useNavigate();
   const { status } = useTableValidation(tableId);
   const [order, setOrder] = useState<any>(null);
   const [isLoadingOrder, setIsLoadingOrder] = useState(true);
 
   useEffect(() => {
-    if (tableId) {
+    if (orderId) {
+      fetchOrderById(orderId);
+    } else if (tableId) {
       fetchOrderData();
+    } else {
+      setIsLoadingOrder(false);
     }
-  }, [tableId]);
+  }, [tableId, orderId]);
+
+  const fetchOrderById = async (id: string) => {
+    try {
+      const res = await axios.get(`/api/orders/${id}/status`);
+      setOrder(res.data);
+    } catch (err) {
+      console.error('Failed to fetch specific order:', err);
+    } finally {
+      setIsLoadingOrder(false);
+    }
+  };
 
   const fetchOrderData = async () => {
     try {
@@ -155,7 +172,7 @@ export const SuccessPage = () => {
       {/* Action Button */}
       <div className="mt-16 w-full max-w-md">
         <Button 
-          onClick={() => navigate(`/table/${tableId}/menu`)} 
+          onClick={() => tableId ? navigate(`/table/${tableId}/menu`) : navigate('/kiosk')} 
           className="w-full bg-white/20 hover:bg-white/30 text-white border-white/40 border py-5 rounded-2xl font-black uppercase tracking-widest backdrop-blur-sm transition-all shadow-xl active:scale-95"
         >
           Quay lại Trang Chủ

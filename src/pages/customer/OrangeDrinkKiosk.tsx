@@ -109,9 +109,9 @@ export default function FreshLemonTeaKiosk() {
       });
       const result = await res.json();
       if (res.ok) {
+        const actualOrderId = result.qrData?.orderId || result._id || result.id;
+        const actualTableId = result.tableId || result.qrData?.tableId;
         if (paymentMethod === 'transfer' && result.qrData) {
-          const actualOrderId = result.qrData.orderId || result._id || result.id;
-          const actualTableId = result.tableId || result.qrData.tableId;
           console.log("Setting QR Response with orderId:", actualOrderId, "tableId:", actualTableId);
           setQrResponse({ ...result.qrData, orderId: actualOrderId, tableId: actualTableId });
         } else {

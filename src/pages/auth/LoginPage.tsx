@@ -17,6 +17,8 @@ export const LoginPage = () => {
     if (user) {
       if (user.role === 'admin') {
         navigate('/admin', { replace: true });
+      } else if (user.role === 'chef') {
+        navigate('/kitchen', { replace: true });
       } else {
         navigate('/pos', { replace: true });
       }

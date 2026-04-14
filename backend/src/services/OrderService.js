@@ -63,7 +63,7 @@ class OrderService {
     const activeMenu = await WeeklyMenuService.getActiveWeeklyMenu();
     // Nếu chưa có lịch tuần → cho phép đặt tất cả món (chế độ không giới hạn)
     const allowedIds = activeMenu
-      ? activeMenu.menuItems.map(m => String(m._id || m))
+      ? activeMenu.menuItems.map((m) => String(m._id || m))
       : null;
 
     // Calculate total for incoming items
@@ -75,7 +75,9 @@ class OrderService {
 
       // Chỉ kiểm tra nếu có lịch tuần active
       if (allowedIds && !allowedIds.includes(menuItemIdStr)) {
-        throw new BadRequestError(`Món '${item.name || menuItemIdStr}' chưa được xuất bán trong tuần này!`);
+        throw new BadRequestError(
+          `Món '${item.name || menuItemIdStr}' chưa được xuất bán trong tuần này!`,
+        );
       }
 
       let itemPrice = Number(basePrice);
@@ -135,8 +137,8 @@ class OrderService {
     }
 
     if (io) {
-      io.emit("new-order", session);
-      io.emit("tables-updated", await Table.find());
+      io.to('role_kitchen').emit("new-order", session);
+      io.to('role_staff').emit("tables-updated", await Table.find());
     }
     return session;
   }
@@ -172,7 +174,7 @@ class OrderService {
     const activeMenu = await WeeklyMenuService.getActiveWeeklyMenu();
     // Nếu chưa có lịch tuần → cho phép đặt tất cả món (chế độ không giới hạn)
     const allowedIds = activeMenu
-      ? activeMenu.menuItems.map(m => String(m._id || m))
+      ? activeMenu.menuItems.map((m) => String(m._id || m))
       : null;
 
     let newItemsTotal = 0;
@@ -183,7 +185,9 @@ class OrderService {
 
       // Chỉ kiểm tra nếu có lịch tuần active
       if (allowedIds && !allowedIds.includes(menuItemIdStr)) {
-        throw new BadRequestError(`Món '${item.name || menuItemIdStr}' chưa được xuất bán trong tuần này!`);
+        throw new BadRequestError(
+          `Món '${item.name || menuItemIdStr}' chưa được xuất bán trong tuần này!`,
+        );
       }
 
       let itemPrice = Number(basePrice);
@@ -234,9 +238,9 @@ class OrderService {
     }
 
     if (io) {
-      io.emit("new-order", session);
-      io.emit("order-updated", session);
-      io.emit("tables-updated", await Table.find());
+      io.to('role_kitchen').emit("new-order", session);
+      io.to('role_staff').to(`table_${session.tableId}`).emit("order-updated", session);
+      io.to('role_staff').emit("tables-updated", await Table.find());
     }
     return session;
   }
@@ -247,10 +251,10 @@ class OrderService {
   // =============================================
   async createKioskOrder(data, clientIp, io) {
     const {
-      orderType    = "dine_in",
-      paymentMethod = "cash",          // "cash" | "transfer"
-      customerInfo  = {},
-      items
+      orderType = "dine_in",
+      paymentMethod = "cash", // "cash" | "transfer"
+      customerInfo = {},
+      items,
     } = data;
 
     // ── VALIDATE BẮT BUỘC ──────────────────────────────────────────
@@ -264,14 +268,23 @@ class OrderService {
     }
 
     if (orderType === "delivery") {
-      if (!customerInfo.phone?.trim())           throw new BadRequestError("Đơn Giao hàng bắt buộc phải có Số điện thoại");
-      if (!customerInfo.deliveryAddress?.trim()) throw new BadRequestError("Đơn Giao hàng bắt buộc phải có Địa chỉ giao hàng");
+      if (!customerInfo.phone?.trim())
+        throw new BadRequestError(
+          "Đơn Giao hàng bắt buộc phải có Số điện thoại",
+        );
+      if (!customerInfo.deliveryAddress?.trim())
+        throw new BadRequestError(
+          "Đơn Giao hàng bắt buộc phải có Địa chỉ giao hàng",
+        );
     }
     if (orderType === "takeaway") {
-      if (!customerInfo.phone?.trim()) throw new BadRequestError("Đơn Mang về bắt buộc phải có Số điện thoại");
+      if (!customerInfo.phone?.trim())
+        throw new BadRequestError("Đơn Mang về bắt buộc phải có Số điện thoại");
     }
     if (!["cash", "transfer"].includes(paymentMethod)) {
-      throw new BadRequestError("Phương thức thanh toán không hợp lệ (cash | transfer)");
+      throw new BadRequestError(
+        "Phương thức thanh toán không hợp lệ (cash | transfer)",
+      );
     }
 
     // ── SINH BÀN ẢO ────────────────────────────────────────────────
@@ -281,7 +294,9 @@ class OrderService {
     } else if (orderType === "takeaway") {
       tableName = `Mang về - ${customerInfo.phone}`;
     } else {
-      tableName = data.tableName || `Tại quầy - ${new Date().getHours()}h${new Date().getMinutes()}`;
+      tableName =
+        data.tableName ||
+        `Tại quầy - ${new Date().getHours()}h${new Date().getMinutes()}`;
     }
 
     const slug = crypto.randomBytes(4).toString("hex");
@@ -292,28 +307,34 @@ class OrderService {
     // ── KIỂM TRA THỰC ĐƠN TUẦN ────────────────────────────────────
     const activeMenu = await WeeklyMenuService.getActiveWeeklyMenu();
     const allowedIds = activeMenu
-      ? activeMenu.menuItems.map(m => String(m._id || m))
+      ? activeMenu.menuItems.map((m) => String(m._id || m))
       : null;
 
     // ── TÍNH GIÁ TỪNG MÓN ─────────────────────────────────────────
     // Transfer (trả trước) → Items ở trạng thái awaiting_payment, BẾP CHƯA THẤY
     // Cash (trả sau)       → Items ở trạng thái pending_approval,  BẾP THẤY NGAY
-    const itemStatus = paymentMethod === "transfer" ? "awaiting_payment" : "pending_approval";
+    const itemStatus =
+      paymentMethod === "transfer" ? "awaiting_payment" : "pending_approval";
 
     let total = 0;
     const newItems = items.map((item) => {
-      const basePrice   = item.basePrice || item.price || 0;
-      const menuItemId  = item.id || item.menuItemId || item._id;
+      const basePrice = item.basePrice || item.price || 0;
+      const menuItemId = item.id || item.menuItemId || item._id;
       const menuItemIdStr = String(menuItemId);
 
       if (allowedIds && !allowedIds.includes(menuItemIdStr)) {
-        throw new BadRequestError(`Món '${item.name || menuItemIdStr}' chưa được xuất bán trong tuần này!`);
+        throw new BadRequestError(
+          `Món '${item.name || menuItemIdStr}' chưa được xuất bán trong tuần này!`,
+        );
       }
 
       let itemPrice = Number(basePrice);
-      if (item.selectedOption?.priceExtra)  itemPrice += Number(item.selectedOption.priceExtra);
-      if (item.selectedAddons?.length > 0)  {
-        item.selectedAddons.forEach(a => { if (a.priceExtra) itemPrice += Number(a.priceExtra); });
+      if (item.selectedOption?.priceExtra)
+        itemPrice += Number(item.selectedOption.priceExtra);
+      if (item.selectedAddons?.length > 0) {
+        item.selectedAddons.forEach((a) => {
+          if (a.priceExtra) itemPrice += Number(a.priceExtra);
+        });
       }
       const totalPrice = itemPrice * Number(item.quantity || 1);
       total += totalPrice;
@@ -321,36 +342,58 @@ class OrderService {
       return {
         ...item,
         menuItemId: menuItemIdStr,
-        basePrice:  Number(basePrice),
+        basePrice: Number(basePrice),
         totalPrice,
-        status:     itemStatus,
+        status: itemStatus,
       };
     });
 
     // ── TẠO ORDER ─────────────────────────────────────────────────
     const sessionToken = crypto.randomBytes(16).toString("hex");
     const session = await new Order({
-      tableId:       tableIdStr,
+      tableId: tableIdStr,
       tableName,
       sessionToken,
-      items:         newItems,
+      items: newItems,
       total,
-      status:        "active",
+      status: "active",
       paymentStatus: "unpaid",
-      paymentMethod,            // "cash" hoặc "transfer"
+      paymentMethod, // "cash" hoặc "transfer"
       orderType,
       customerInfo,
-      clientIp: clientIp || null,  // Lưu IP người đặt
+      clientIp: clientIp || null, // Lưu IP người đặt
     }).save();
 
     // ── BẮN SOCKET ────────────────────────────────────────────────
-    // Chỉ báo Bếp nếu là tiền mặt (transfer thì chờ webhook xác nhận)
     if (io) {
+      io.to('role_staff').to(`table_${session.tableId}`).emit("order-updated", session);
+      io.to('role_staff').emit("tables-updated", await Table.find());
+
+      const orderLabel = orderType === "delivery" ? "Giao hàng" : "Mang về";
+      const customerName = customerInfo.name || "Khách hàng";
+
       if (paymentMethod === "cash") {
-        io.emit("new-order", session);    // Chuông bếp
+        // 1. ĐƠN TIỀN MẶT: Báo nhân viên duyệt NGAY LẬP TỨC
+        io.to('role_staff').emit("notification:staff", {
+          type: "warning",
+          title: `🛎️ Có đơn ${orderLabel} mới (Tiền mặt)`,
+          message: `Khách [${customerName}] vừa đặt đơn mới. Vui lòng kiểm tra và duyệt xuống bếp!`,
+          orderId: session._id,
+          sound: "bell_ring"
+        });
+
+        // (Tuỳ chọn) Báo luôn cho bếp chuẩn bị tinh thần
+        io.to('role_kitchen').emit("new-order", session);
+      } else {
+        // 2. ĐƠN CHUYỂN KHOẢN: Báo nhân viên có người đang quét mã
+        io.to('role_staff').emit("notification:staff", {
+          type: "info",
+          title: `⏱️ Đơn ${orderLabel} đang chờ thanh toán`,
+          message: `Khách [${customerName}] đang tiến hành quét mã QR chuyển khoản.`,
+          orderId: session._id,
+          sound: "info"
+        });
       }
-      io.emit("order-updated", session);
-      io.emit("tables-updated", await Table.find());
     }
 
     return session;
@@ -363,7 +406,19 @@ class OrderService {
       { arrayFilters: [{ "elem.status": "in_cart" }], new: true },
     );
     if (!session) throw new NotFoundError("Session not found or Cart is empty");
-    if (io) io.emit("order-updated", session);
+
+    if (io) {
+      io.to('role_staff').to(`table_${session.tableId}`).emit("order-updated", session);
+
+      // Bắn thông báo cho Thu Ngân
+      io.to('role_staff').emit("notification:staff", {
+        type: "info",
+        title: "🛎️ Đơn gọi món mới",
+        message: `Bàn [${session.tableName}] vừa chốt giỏ hàng gửi yêu cầu đặt món. Cần xác nhận!`,
+        orderId: session._id,
+        sound: "info",
+      });
+    }
     return session;
   }
 
@@ -383,10 +438,10 @@ class OrderService {
 
     session.total -= item.totalPrice;
     session.items.splice(itemIndex, 1);
-    
+
     await session.save();
-    
-    if (io) io.emit("order-updated", session);
+
+    if (io) io.to('role_staff').to(`table_${session.tableId}`).emit("order-updated", session);
     return session;
   }
 
@@ -398,14 +453,16 @@ class OrderService {
     if (!item) throw new NotFoundError("Item not found");
 
     if (item.status !== "in_cart" && item.status !== "pending_approval") {
-      throw new BadRequestError("Không thể thay đổi số lượng món đang làm hoặc đã làm xong");
+      throw new BadRequestError(
+        "Không thể thay đổi số lượng món đang làm hoặc đã làm xong",
+      );
     }
 
     const pricePerUnit = item.totalPrice / (item.quantity || 1);
     const newQuantity = (item.quantity || 1) + Number(delta);
 
     if (newQuantity <= 0) {
-      // Remove item entirely 
+      // Remove item entirely
       session.total -= item.totalPrice;
       session.items.pull(itemId);
     } else {
@@ -417,7 +474,7 @@ class OrderService {
     }
 
     await session.save();
-    if (io) io.emit("order-updated", session);
+    if (io) io.to('role_staff').to(`table_${session.tableId}`).emit("order-updated", session);
     return session;
   }
 
@@ -434,26 +491,25 @@ class OrderService {
       if (item.selectedOption && item.selectedOption.priceExtra) {
         itemPrice += Number(item.selectedOption.priceExtra);
       }
-      
+
       if (item.selectedAddons && item.selectedAddons.length > 0) {
         item.selectedAddons.forEach((addon) => {
           if (addon.priceExtra) itemPrice += Number(addon.priceExtra);
         });
       }
-      
+
       const totalPrice = itemPrice * Number(item.quantity || 1);
       totalCartPrice += totalPrice;
 
       return {
         ...item,
         unitPrice: itemPrice,
-        totalPrice
+        totalPrice,
       };
     });
 
     return { calculatedItems, totalCartPrice };
   }
-
 
   async updateItemStatus(sessionId, itemId, status, io, user = null) {
     const updateFields = { "items.$.status": status };
@@ -462,21 +518,58 @@ class OrderService {
       updateFields["items.$.actionByName"] = user.name;
       updateFields["items.$.actionAt"] = new Date();
     }
+
     const session = await Order.findOneAndUpdate(
       { _id: sessionId, "items._id": itemId },
       { $set: updateFields },
       { new: true },
     );
     if (!session) throw new NotFoundError("Session or Item not found");
-    if (io) io.emit("order-updated", session);
+
+    if (io) {
+      io.to('role_staff').to(`table_${session.tableId}`).emit("order-updated", session);
+
+      if (status === "cooking") {
+        const item = session.items.id(itemId);
+        io.to('role_kitchen').emit("notification:kitchen", {
+          type: "warning",
+          title: "🔥 Bếp chú ý: Món bổ sung",
+          message: `Món [${item.name}] của Bàn [${session.tableName}] vừa được duyệt.`,
+          orderId: session._id,
+          sound: "warning",
+        });
+
+        io.to(`table_${session.tableId}`).emit("customer:item_status_changed", {
+          itemId: item._id,
+          newStatus: "cooking",
+          message: "Đầu bếp đang chuẩn bị món ăn của bạn!"
+        });
+      }
+
+      if (status === "served" || status === "ready_to_serve") {
+        const item = session.items.id(itemId);
+        io.to('role_staff').emit("notification:staff", {
+          type: "success",
+          title: "🍲 Món đã sẵn sàng",
+          message: `Món [${item.name}] của Bàn [${session.tableName}] đã làm xong. Vui lòng mang cho khách!`,
+          sound: "food_ready"
+        });
+        io.to(`table_${session.tableId}`).emit("customer:item_status_changed", {
+          itemId: item._id,
+          newStatus: status,
+          message: "Món ăn của bạn đã hoàn thành!"
+        });
+      }
+    }
     return session;
   }
-
   async approveAllItems(sessionId, io, user = null) {
     const session = await Order.findById(sessionId);
     if (!session) throw new NotFoundError("Session not found");
 
     let updated = false;
+    let approvedCount = 0;
+
     session.items.forEach((item) => {
       if (item.status === "pending_approval") {
         item.status = "cooking";
@@ -486,12 +579,24 @@ class OrderService {
           item.actionAt = new Date();
         }
         updated = true;
+        approvedCount++;
       }
     });
 
     if (updated) {
       await session.save();
-      if (io) io.emit("order-updated", session);
+      if (io) {
+        io.to('role_staff').to(`table_${session.tableId}`).emit("order-updated", session);
+
+        // Bắn thông báo cho Bếp
+        io.to('role_kitchen').emit("notification:kitchen", {
+          type: "warning",
+          title: "🔥 Bếp chú ý: Có bill mới",
+          message: `Bàn [${session.tableName}] vừa được duyệt ${approvedCount} món xuống bếp. Vui lòng chuẩn bị!`,
+          orderId: session._id,
+          sound: "warning",
+        });
+      }
     }
     return session;
   }
@@ -515,10 +620,10 @@ class OrderService {
           { status: "empty" },
           { new: true },
         );
-      if (io) io.emit("tables-updated", await Table.find());
+      if (io) io.to('role_staff').emit("tables-updated", await Table.find());
     }
 
-    if (io) io.emit("order-updated", session);
+    if (io) io.to('role_staff').to(`table_${session.tableId}`).emit("order-updated", session);
     return session;
   }
 
@@ -533,7 +638,7 @@ class OrderService {
         { status: "empty" },
         { new: true },
       );
-    if (io) io.emit("tables-updated", await Table.find());
+    if (io) io.to('role_staff').emit("tables-updated", await Table.find());
 
     return true;
   }
@@ -556,8 +661,8 @@ class OrderService {
     await Table.findByIdAndUpdate(order.tableId, { status: "empty" });
 
     if (io) {
-      io.emit("tables-updated", await Table.find());
-      io.emit("order-updated", order);
+      io.to('role_staff').emit("tables-updated", await Table.find());
+      io.to('role_staff').to(`table_${order.tableId}`).emit("order-updated", order);
     }
     return order;
   }

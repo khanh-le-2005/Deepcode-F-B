@@ -110,6 +110,23 @@ export const StaffPOSPage = () => {
     }
   };
 
+  const handleApproveItems = async () => {
+    if (!activeSession) return;
+    setSubmitting(true);
+    try {
+      await axios.put(`/api/orders/${activeSession._id || activeSession.id}/approve-all`);
+      toast.success('Đã duyệt tất cả món xuống bếp!');
+      // Refresh dữ liệu bàn và session
+      fetchTables();
+      const table = tables.find(t => t.id === selectedTableId || (t as any)._id === selectedTableId);
+      if (table) fetchActiveSession(table.slug || table.id || (table as any)._id);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Lỗi khi duyệt món');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const fetchMenu = () => {
     axios.get('/api/menu')
       .then(res => setMenu(res.data || []))
@@ -202,6 +219,11 @@ export const StaffPOSPage = () => {
     if (!activeSession || !activeSession.items || activeSession.items.length === 0) return false;
     // Kiểm tra tất cả món trong đơn đã được phục vụ (served) hoặc bị huỷ (cancelled) chưa
     return activeSession.items.every((i: any) => i.status === 'served' || i.status === 'cancelled');
+  }, [activeSession]);
+  
+  const hasPendingItems = useMemo(() => {
+    if (!activeSession || !activeSession.items) return false;
+    return activeSession.items.some((i: any) => i.status === 'pending_approval');
   }, [activeSession]);
 
   // --- UI THEO ẢNH MẪU ---
@@ -455,11 +477,21 @@ export const StaffPOSPage = () => {
 
             {activeSession && (
               <div className="space-y-3">
-                {!isOrderDone && (
+                {hasPendingItems && (
+                  <button
+                    onClick={handleApproveItems}
+                    disabled={submitting}
+                    className="w-full bg-brand hover:brightness-110 disabled:opacity-50 text-white rounded-2xl py-4 font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-lg shadow-orange-100"
+                  >
+                    <CheckCircle2 className="w-5 h-5" /> Duyệt món xuống bếp
+                  </button>
+                )}
+
+                {!isOrderDone && !hasPendingItems && (
                   <div className="flex items-center gap-2 p-4 bg-amber-50 rounded-2xl border border-amber-100 mb-2">
                     <AlertCircle className="w-5 h-5 text-amber-500 animate-pulse" />
                     <p className="text-[10px] font-black uppercase text-amber-600 tracking-widest leading-tight">
-                      Nhân viên vui lòng ấn gửi món xuống bếp 
+                      Món đang được đầu bếp xử lý...
                     </p>
                   </div>
                 )}

@@ -166,9 +166,21 @@ max: 1000,
   }
 
   io.on("connection", (socket) => {
-    console.log("A user connected");
+    console.log("A user connected: " + socket.id);
+
+    // Kênh phân luồng
+    socket.on("join-room", (room) => {
+      socket.join(room);
+      console.log(`Socket ${socket.id} joined room: ${room}`);
+    });
+
+    socket.on("leave-room", (room) => {
+      socket.leave(room);
+      console.log(`Socket ${socket.id} left room: ${room}`);
+    });
+
     socket.on("disconnect", () => {
-      console.log("User disconnected");
+      console.log("User disconnected: " + socket.id);
     });
   });
 

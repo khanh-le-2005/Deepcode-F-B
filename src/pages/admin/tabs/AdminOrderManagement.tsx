@@ -107,6 +107,17 @@ export const AdminOrderManagement = () => {
     }
   };
 
+  const updateItemStatus = async (orderId: string, itemId: string, status: string) => {
+    try {
+      await axios.put(`/api/orders/${orderId}/item/${itemId}/status`, { status });
+      fetchOrders();
+      toast.success('Đã chuyển món vào bếp!');
+    } catch (err) {
+      console.error('Failed to update item:', err);
+      toast.error('Không thể cập nhật món!');
+    }
+  };
+
   const normalizeStatus = (status: string) => {
     if (status === 'paid') return 'completed';
     return status;
@@ -284,6 +295,14 @@ export const AdminOrderManagement = () => {
                             <span className="text-xs font-bold text-gray-900">
                               {Number(item.totalPrice ?? item.basePrice ?? item.price ?? 0).toLocaleString()}đ
                             </span>
+                            {item.status === 'pending_approval' && (
+                              <button
+                                onClick={() => updateItemStatus(orderId, (item as any)._id || idx.toString(), 'cooking')}
+                                className="ml-2 px-3 py-1.5 bg-brand/10 text-brand rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-brand hover:text-white transition-all shadow-sm flex items-center gap-1"
+                              >
+                                Duyệt món
+                              </button>
+                            )}
                           </div>
                         </div>
                       ))}

@@ -49,7 +49,7 @@ export const KitchenDisplay = () => {
         const updatedId = (updatedOrder as any)._id || updatedOrder.id;
         const exists = prev.some(o => ((o as any)._id === updatedId || o.id === updatedId));
         if (!exists) {
-          const relevant = updatedOrder.items.some(i => i.status === 'pending_approval' || i.status === 'cooking');
+          const relevant = updatedOrder.items.some(i => i.status === 'cooking');
           if (relevant) return [updatedOrder, ...prev];
           return prev;
         }
@@ -57,9 +57,20 @@ export const KitchenDisplay = () => {
       });
     });
 
+    socket.on('notification:kitchen', () => {
+      // Khi có thông báo mới (đơn mới được duyệt), tự động load lại danh sách
+      fetchOrders();
+    });
+
+    socket.on('notification:staff', () => {
+      // Khi có bàn chốt đơn (pending_approval), tự động load để bếp thấy đơn mới
+      fetchOrders();
+    });
+ 
     return () => {
       socket.off('new-order');
       socket.off('order-updated');
+      socket.off('notification:kitchen');
     };
   }, []);
 
@@ -81,7 +92,8 @@ export const KitchenDisplay = () => {
       .then(res => {
         const activeOrders = (res.data || []).filter((o: Order) => {
           if (o.status !== 'active') return false;
-          return o.items.some(i => i.status === 'pending_approval' || i.status === 'cooking');
+          // Hiển thị cả món đang chờ duyệt và món đang nấu
+          return o.items.some(i => i.status === 'cooking' || i.status === 'pending_approval');
         });
         setOrders(activeOrders);
       })
@@ -94,17 +106,6 @@ export const KitchenDisplay = () => {
       });
   };
 
-  const approveAllItems = async (orderId: string) => {
-    try {
-      await axiosInstance.put(`/api/orders/${orderId}/approve-all`);
-      fetchOrders();
-    } catch (err) {
-      if (axios.isAxiosError(err) && err.response?.status === 401) {
-        handleAuthFailure();
-        return;
-      }
-    }
-  };
 
   const updateItemStatus = async (orderId: string, itemId: string, status: OrderItem['status']) => {
     try {
@@ -166,29 +167,33 @@ export const KitchenDisplay = () => {
 
           <div className={cn("w-px h-8 mx-2", isDark ? "bg-white/10" : "bg-slate-200")} />
 
-          <Button
-            variant="ghost"
-            onClick={() => navigate('/pos')}
-            className={cn(
-              "rounded-xl h-12 px-5 transition-all",
-              isDark ? "text-slate-400 hover:text-white hover:bg-white/5" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-            )}
-          >
-            <ShoppingCart className="w-4 h-4 mr-2" />
-            Sơ đồ bàn
-          </Button>
-          
-          <Button
-            variant="ghost"
-            onClick={() => navigate('/admin')}
-            className={cn(
-              "rounded-xl h-12 px-5 transition-all",
-              isDark ? "text-slate-400 hover:text-white hover:bg-white/5" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-            )}
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Admin
-          </Button>
+          {user?.role === 'admin' && (
+            <>
+              <Button
+                variant="ghost"
+                onClick={() => navigate('/pos')}
+                className={cn(
+                  "rounded-xl h-12 px-5 transition-all",
+                  isDark ? "text-slate-400 hover:text-white hover:bg-white/5" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                )}
+              >
+                <ShoppingCart className="w-4 h-4 mr-2" />
+                Sơ đồ bàn
+              </Button>
+              
+              <Button
+                variant="ghost"
+                onClick={() => navigate('/admin')}
+                className={cn(
+                  "rounded-xl h-12 px-5 transition-all",
+                  isDark ? "text-slate-400 hover:text-white hover:bg-white/5" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                )}
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Admin
+              </Button>
+            </>
+          )}
 
           <div className={cn("w-px h-8 mx-2", isDark ? "bg-white/10" : "bg-slate-200")} />
 
@@ -207,7 +212,7 @@ export const KitchenDisplay = () => {
           <AnimatePresence mode="popLayout">
             {orders.map((order, i) => {
               const orderId = (order as any)._id || order.id;
-              const kitchenItems = order.items.filter(i => i.status === 'pending_approval' || i.status === 'cooking');
+              const kitchenItems = order.items.filter(i => i.status === 'cooking' || i.status === 'pending_approval');
               if (kitchenItems.length === 0) return null;
 
               const isAnyCooking = kitchenItems.some(i => i.status === 'cooking');
@@ -254,29 +259,19 @@ export const KitchenDisplay = () => {
 
                   {/* Items List */}
                   <div className="p-5 flex-1 flex flex-col gap-4">
-                    {kitchenItems.some(item => item.status === 'pending_approval') && (
-                      <button
-                        onClick={() => approveAllItems(orderId)}
-                        className={cn(
-                          "w-full py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all",
-                          isDark ? "bg-white/5 text-slate-300 hover:bg-white/10" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                        )}
-                      >
-                        Duyệt tất cả
-                      </button>
-                    )}
 
                     <div className="space-y-3">
                       {kitchenItems.map((item, idx) => {
                         const itemId = (item as any)._id || idx.toString();
                         const isCooking = item.status === 'cooking';
+                        const isPending = item.status === 'pending_approval';
 
                         return (
                           <div key={itemId} className={cn(
                             "p-4 rounded-3xl border transition-all duration-300",
                             isDark 
-                              ? (isCooking ? "bg-slate-800/50 border-brand/20" : "bg-black/20 border-white/5 opacity-70")
-                              : (isCooking ? "bg-orange-50/50 border-brand/20 shadow-sm" : "bg-slate-50 border-slate-100")
+                              ? (isCooking ? "bg-slate-800/50 border-brand/20" : isPending ? "bg-amber-500/10 border-amber-500/30" : "bg-black/20 border-white/5 opacity-70")
+                              : (isCooking ? "bg-orange-50/50 border-brand/20 shadow-sm" : isPending ? "bg-amber-50 border-amber-200" : "bg-slate-50 border-slate-100")
                           )}>
                             <div className="flex justify-between gap-4">
                               <div className="flex-1">
@@ -297,32 +292,17 @@ export const KitchenDisplay = () => {
                             </div>
 
                             <div className="mt-4 flex gap-2">
-                              {item.status === 'pending_approval' ? (
-                                <button
-                                  onClick={() => updateItemStatus(orderId, itemId, 'cooking')}
-                                  className="w-full h-11 bg-brand text-white rounded-xl font-bold text-[10px] uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-lg shadow-brand/20"
-                                >
-                                  <Play className="w-3.5 h-3.5 fill-current" /> Bắt đầu nấu
-                                </button>
-                              ) : (
-                                <>
-                                  <button
-                                    onClick={() => updateItemStatus(orderId, itemId, 'pending_approval')}
-                                    className={cn(
-                                      "h-11 px-4 rounded-xl transition-all border",
-                                      isDark ? "bg-white/5 text-slate-500 border-white/5 hover:text-white" : "bg-white text-slate-400 border-slate-200 hover:text-slate-600"
-                                    )}
-                                  >
-                                    Dừng
-                                  </button>
                                   <button
                                     onClick={() => updateItemStatus(orderId, itemId, 'served')}
                                     className="flex-1 h-11 bg-emerald-500 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-emerald-600 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20"
                                   >
                                     <CheckCircle2 className="w-4 h-4" /> Hoàn tất
                                   </button>
-                                </>
-                              )}
+                                  {isPending && (
+                                    <div className="flex-1 h-11 bg-amber-500/10 text-amber-600 rounded-xl font-bold text-[8px] uppercase tracking-tighter flex items-center justify-center border border-amber-500/20">
+                                      Chờ duyệt
+                                    </div>
+                                  )}
                             </div>
                           </div>
                         );

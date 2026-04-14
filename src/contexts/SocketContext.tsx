@@ -27,25 +27,32 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
 
+  const socketRef = React.useRef<Socket | null>(null);
+
   // Khởi tạo socket 1 lần duy nhất
   useEffect(() => {
-    const newSocket = io(SOCKET_URL, {
-      withCredentials: true,
-      transports: ['websocket', 'polling']
-    });
+    if (!socketRef.current) {
+      const newSocket = io(SOCKET_URL, {
+        withCredentials: true,
+        transports: ['websocket', 'polling']
+      });
 
-    // newSocket.on('connect', () => {
-    //   console.log('✅ Socket connected:', newSocket.id);
-    // });
+      // newSocket.on('connect', () => {
+      //   console.log('✅ Socket connected:', newSocket.id);
+      // });
 
-    // newSocket.on('connect_error', (error) => {
-    //   console.error('❌ Socket connection error:', error);
-    // });
+      // newSocket.on('connect_error', (error) => {
+      //   console.error('❌ Socket connection error:', error);
+      // });
 
-    setSocket(newSocket);
+      socketRef.current = newSocket;
+      setSocket(newSocket);
+    }
 
     return () => {
-      newSocket.disconnect();
+      // Trong React 18 Strict Mode, effect này có thể chạy 2 lần.
+      // Chúng ta giữ socketRef để không ngắt kết nối nếu chỉ là unmount tạm thời của Strict Mode.
+      // Nếu component thực sự bị hủy lâu dài, socket sẽ tự đóng khi ứng dụng kết thúc.
     };
   }, []);
 
@@ -54,37 +61,43 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
     if (!socket) return;
 
     if (user) {
-      // 1. Join admin_hub room theo role như tài liệu v3.1 yêu cầu
-      console.log(`Setting up socket for user: ${user.email} with role: ${user.role}`);
-      socket.emit('setup_user', user.role);
+      // 1. Join room theo role như backend yêu cầu (role_staff hoặc role_kitchen)
+      if (user.role === 'admin' || user.role === 'staff') {
+        socket.emit('join-room', 'role_staff');
+      } else if (user.role === 'chef') {
+        socket.emit('join-room', 'role_kitchen');
+        socket.emit('join-room', 'role_staff'); // Tham gia cả staff để nghe tín hiệu bàn chốt đơn
+      }
 
-      // 2. Tải danh sách thông báo ban đầu từ REST API
+      // 2. Tải danh sách thông báo ban đầu
       fetchNotifications();
 
-      // 3. Lắng nghe thông báo mới real-time
-      socket.on('new_notification', (notif: Notification) => {
-        console.log('🔔 New notification received:', notif);
+      // 3. Lắng nghe thông báo mới real-time (khớp với emit từ backend)
+      const handleStaffNotification = (notif: any) => {
+        console.log('🔔 Staff notification received:', notif);
         handleNewNotification(notif);
-      });
+      };
+      const handleKitchenNotification = (notif: any) => {
+        console.log('🔔 Kitchen notification received:', notif);
+        handleNewNotification(notif);
+      };
 
-      // 4. Lắng nghe các sự kiện update khác
-      socket.on('order-paid', (data) => {
-        console.log('Order paid event received:', data);
-        // Có thể emit event cục bộ hoặc refresh data tại đây
-      });
+      socket.on('notification:staff', handleStaffNotification);
+      socket.on('notification:kitchen', handleKitchenNotification);
+      socket.on('order-updated', (data) => console.log('📦 Order updated:', data));
+      socket.on('order-paid', (data) => console.log('💰 Order paid:', data));
+
+      return () => {
+        socket.off('notification:staff', handleStaffNotification);
+        socket.off('notification:kitchen', handleKitchenNotification);
+        socket.off('order-updated');
+        socket.off('order-paid');
+      };
     } else {
-      // Nếu logout
-      console.log('Logging out socket user, cleaning up listeners...');
+      console.log('🚪 User logged out, cleaning up socket...');
       setNotifications([]);
       setUnreadCount(0);
-      socket.off('new_notification');
-      socket.off('order-paid');
     }
-
-    return () => {
-      socket.off('new_notification');
-      socket.off('order-paid');
-    };
   }, [user, socket]);
 
   const fetchNotifications = async () => {

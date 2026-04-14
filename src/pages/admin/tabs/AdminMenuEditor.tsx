@@ -150,7 +150,7 @@ export const AdminMenuEditor = () => {
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
+    const files = Array.from(e.target.files || []) as File[];
     if (files.length === 0) return;
 
     if (files.length + galleryImageIds.length + selectedFiles.length > 5) {
@@ -158,7 +158,7 @@ export const AdminMenuEditor = () => {
       return;
     }
 
-    const validFiles = files.filter(file => file.type.startsWith('image/'));
+    const validFiles = files.filter((file: File) => file.type.startsWith('image/'));
     setSelectedFiles(prev => [...prev, ...validFiles]);
 
     Promise.all(
@@ -334,12 +334,17 @@ export const AdminMenuEditor = () => {
                               whileHover={{ scale: 1.05 }}
                               whileTap={{ scale: 0.95 }}
                               onClick={() => selectSuggestedImage(img)}
-                              className="aspect-square rounded-2xl overflow-hidden cursor-pointer hover:ring-4 hover:ring-brand/40 transition-all group relative border border-gray-100"
+                              className="flex flex-col gap-2 cursor-pointer group"
                             >
-                              <img src={`/api/images/${img._id || img.id}`} alt={img.name} className="w-full h-full object-cover" />
-                              <div className="absolute inset-0 bg-brand/20 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white backdrop-blur-[1px]">
-                                <Plus className="w-6 h-6 stroke-[3px]" />
+                              <div className="aspect-square rounded-2xl overflow-hidden hover:ring-4 hover:ring-brand/40 transition-all relative border border-gray-100">
+                                <img src={`/api/images/${img._id || img.id}`} alt={img.name} className="w-full h-full object-cover" />
+                                <div className="absolute inset-0 bg-brand/20 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white backdrop-blur-[1px]">
+                                  <Plus className="w-6 h-6 stroke-[3px]" />
+                                </div>
                               </div>
+                              <p className="text-[9px] font-bold text-gray-400 truncate text-center px-1 uppercase tracking-tighter">
+                                {img.name}
+                              </p>
                             </motion.div>
                           ))}
                         </div>

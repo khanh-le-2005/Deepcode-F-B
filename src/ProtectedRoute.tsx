@@ -24,6 +24,10 @@ const ProtectedRoute = ({ children, allowedRoles }: ProtectedRouteProps) => {
   }
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
+    // Nếu là Bếp mà vào nhầm trang (Admin/POS) thì đẩy về trang Bếp
+    if (user.role === 'chef') {
+      return <Navigate to="/kitchen" replace />;
+    }
     return <Navigate to="/" replace />;
   }
 

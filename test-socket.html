@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Test Hệ Thống API & WebSocket (Có Login)</title>
+    <!-- Import Socket.io Client -->
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        padding: 20px;
+        background: #eef2f3;
+        margin: 0;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        max-width: 1200px;
+        margin: auto;
+      }
+      .panel {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+      }
+      h2 {
+        margin-top: 0;
+        color: #333;
+        border-bottom: 2px solid #ddd;
+        padding-bottom: 10px;
+      }
+
+      .form-group {
+        margin-bottom: 15px;
+      }
+      .form-group label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+      }
+      .form-group input {
+        width: 100%;
+        padding: 8px;
+        box-sizing: border-box;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+      }
+
+      button {
+        padding: 10px 15px;
+        cursor: pointer;
+        background: #007bff;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        font-weight: bold;
+      }
+      button:hover {
+        background: #0056b3;
+      }
+      button:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+      }
+
+      .btn-test {
+        background: #28a745;
+        width: 100%;
+        margin-top: 10px;
+      }
+      .btn-test:hover {
+        background: #218838;
+      }
+
+      .log-box {
+        height: 300px;
+        overflow-y: auto;
+        background: #1e1e1e;
+        color: #fff;
+        padding: 10px;
+        border-radius: 4px;
+        font-family: monospace;
+        font-size: 13px;
+        margin-top: 10px;
+      }
+      .notify {
+        margin-bottom: 10px;
+        padding: 10px;
+        border-radius: 4px;
+        border-left: 5px solid;
+        background: #fff;
+        color: #333;
+      }
+
+      .success {
+        border-color: #28a745;
+        background-color: #d4edda;
+      }
+      .info {
+        border-color: #17a2b8;
+        background-color: #d1ecf1;
+      }
+      .warning {
+        border-color: #ffc107;
+        background-color: #fff3cd;
+      }
+
+      .badge {
+        display: inline-block;
+        padding: 4px 8px;
+        background: #dc3545;
+        color: white;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: bold;
+      }
+      .badge.connected {
+        background: #28a745;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <!-- CỘT 1: ĐIỀU KHIỂN & ĐĂNG NHẬP -->
+      <div>
+        <div class="panel" style="margin-bottom: 20px">
+          <h2>1. Đăng Nhập Hệ Thống</h2>
+          <div class="form-group">
+            <label>Email Thu Ngân / Admin:</label>
+            <input
+              type="email"
+              id="email"
+              value="admin@gmail.com"
+              placeholder="Nhập email..."
+            />
+          </div>
+          <div class="form-group">
+            <label>Mật khẩu:</label>
+            <input
+              type="password"
+              id="password"
+              value="123456"
+              placeholder="Nhập mật khẩu..."
+            />
+          </div>
+          <button id="btnLogin" onclick="login()">Đăng Nhập lấy Token</button>
+          <p id="loginStatus" style="color: green; font-weight: bold"></p>
+        </div>
+
+        <div class="panel">
+          <h2>2. Bảng Điều Khiển Test (Gửi API)</h2>
+          <div class="form-group">
+            <label>Nhập ID Bàn/Session (OrderId) đang test:</label>
+            <input
+              type="text"
+              id="orderIdTest"
+              placeholder="Ví dụ: 65d4f3b2a1c..."
+            />
+          </div>
+
+          <!-- Các nút này sẽ gọi API lên backend -->
+          <button
+            class="btn-test"
+            id="btnMock"
+            onclick="fireWebhookMock()"
+            disabled
+          >
+            ⚡ Test: Giả lập Ngân hàng chuyển khoản thành công
+          </button>
+          <button
+            class="btn-test"
+            style="background: #17a2b8"
+            id="btnCheckout"
+            onclick="fireCheckout()"
+            disabled
+          >
+            ⚡ Test: Khách hàng ấn gửi thực đơn (Checkout Cart)
+          </button>
+        </div>
+      </div>
+
+      <!-- CỘT 2: MÀN HÌNH NGHE SOCKET -->
+      <div>
+        <div class="panel" style="margin-bottom: 20px">
+          <h2>
+            💻 Màn Hình Thu Ngân
+            <span id="statusStaff" class="badge">Mất kết nối</span>
+          </h2>
+          <div id="logsStaff" class="log-box"></div>
+        </div>
+
+        <div class="panel">
+          <h2>
+            🍳 Màn Hình Nhà Bếp
+            <span id="statusKitchen" class="badge">Mất kết nối</span>
+          </h2>
+          <div id="logsKitchen" class="log-box" style="height: 150px;"></div>
+        </div>
+
+        <div class="panel" style="margin-top: 20px;">
+          <h2>3. Màn Hình Khách (Tại Bàn)</h2>
+          <div class="form-group">
+            <label>Khách thuộc Bàn ID (VD: ID bàn trong DB):</label>
+            <input type="text" id="customerTableId" placeholder="VD: 65fa123...">
+          </div>
+          <button class="btn-test" style="background:#5a6268;" onclick="joinTableRoom()">🔌 Khách Join Bàn (Đợi Món)</button>
+          <div id="logsCustomer" class="log-box" style="height: 150px;"></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const BASE_URL = "http://localhost:3000";
+      let authToken = "";
+
+      // UI Elements
+      const statusStaff = document.getElementById("statusStaff");
+      const statusKitchen = document.getElementById("statusKitchen");
+      const logsStaff = document.getElementById("logsStaff");
+      const logsKitchen = document.getElementById("logsKitchen");
+      const btnMock = document.getElementById("btnMock");
+      const btnCheckout = document.getElementById("btnCheckout");
+
+      // ==========================================
+      // 1. KẾT NỐI WEBSOCKET
+      // ==========================================
+      const socket = io(BASE_URL);
+
+      socket.on("connect", () => {
+        statusStaff.textContent = "Đã kết nối";
+        statusStaff.className = "badge connected";
+        statusKitchen.textContent = "Đã kết nối";
+        statusKitchen.className = "badge connected";
+
+        // Join room theo role
+        socket.emit("join-room", "role_staff");
+        socket.emit("join-room", "role_kitchen");
+      });
+
+      // Cơ chế chống rớt mạng (State Sync)
+      socket.io.on("reconnect", () => {
+        console.log("Socket reconnected! Cần gọi lại API GET /api/orders/active để lấy data mới nhất.");
+        appendLog(logsStaff, { type: "info", title: "🔄 Reconnected", message: "Đã có lại mạng. Đang đồng bộ lại state từ API..." });
+      });
+
+      socket.on("disconnect", () => {
+        statusStaff.textContent = "Mất kết nối";
+        statusStaff.className = "badge";
+        statusKitchen.textContent = "Mất kết nối";
+        statusKitchen.className = "badge";
+      });
+
+      // Hàm vẽ UI thông báo
+      function appendLog(element, data) {
+        const time = new Date().toLocaleTimeString();
+        const div = document.createElement("div");
+        div.className = `notify ${data.type || "info"}`;
+        div.innerHTML = `<strong>[${time}] ${data.title}</strong><br>${data.message}`;
+        element.prepend(div);
+      }
+
+      socket.on("notification:staff", (data) => appendLog(logsStaff, data));
+      socket.on("notification:kitchen", (data) => appendLog(logsKitchen, data));
+
+      // Khách hàng
+      const logsCustomer = document.getElementById("logsCustomer");
+      function joinTableRoom() {
+        const tId = document.getElementById("customerTableId").value;
+        if (!tId) return alert("Nhập Table ID trước!");
+        socket.emit("join-room", "table_" + tId);
+        appendLog(logsCustomer, { type: "info", title: "Khách đã join", message: `Đang nghe thông báo từ bàn table_${tId}...`});
+      }
+
+      socket.on("customer:item_status_changed", (data) => {
+        appendLog(logsCustomer, {
+          type: "success", 
+          title: "👨‍🍳 Món của bạn đang thay đổi trạng thái!", 
+          message: data.message
+        });
+      });
+      // Lắng nghe order-updated để sync state
+      socket.on("order-updated", (data) => {
+        console.log("[State Sync] Lấy thẳng data DB đổ ra UI:", data._id);
+      });
+      socket.on("order-paid", (data) => {
+        console.log("Thanh toán xong cho đơn:", data.orderId);
+      });
+
+      // ==========================================
+      // 2. LOGIC GỌI API BẰNG FETCH
+      // ==========================================
+
+      // Đăng nhập lấy Token
+      async function login() {
+        const email = document.getElementById("email").value;
+        const password = document.getElementById("password").value;
+        try {
+          const res = await fetch(`${BASE_URL}/api/auth/login`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, password }),
+          });
+
+          const data = await res.json();
+          if (data.success) {
+            authToken = data.token; // Lưu token vào biến
+            document.getElementById("loginStatus").innerText =
+              "✅ Đăng nhập thành công! Đã có Token.";
+            // Mở khóa các nút test
+            btnMock.disabled = false;
+            btnCheckout.disabled = false;
+          } else {
+            alert("Lỗi đăng nhập: " + (data.error?.message || "Sai thông tin"));
+          }
+        } catch (err) {
+          alert("Lỗi kết nối tới Server: " + err.message);
+        }
+      }
+
+      // Gọi API Mock Webhook
+      async function fireWebhookMock() {
+        const orderId = document.getElementById("orderIdTest").value;
+        if (!orderId) return alert("Vui lòng nhập Order ID để test!");
+
+        try {
+          const res = await fetch(
+            `${BASE_URL}/api/payments/webhook-mock/${orderId}`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${authToken}`, // CHÈN TOKEN VÀO ĐÂY
+              },
+            },
+          );
+          const data = await res.json();
+          if (!data.success && data.error)
+            alert("Lỗi BE: " + data.error.message);
+          // Nếu thành công, Socket sẽ tự bắn về màn hình Thu Ngân
+        } catch (err) {
+          console.error(err);
+        }
+      }
+
+      // Gọi API Checkout Cart
+      async function fireCheckout() {
+        const orderId = document.getElementById("orderIdTest").value;
+        if (!orderId) return alert("Vui lòng nhập Order ID để test!");
+
+        try {
+          const res = await fetch(
+            `${BASE_URL}/api/orders/${orderId}/checkout`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${authToken}`,
+              },
+            },
+          );
+          const data = await res.json();
+          if (data.error) alert("Lỗi BE: " + data.error.message);
+          // Nếu thành công, Socket sẽ tự bắn về màn hình Thu Ngân
+        } catch (err) {
+          console.error(err);
+        }
+      }
+    </script>
+  </body>
+</html>

@@ -81,6 +81,9 @@ const orderSchema = new mongoose.Schema(
     completedAt: { type: Date },
     completedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     completedByName: { type: String },
+    
+    // 7. PAYOS INTEGRATION - Bắt buộc phải có để thanh toán
+    orderCode: { type: Number, unique: true, sparse: true },
   },
   globalSchemaOptions,
 );
@@ -88,5 +91,17 @@ const orderSchema = new mongoose.Schema(
 orderSchema.index({ tableId: 1 });
 orderSchema.index({ status: 1 });
 orderSchema.index({ createdAt: -1 });
+
+// Tự động tạo orderCode (kiểu Number int < 2^53) cho PayOS
+orderSchema.pre('save', function(next) {
+  if (!this.orderCode) {
+    // Thuật toán: Random 6 chữ số + Date.now millis rút gọn = số duy nhất và đọc được
+    // Đảm bảo không quá giới hạn JS Number MAX_SAFE_INTEGER
+    const timePart = String(Date.now()).slice(-8); 
+    const randomPart = Math.floor(10 + Math.random() * 90); // 2 số random
+    this.orderCode = Number(`${timePart}${randomPart}`);
+  }
+  next();
+});
 
 export const Order = mongoose.model("Order", orderSchema);

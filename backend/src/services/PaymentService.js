@@ -2,28 +2,29 @@ import { Payment } from "../models/Payment.js";
 import { Order } from "../models/Order.js";
 import { Table } from "../models/Table.js";
 import { BankAccount } from "../models/BankAccount.js";
-import paymentGateway from "../utils/paymentGatewayClient.js";
 import { NotFoundError, BadRequestError, ServiceUnavailableError } from "../utils/AppError.js";
+import pkg from "@payos/node";
+const PayOS = pkg.PayOS || pkg;
+
+const payos = new PayOS({
+  clientId: process.env.PAYOS_CLIENT_ID || "client_id",
+  apiKey: process.env.PAYOS_API_KEY || "api_key",
+  checksumKey: process.env.PAYOS_CHECKSUM_KEY || "checksum_key"
+});
 
 class PaymentService {
   async processPayment(data, user = null) {
     const { orderId, amount, method, bankAccountId } = data;
 
-    // FIX #3: Kiểm tra idempotency - tránh thanh toán kép
     const existingOrder = await Order.findById(orderId);
     if (!existingOrder) throw new NotFoundError("Order không tồn tại");
     if (existingOrder.paymentStatus === "paid") {
-      throw new BadRequestError(
-        "Đơn hàng này đã được thanh toán rồi! Không thể thu tiền 2 lần.",
-      );
+      throw new BadRequestError("Đơn hàng này đã được thanh toán rồi! Không thể thu tiền 2 lần.");
     }
 
-    // Trích xuất Tên Bàn cụ thể
     const orderObj = await Order.findById(orderId).populate("tableId");
-    const tableNameStr =
-      orderObj?.tableName || orderObj?.tableId?.name || "Mang đi / Đã xóa bàn";
+    const tableNameStr = orderObj?.tableName || orderObj?.tableId?.name || "Mang đi / Đã xóa bàn";
 
-    // Trích xuất chi tiết Ngân hàng thụ hưởng
     let bankNameSnapshotStr = method || "Tiền mặt";
     if (bankAccountId) {
       const bank = await BankAccount.findById(bankAccountId);
@@ -32,11 +33,8 @@ class PaymentService {
       }
     }
 
-    // Lưu lịch sử giao dịch (chụp dữ liệu cứng tại thời điểm thanh toán)
     let payment = new Payment({
-      orderId,
-      amount,
-      method,
+      orderId, amount, method,
       bankAccountId: bankAccountId || null,
       tableName: tableNameStr,
       bankNameSnapshot: bankNameSnapshotStr,
@@ -44,25 +42,13 @@ class PaymentService {
     });
     payment = await payment.save();
 
-    // Cập nhật ngày chốt đơn và ai là người thu tiền
     const updateData = { paymentStatus: "paid", status: "completed", completedAt: new Date() };
-    if (user) {
-      updateData.completedBy = user.id;
-      updateData.completedByName = user.name;
-    }
+    if (user) { updateData.completedBy = user.id; updateData.completedByName = user.name; }
 
-    // Đóng Order (Phiên)
-    const order = await Order.findByIdAndUpdate(orderId, updateData, {
-      new: true,
-    });
+    const order = await Order.findByIdAndUpdate(orderId, updateData, { new: true });
 
-    // Giải phóng Bàn (chuyển bàn về trạng thái 'empty')
     if (order) {
-      await Table.findByIdAndUpdate(
-        order.tableId,
-        { status: "empty" },
-        { new: true },
-      );
+      await Table.findByIdAndUpdate(order.tableId, { status: "empty" }, { new: true });
     }
 
     return payment;
@@ -71,34 +57,33 @@ class PaymentService {
   async generatePaymentQR(orderId) {
     const order = await Order.findById(orderId);
     if (!order) throw new NotFoundError("Order not found");
-    // FIX #4: Dùng đúng trường paymentStatus thay vì status
     if (order.paymentStatus === "paid") {
       throw new BadRequestError("Đơn hàng này đã được thanh toán, không cần tạo QR mới");
     }
 
     try {
-      const response = await paymentGateway.post("/create-payment/", {
-        user_id: order._id.toString(),
+      // Tích hợp thanh toán PayOS
+      const domain = process.env.FRONTEND_URL || "http://localhost:3000";
+      const body = {
+        orderCode: order.orderCode, // Bắt buộc là Number và Sinh tự động ở Order model
         amount: order.total,
-      });
+        description: `Thanh toan ID ${order._id.toString().slice(-6)}`.substring(0, 25),
+        returnUrl: `${domain}/order/${order._id}/success`, 
+        cancelUrl: `${domain}/order/${order._id}/cancel`, 
+      };
+
+      const paymentLinkResponse = await payos.createPaymentLink(body);
 
       return {
         orderId: order._id,
         amount: order.total,
-        qrBase64: response.data.qr_base64,
-        paymentContent: response.data.payment_content,
+        checkoutUrl: paymentLinkResponse.checkoutUrl, 
+        qrCode: paymentLinkResponse.qrCode, // Text thuần để hiển thị vietqr
+        paymentContent: body.description
       };
     } catch (error) {
-      console.warn("Payment Gateway unavailable, using fallback mock QR.");
-      // Trả về mã QR giả lập để bạn có thể test UI mà không cần chạy bot ngân hàng
-      return {
-        orderId: order._id,
-        amount: order.total,
-        qrBase64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", // 1x1 Transparent pixel mock
-        paymentContent: `DC ${order._id.toString().slice(-6).toUpperCase()}`,
-        isMock: true,
-        warning: "Hệ thống ngân hàng đang gián đoạn, đây là mã QR giả lập để test."
-      };
+      console.error("PayOS Error:", error);
+      throw new ServiceUnavailableError("Cổng thanh toán PayOS đang gián đoạn hoặc API Key sai.");
     }
   }
 
@@ -110,74 +95,82 @@ class PaymentService {
   }
 
   async handleWebhook(payload, io) {
-    const orderId = payload.booking_id;
-
-    // 1. Tìm Order
-    const order = await Order.findById(orderId);
-    if (!order) throw new NotFoundError("Order không tồn tại");
-
-    // 2. Idempotency Check: Tránh Webhook bị gọi 2 lần gây lặp giao dịch
-    if (order.paymentStatus === "paid") {
-      return true;
+    let webhookData;
+    try {
+        // Xác minh Signature của Webhook ngầm từ Server PayOS
+        webhookData = payos.verifyPaymentWebhookData(payload);
+    } catch (error) {
+        console.error("Webhook Verification Failed:", error);
+        throw new BadRequestError("Invalid PayOS webhook signature");
     }
 
-    // 3. Cập nhật trạng thái thanh toán
+    if (webhookData.code !== "00") return true; // Canceled or processing
+
+    const orderCode = webhookData.orderCode;
+    const order = await Order.findOne({ orderCode: orderCode });
+    if (!order) throw new NotFoundError("Order thuộc PayOS code không tồn tại");
+
+    if (order.paymentStatus === "paid") return true;
+
     order.paymentStatus = "paid";
     
-    // Logic phân loại:
-    // - Dine-in: Thanh toán xong là xong -> status = completed, giải phóng bàn.
-    // - Kiosk (Delivery/Takeaway): Thanh toán xong mới là lúc đưa xuống bếp -> status giữ active, items chuyển pending_approval.
     const isKiosk = order.orderType === "delivery" || order.orderType === "takeaway";
     
     if (isKiosk) {
       order.status = "active";
-      // Chuyển tất cả món từ "chờ thanh toán" sang "chờ bếp duyệt"
       order.items.forEach(item => {
-        if (item.status === "awaiting_payment") {
-          item.status = "pending_approval";
-        }
+        if (item.status === "awaiting_payment") item.status = "pending_approval";
       });
     } else {
       order.status = "completed";
       order.completedAt = new Date();
-      // Giải phóng bàn về trạng thái trống (chỉ dành cho khách ngồi tại chỗ)
       await Table.findByIdAndUpdate(order.tableId, { status: "empty" });
     }
 
-    order.completedByName = "Hệ thống tự động (MBBank Auto)";
+    order.completedByName = "Tự động (PayOS)";
     await order.save();
 
-    // 5. Lấy thông tin bàn để ghi lịch sử
-    const orderData = await Order.findById(orderId).populate("tableId");
-    const tableNameStr =
-      orderData?.tableName || orderData?.tableId?.name || "Bàn không xác định";
+    const orderData = await Order.findById(order._id).populate("tableId");
+    const tableNameStr = orderData?.tableName || orderData?.tableId?.name || "Bàn không xác định";
 
-    // 5. Lấy thông tin ngân hàng mặc định
-    const defaultBank = await BankAccount.findOne({ isDefault: true });
-    let bankNameSnapshotStr = "MBBank / Không rõ STK";
-    if (defaultBank) {
-      bankNameSnapshotStr = `${defaultBank.bankName} - ${defaultBank.accountNo} (${defaultBank.accountName})`;
-    }
-
-    // 6. Lưu lịch sử giao dịch (dữ liệu cứng tại thời điểm thu tiền)
     await Payment.create({
       orderId: order._id,
       amount: order.total,
-      method: "Chuyển khoản (Bot Python Auto quét)",
-      bankAccountId: defaultBank ? defaultBank._id : null,
+      method: "Chuyển khoản (PayOS)",
+      bankAccountId: null,
       tableName: tableNameStr,
-      bankNameSnapshot: bankNameSnapshotStr,
-      cashierName: "Hệ thống điện tử tự động",
+      bankNameSnapshot: "PayOS Official",
+      cashierName: "Hệ thống thanh toán",
       status: "success",
     });
 
-    // 7. Bắn Socket cho Frontend cập nhật UI ngay lập tức
+    // Thông báo WebSocket
     if (io) {
-      io.emit("order-paid", { orderId: order._id, paymentStatus: "paid" });
-      io.emit("order-updated", order);
-      io.emit("tables-updated", await Table.find());
-    }
+      io.to('role_staff').to(`table_${order.tableId}`).emit("order-paid", { orderId: order._id, paymentStatus: "paid" });
+      io.to('role_staff').to(`table_${order.tableId}`).emit("order-updated", order);
+      io.to('role_staff').emit("tables-updated", await Table.find());
 
+      if (isKiosk) {
+        const orderLabel = order.orderType === "delivery" ? "Giao hàng" : "Mang về";
+        const customerName = order.customerInfo?.name || "Khách vãng lai";
+
+        io.to('role_staff').emit("notification:staff", {
+          type: "success",
+          title: `💰 Khách chuyển khoản thành công`,
+          message: `Đơn [${orderLabel}] của khách ${customerName} đã thanh toán ${order.total.toLocaleString("vi-VN")}đ qua PayOS. Vui lòng duyệt món xuống bếp!`,
+          orderId: order._id,
+          sound: "success",
+        });
+      } else {
+        io.to('role_staff').emit("notification:staff", {
+          type: "success",
+          title: `💸 Bàn đã thanh toán qua PayOS`,
+          message: `Bàn [${tableNameStr}] thanh toán thành công ${order.total.toLocaleString("vi-VN")}đ. Đã chốt bàn.`,
+          orderId: order._id,
+          sound: "success",
+        });
+      }
+    }
     return true;
   }
 }

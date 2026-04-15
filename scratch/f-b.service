@@ -1,0 +1,18 @@
+[Unit]
+Description=F&B Project Backend & Frontend Service
+After=network.target
+
+[Service]
+# Chú ý: Thay '/var/www/f-b-backend' bằng đường dẫn thực tế trên Server của bạn
+WorkingDirectory=/var/www/f-b-backend
+ExecStart=/usr/bin/npm start
+Restart=on-failure
+User=root
+# Nạp biến môi trường từ .env
+EnvironmentFile=/var/www/f-b-backend/.env
+# Cấu hình Port sản xuất (Mặc định app chạy 3000)
+Environment=PORT=3000
+# Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target

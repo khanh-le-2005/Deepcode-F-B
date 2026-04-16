@@ -48,11 +48,40 @@ export const getActiveSession = async (req, res) => {
 
 export const createOrder = async (req, res) => {
   const session = await OrderService.createOrder(req.body, req.io);
+  
+  // Trả về QR ngay nếu là đơn chuyển khoản
+  if (req.body.paymentMethod === "transfer") {
+    try {
+      const qrData = await PaymentService.generatePaymentQR(session._id);
+      return res.status(201).json({
+        ...session.toObject(),
+        qrData
+      });
+    } catch (qrErr) {
+      console.error("QR Generation failed for Table Order:", qrErr);
+      // Vẫn trả về order nhưng không có QR
+    }
+  }
+
   res.status(201).json(session);
 };
 
 export const createCounterOrder = async (req, res) => {
   const session = await OrderService.createCounterOrder(req.body, req.io);
+
+  // Trả về QR ngay nếu là đơn chuyển khoản tại quầy
+  if (req.body.paymentMethod === "transfer") {
+    try {
+      const qrData = await PaymentService.generatePaymentQR(session._id);
+      return res.status(201).json({
+        ...session.toObject(),
+        qrData
+      });
+    } catch (qrErr) {
+      console.error("QR Generation failed for Counter Order:", qrErr);
+    }
+  }
+
   res.status(201).json(session);
 };
 

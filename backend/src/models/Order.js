@@ -96,8 +96,8 @@ orderSchema.index({ createdAt: -1 });
 orderSchema.pre('save', async function () {
   if (!this.orderCode) {
     // Thuật toán: Random 2 chữ số + 8 chữ số cuối cùa Date.now = số duy nhất và đọc được
-    const timePart = String(Date.now()).slice(-8);
-    const randomPart = Math.floor(10 + Math.random() * 90);
+    const timePart = String(Date.now()).slice(-6);
+    const randomPart = Math.floor(100 + Math.random() * 900);
     this.orderCode = Number(`${timePart}${randomPart}`);
   }
 });

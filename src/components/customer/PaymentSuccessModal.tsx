@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle2, ArrowRight, ShoppingBag } from 'lucide-react';
 import { Button } from '../Button';
@@ -20,6 +21,25 @@ export const PaymentSuccessModal = ({
   tableId,
   onViewMenu
 }: PaymentSuccessModalProps) => {
+  const [countdown, setCountdown] = useState(5);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const timer = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          onViewMenu();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [isOpen, onViewMenu]);
+
   if (!isOpen) return null;
 
   return (
@@ -69,8 +89,11 @@ export const PaymentSuccessModal = ({
                 <h2 className="text-3xl sm:text-4xl font-black text-slate-900 mb-2 italic" style={{ fontFamily: "'Playfair Display', serif" }}>
                   Thanh toán thành công!
                 </h2>
-                <p className="text-slate-500 font-medium mb-8">
+                <p className="text-slate-500 font-medium mb-2">
                   Cảm ơn quý khách đã tin tưởng và sử dụng dịch vụ của chúng tôi.
+                </p>
+                <p className="text-emerald-600 text-sm font-bold mb-8 animate-pulse">
+                  Tự động quay lại menu sau {countdown} giây...
                 </p>
               </motion.div>
 

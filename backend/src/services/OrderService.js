@@ -2,6 +2,8 @@ import { Order } from "../models/Order.js";
 import { Table } from "../models/Table.js";
 import { Payment } from "../models/Payment.js";
 import mongoose from "mongoose";
+import { MenuItem } from "../models/MenuItem.js";
+import { Combo } from "../models/Combo.js";
 import crypto from "crypto";
 import { NotFoundError, BadRequestError } from "../utils/AppError.js";
 import WeeklyMenuService from "./WeeklyMenuService.js";
@@ -68,17 +70,29 @@ class OrderService {
 
     // Calculate total for incoming items
     let newItemsTotal = 0;
-    const newItems = data.items.map((item) => {
-      const basePrice = item.basePrice || item.price || 0;
+    const newItems = await Promise.all(data.items.map(async (item) => {
       const menuItemId = item.id || item.menuItemId || item._id;
       const menuItemIdStr = String(menuItemId);
 
-      // Chỉ kiểm tra nếu có lịch tuần active
-      if (allowedIds && !allowedIds.includes(menuItemIdStr)) {
-        throw new BadRequestError(`Món '${item.name || menuItemIdStr}' chưa được xuất bán trong tuần này!`);
+      // Lấy thông tin thật từ DB để tránh lỗi thiếu name/price và chống hack
+      let dbItem = await MenuItem.findById(menuItemIdStr);
+      let isCombo = false;
+      
+      if (!dbItem) {
+        dbItem = await Combo.findById(menuItemIdStr);
+        if (dbItem) isCombo = true;
       }
 
-      let itemPrice = Number(basePrice);
+      if (!dbItem) {
+        throw new NotFoundError(`Món ăn với ID ${menuItemIdStr} không tồn tại`);
+      }
+
+      // Chỉ kiểm tra nếu có lịch tuần active
+      if (allowedIds && !allowedIds.includes(menuItemIdStr)) {
+        throw new BadRequestError(`Món '${dbItem.name}' chưa được xuất bán trong tuần này!`);
+      }
+
+      let itemPrice = Number(dbItem.price);
       if (item.selectedOption && item.selectedOption.priceExtra)
         itemPrice += Number(item.selectedOption.priceExtra);
       if (item.selectedAddons && item.selectedAddons.length > 0) {
@@ -86,17 +100,21 @@ class OrderService {
           if (addon.priceExtra) itemPrice += Number(addon.priceExtra);
         });
       }
-      const totalPrice = itemPrice * Number(item.quantity || 1);
+      
+      const quantity = Number(item.quantity || 1);
+      const totalPrice = itemPrice * quantity;
       newItemsTotal += totalPrice;
 
       return {
         ...item,
-        menuItemId: String(menuItemId),
-        basePrice: Number(basePrice),
+        name: dbItem.name, // Quan trọng: Luôn lấy name từ DB
+        menuItemId: menuItemIdStr,
+        isCombo,
+        basePrice: Number(dbItem.price),
         totalPrice,
-        status: "in_cart", // Mới: Thêm vào Giỏ Hàng Chung của Bàn
+        status: "in_cart",
       };
-    });
+    }));
 
     // FIX #3: Kiểm tra cả paymentStatus để tránh nhồi món vào bill đã thanh toán
     let session = await Order.findOne({
@@ -110,7 +128,7 @@ class OrderService {
       session = await Order.findByIdAndUpdate(
         session._id,
         { $push: { items: { $each: newItems } } },
-        { new: true },
+        { returnDocument: 'after' },
       );
       // Update total
       session.total += newItemsTotal;
@@ -130,7 +148,7 @@ class OrderService {
       await Table.findByIdAndUpdate(
         table._id,
         { status: "occupied" },
-        { new: true },
+        { returnDocument: 'after' },
       );
     }
 
@@ -156,7 +174,7 @@ class OrderService {
       await Table.findByIdAndUpdate(
         table._id,
         { status: "occupied" },
-        { new: true },
+        { returnDocument: 'after' },
       );
     } else {
       // 2. Khách vãng lai mang đi (Không có tableId), tự sinh ra 1 bàn ảo
@@ -176,17 +194,24 @@ class OrderService {
       : null;
 
     let newItemsTotal = 0;
-    const newItems = data.items.map((item) => {
-      const basePrice = item.basePrice || item.price || 0;
+    const newItems = await Promise.all(data.items.map(async (item) => {
       const menuItemId = item.id || item.menuItemId || item._id;
       const menuItemIdStr = String(menuItemId);
 
-      // Chỉ kiểm tra nếu có lịch tuần active
+      let dbItem = await MenuItem.findById(menuItemIdStr);
+      let isCombo = false;
+      if (!dbItem) {
+        dbItem = await Combo.findById(menuItemIdStr);
+        if (dbItem) isCombo = true;
+      }
+      if (!dbItem) throw new NotFoundError(`Món ăn ID ${menuItemIdStr} không tồn tại`);
+
+      // Kiểm tra lịch tuần
       if (allowedIds && !allowedIds.includes(menuItemIdStr)) {
-        throw new BadRequestError(`Món '${item.name || menuItemIdStr}' chưa được xuất bán trong tuần này!`);
+        throw new BadRequestError(`Món '${dbItem.name}' chưa được xuất bán tuần này!`);
       }
 
-      let itemPrice = Number(basePrice);
+      let itemPrice = Number(dbItem.price);
       if (item.selectedOption && item.selectedOption.priceExtra)
         itemPrice += Number(item.selectedOption.priceExtra);
       if (item.selectedAddons && item.selectedAddons.length > 0) {
@@ -194,17 +219,21 @@ class OrderService {
           if (addon.priceExtra) itemPrice += Number(addon.priceExtra);
         });
       }
-      const totalPrice = itemPrice * Number(item.quantity || 1);
+      
+      const quantity = Number(item.quantity || 1);
+      const totalPrice = itemPrice * quantity;
       newItemsTotal += totalPrice;
 
       return {
         ...item,
-        menuItemId: String(menuItemId),
-        basePrice: Number(basePrice),
+        name: dbItem.name,
+        menuItemId: menuItemIdStr,
+        isCombo,
+        basePrice: Number(dbItem.price),
         totalPrice,
-        status: "pending_approval", // Gửi thẳng xuống bếp
+        status: "pending_approval",
       };
-    });
+    }));
 
     let session = await Order.findOne({
       tableId: tableIdStr,
@@ -216,7 +245,7 @@ class OrderService {
       session = await Order.findByIdAndUpdate(
         session._id,
         { $push: { items: { $each: newItems } } },
-        { new: true },
+        { returnDocument: 'after' },
       );
       session.total += newItemsTotal;
       await session.save();
@@ -301,31 +330,41 @@ class OrderService {
     const itemStatus = paymentMethod === "transfer" ? "awaiting_payment" : "pending_approval";
 
     let total = 0;
-    const newItems = items.map((item) => {
-      const basePrice   = item.basePrice || item.price || 0;
+    const newItems = await Promise.all(items.map(async (item) => {
       const menuItemId  = item.id || item.menuItemId || item._id;
       const menuItemIdStr = String(menuItemId);
 
+      let dbItem = await MenuItem.findById(menuItemIdStr);
+      let isCombo = false;
+      if (!dbItem) {
+        dbItem = await Combo.findById(menuItemIdStr);
+        if (dbItem) isCombo = true;
+      }
+      if (!dbItem) throw new NotFoundError(`Món ăn ID ${menuItemIdStr} không tồn tại`);
+
       if (allowedIds && !allowedIds.includes(menuItemIdStr)) {
-        throw new BadRequestError(`Món '${item.name || menuItemIdStr}' chưa được xuất bán trong tuần này!`);
+        throw new BadRequestError(`Món '${dbItem.name}' chưa được xuất bán trong tuần này!`);
       }
 
-      let itemPrice = Number(basePrice);
+      let itemPrice = Number(dbItem.price);
       if (item.selectedOption?.priceExtra)  itemPrice += Number(item.selectedOption.priceExtra);
       if (item.selectedAddons?.length > 0)  {
         item.selectedAddons.forEach(a => { if (a.priceExtra) itemPrice += Number(a.priceExtra); });
       }
-      const totalPrice = itemPrice * Number(item.quantity || 1);
+      const quantity = Number(item.quantity || 1);
+      const totalPrice = itemPrice * quantity;
       total += totalPrice;
 
       return {
         ...item,
+        name: dbItem.name,
         menuItemId: menuItemIdStr,
-        basePrice:  Number(basePrice),
+        isCombo,
+        basePrice:  Number(dbItem.price),
         totalPrice,
         status:     itemStatus,
       };
-    });
+    }));
 
     // ── TẠO ORDER ─────────────────────────────────────────────────
     const sessionToken = crypto.randomBytes(16).toString("hex");
@@ -360,7 +399,7 @@ class OrderService {
     const session = await Order.findOneAndUpdate(
       { _id: sessionId, "items.status": "in_cart" },
       { $set: { "items.$[elem].status": "pending_approval" } },
-      { arrayFilters: [{ "elem.status": "in_cart" }], new: true },
+      { arrayFilters: [{ "elem.status": "in_cart" }], returnDocument: 'after' },
     );
     if (!session) throw new NotFoundError("Session not found or Cart is empty");
 
@@ -478,7 +517,7 @@ class OrderService {
     const session = await Order.findOneAndUpdate(
       { _id: sessionId, "items._id": itemId },
       { $set: updateFields },
-      { new: true },
+      { returnDocument: 'after' },
     );
     if (!session) throw new NotFoundError("Session or Item not found");
 
@@ -545,7 +584,7 @@ async approveAllItems(sessionId, io, user = null) {
       data.completedAt = new Date();
     }
 
-    const session = await Order.findByIdAndUpdate(id, data, { new: true });
+    const session = await Order.findByIdAndUpdate(id, data, { returnDocument: 'after' });
     if (!session) throw new NotFoundError("Session not found");
 
     if (session.status === "completed" || session.status === "cancelled") {
@@ -554,7 +593,7 @@ async approveAllItems(sessionId, io, user = null) {
         await Table.findByIdAndUpdate(
           table._id,
           { status: "empty" },
-          { new: true },
+          { returnDocument: 'after' },
         );
       if (io) io.emit("tables-updated", await Table.find());
     }
@@ -572,7 +611,7 @@ async approveAllItems(sessionId, io, user = null) {
       await Table.findByIdAndUpdate(
         table._id,
         { status: "empty" },
-        { new: true },
+        { returnDocument: 'after' },
       );
     if (io) io.emit("tables-updated", await Table.find());
 

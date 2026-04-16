@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import axios from '@/src/lib/axiosClient';
 import { motion } from 'framer-motion';
@@ -17,13 +17,16 @@ const socket = io();
 
 export const OrderTrackingPage = () => {
   const { tableId, orderId } = useParams();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { status, session: initialSession } = useTableValidation(tableId);
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [isGeneratingQr, setIsGeneratingQr] = useState(false);
   const [paymentQr, setPaymentQr] = useState<{
-    qrBase64: string;
+    qrBase64?: string;
+    qrCode?: string;
+    checkoutUrl?: string;
     paymentContent: string;
     amount: number;
     orderId: string;
@@ -101,6 +104,22 @@ export const OrderTrackingPage = () => {
       socket.off('order-paid');
     };
   }, [tableId, orderId, status, initialSession]);
+
+  // 3. Xử lý Query Params từ PayOS (Redirect quay về)
+  useEffect(() => {
+    const code = searchParams.get('code');
+    const cancel = searchParams.get('cancel');
+    const statusParam = searchParams.get('status');
+
+    if (code === '00' && statusParam === 'PAID') {
+      setShowSuccessModal(true);
+      // Xóa params để tránh hiện modal lặp lại khi refresh
+      navigate(window.location.pathname, { replace: true });
+    } else if (cancel === 'true') {
+      toast.info("Giao dịch đã được hủy.");
+      navigate(window.location.pathname, { replace: true });
+    }
+  }, [searchParams, navigate]);
 
   // Backup polling for order status
   useEffect(() => {
@@ -184,12 +203,20 @@ export const OrderTrackingPage = () => {
       setPaymentError('');
       setPaymentQr(null);
       const response = await axios.post(`/api/payments/generate-qr/${order.id || order._id}`);
+      const data = response.data;
+      if (data?.checkoutUrl) {
+        // Chuyển hướng ngay lập tức sang trang thanh toán của PayOS
+        window.location.href = data.checkoutUrl;
+        return;
+      }
+
       setPaymentQr({
-        qrBase64: response.data?.qrBase64,
-        paymentContent: response.data?.paymentContent,
-        amount: response.data?.amount,
-        orderId: response.data?.orderId,
-        gatewayWarning: response.data?.gatewayWarning,
+        qrCode: data?.qrCode,
+        checkoutUrl: data?.checkoutUrl,
+        paymentContent: data?.paymentContent,
+        amount: data?.amount,
+        orderId: data?.orderId,
+        gatewayWarning: data?.gatewayWarning,
       });
     } catch (error) {
       let message = 'Không thể tạo mã thanh toán lúc này. Vui lòng thử lại sau.';
@@ -413,14 +440,16 @@ export const OrderTrackingPage = () => {
                 {/* QR side */}
                 <div className="flex flex-col items-center">
                   <div className="w-44 h-44 rounded-3xl bg-white p-3 flex items-center justify-center shrink-0 overflow-hidden">
-                    {paymentQr.qrBase64 ? (
+                    {(paymentQr.qrCode || paymentQr.qrBase64) ? (
                       <img
                         src={
-                          paymentQr.qrBase64.startsWith('data:')
-                            ? paymentQr.qrBase64
-                            : paymentQr.qrBase64.startsWith('http')
-                              ? paymentQr.qrBase64
-                              : `data:image/png;base64,${paymentQr.qrBase64}`
+                          paymentQr.qrCode 
+                            ? `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(paymentQr.qrCode)}`
+                            : (paymentQr.qrBase64?.startsWith('data:')
+                                ? paymentQr.qrBase64
+                                : paymentQr.qrBase64?.startsWith('http')
+                                  ? paymentQr.qrBase64
+                                  : `data:image/png;base64,${paymentQr.qrBase64}`)
                         }
                         alt="Mã QR thanh toán"
                         className="w-full h-full object-contain"
@@ -431,9 +460,22 @@ export const OrderTrackingPage = () => {
                       </div>
                     )}
                   </div>
+                  
+                  {paymentQr.checkoutUrl && (
+                     <a
+                       href={paymentQr.checkoutUrl}
+                       target="_blank"
+                       rel="noopener noreferrer"
+                       className="mt-4 w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-red-600/20 active:scale-95"
+                     >
+                       <CreditCard className="w-4 h-4" />
+                       Mở trang thanh toán
+                     </a>
+                  )}
+
                   <button
                     onClick={handleDownloadQR}
-                    className="mt-4 w-full flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
+                    className="mt-2 w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-white py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
                   >
                     <Download className="w-3 h-3" />
                     Lưu mã QR
@@ -442,18 +484,17 @@ export const OrderTrackingPage = () => {
 
                 {/* Text side */}
                 <div className="flex-1 text-left">
-                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-400">Thanh toán QR</p>
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-400">Thanh toán PayOS</p>
                   <h3 className="text-2xl sm:text-3xl font-black italic mt-2" style={{ fontFamily: "'Playfair Display', serif" }}>
-                    Quét mã để thanh toán
+                    Quét mã hoặc mở link
                   </h3>
                   <p className="text-sm text-slate-300 mt-3">
                     Số tiền: <span className="text-white font-black">{Number(paymentQr.amount || order.total).toLocaleString()}đ</span>
                   </p>
-                  {paymentQr.orderId && (
-                    <p className="text-xs text-slate-500 mt-2 break-all">
-                      Mã phiên: {paymentQr.orderId}
-                    </p>
-                  )}
+                  <p className="text-xs text-slate-500 mt-2 break-all">
+                    Đơn hàng: #{order.orderCode || (order.id || order._id)?.slice(-6).toUpperCase()}
+                  </p>
+                  
                   {paymentQr.paymentContent && (
                     <div className="mt-4 p-4 rounded-2xl bg-white/5 border border-white/5">
                       <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Nội dung chuyển khoản</p>
@@ -462,7 +503,7 @@ export const OrderTrackingPage = () => {
                   )}
                   {paymentQr.gatewayWarning && (
                     <p className="text-xs text-amber-300 mt-3">
-                      Đang dùng QR dự phòng vì cổng thanh toán tạm thời không phản hồi.
+                      {paymentQr.gatewayWarning}
                     </p>
                   )}
                 </div>

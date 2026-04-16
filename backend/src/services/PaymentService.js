@@ -2,7 +2,7 @@ import { Payment } from "../models/Payment.js";
 import { Order } from "../models/Order.js";
 import { Table } from "../models/Table.js";
 import { BankAccount } from "../models/BankAccount.js";
-import paymentGateway from "../utils/paymentGatewayClient.js";
+import payos from "../config/payos.js";
 import { NotFoundError, BadRequestError, ServiceUnavailableError } from "../utils/AppError.js";
 
 class PaymentService {
@@ -60,26 +60,54 @@ class PaymentService {
     }
 
     try {
-      const response = await paymentGateway.post("/create-payment/", {
-        user_id: order._id.toString(),
+      const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+      const isKiosk = order.orderType === "delivery" || order.orderType === "takeaway";
+      
+      // Định hướng URL quay về tùy theo loại đơn
+      const redirectPath = isKiosk 
+        ? `/tracking/${order._id}` 
+        : `/table/${order.tableId}/tracking`;
+
+      const body = {
+        orderCode: order.orderCode,
         amount: order.total,
-      });
+        description: `${order.orderCode}`,
+        items: order.items.map(item => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.basePrice
+        })),
+        returnUrl: `${frontendUrl}${redirectPath}`,
+        cancelUrl: `${frontendUrl}${redirectPath}`,
+      };
+
+      const paymentLink = await payos.paymentRequests.create(body);
+      console.log("PayOS Payment Link Created:", paymentLink.id || paymentLink.paymentLinkId);
 
       return {
         orderId: order._id,
         amount: order.total,
-        qrBase64: response.data.qr_base64,
-        paymentContent: response.data.payment_content,
+        checkoutUrl: paymentLink.checkoutUrl,
+        qrCode: paymentLink.qrCode,
+        paymentContent: body.description, // Trả về để hiện thị cho khách
+        paymentLinkId: paymentLink.paymentLinkId,
       };
     } catch (error) {
-      console.warn("Payment Gateway unavailable, using fallback mock QR.");
+      console.error("PayOS API FINAL Error:", error?.message || error);
+      let errorDetail = error?.message || String(error);
+      if (error?.response?.data) {
+        console.error("PayOS Error Details:", error.response.data);
+        errorDetail = JSON.stringify(error.response.data);
+      }
+      
       return {
         orderId: order._id,
         amount: order.total,
+        qrCode: "", // Để frontend hiện "Không có QR" hoặc dự phòng
         qrBase64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
-        paymentContent: `DC ${order._id.toString().slice(-6).toUpperCase()}`,
+        paymentContent: `DC ${order.orderCode}`,
         isMock: true,
-        warning: "Hệ thống ngân hàng đang gián đoạn, đây là mã QR giả lập để test."
+        gatewayWarning: `Cổng PayOS lỗi: ${errorDetail}`
       };
     }
   }
@@ -92,10 +120,21 @@ class PaymentService {
   }
 
   async handleWebhook(payload, io) {
-    const orderId = payload.booking_id;
+    // Xác thực chữ ký Webhook từ PayOS để bảo mật
+    let data;
+    try {
+      data = payos.webhooks.verify(payload);
+    } catch (e) {
+      console.error("Webhook verification failed:", e);
+      return false;
+    }
+    
+    if (!data) return false;
+    const { orderCode, amount, status } = data;
+    if (status !== "PAID") return false;
 
-    const order = await Order.findById(orderId);
-    if (!order) throw new NotFoundError("Order không tồn tại");
+    const order = await Order.findOne({ orderCode: orderCode });
+    if (!order) throw new NotFoundError(`Order với mã ${orderCode} không tồn tại`);
 
     if (order.paymentStatus === "paid") return true;
 
@@ -116,10 +155,10 @@ class PaymentService {
       await Table.findByIdAndUpdate(order.tableId, { status: "empty" });
     }
 
-    order.completedByName = "Hệ thống tự động (MBBank Auto)";
+    order.completedByName = "Hệ thống tự động (PayOS)";
     await order.save();
 
-    const orderData = await Order.findById(orderId).populate("tableId");
+    const orderData = await Order.findById(order._id).populate("tableId");
     const tableNameStr = orderData?.tableName || orderData?.tableId?.name || "Bàn không xác định";
 
     const defaultBank = await BankAccount.findOne({ isDefault: true });
@@ -131,7 +170,7 @@ class PaymentService {
     await Payment.create({
       orderId: order._id,
       amount: order.total,
-      method: "Chuyển khoản (Bot Python Auto quét)",
+      method: "Chuyển khoản (PayOS)",
       bankAccountId: defaultBank ? defaultBank._id : null,
       tableName: tableNameStr,
       bankNameSnapshot: bankNameSnapshotStr,

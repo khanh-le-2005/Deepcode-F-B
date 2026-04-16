@@ -44,13 +44,10 @@ async function startServer() {
   const io = new Server(httpServer, {
     cors: {
       origin: [
-        "http://localhost:8000",
-        "http://localhost:8080",
-
+       
         "http://localhost:3000",
         "http://localhost:3001",
-        "https://pay.momangshow.vn/api",
-        "http://127.0.0.1:5500",
+
       ],
       credentials: true,
     },
@@ -62,11 +59,9 @@ async function startServer() {
   app.use(
     cors({
       origin: [
-        "http://localhost:8000",
-        "http://localhost:8080",
+
         "http://localhost:3000",
         "http://localhost:3001",
-        "https://pay.momangshow.vn/api",
         "http://127.0.0.1:5500",
       ],
       methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],

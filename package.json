@@ -20,9 +20,10 @@
     "bcryptjs": "^3.0.3",
     "clsx": "^2.1.1",
     "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
     "date-fns": "^4.1.0",
-    "dotenv": "^17.2.3",
-    "express": "^4.21.2",
+    "dotenv": "^17.4.2",
+    "express": "^4.22.1",
     "express-async-errors": "^3.1.1",
     "express-rate-limit": "^8.3.1",
     "framer-motion": "^12.38.0",
@@ -30,7 +31,7 @@
     "jsonwebtoken": "^9.0.3",
     "lucide-react": "^0.546.0",
     "mongodb-memory-server": "^11.0.1",
-    "mongoose": "^9.3.1",
+    "mongoose": "^9.4.1",
     "morgan": "^1.10.1",
     "motion": "^12.23.24",
     "multer": "^2.1.1",
@@ -56,5 +57,18 @@
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"
-  }
+  },
+  "description": "<div align=\"center\"> <img width=\"1200\" height=\"475\" alt=\"GHBanner\" src=\"https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6\" /> </div>",
+  "main": "bulletproof_reset.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/khanh-le-2005/Deepcode-F-B.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/khanh-le-2005/Deepcode-F-B/issues"
+  },
+  "homepage": "https://github.com/khanh-le-2005/Deepcode-F-B#readme"
 }

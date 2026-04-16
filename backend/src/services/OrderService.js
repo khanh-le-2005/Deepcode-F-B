@@ -363,7 +363,19 @@ class OrderService {
       { arrayFilters: [{ "elem.status": "in_cart" }], new: true },
     );
     if (!session) throw new NotFoundError("Session not found or Cart is empty");
-    if (io) io.emit("order-updated", session);
+
+    if (io) {
+      io.emit("order-updated", session); // Cập nhật state
+      
+      // Bắn thông báo (Notification) cho Thu Ngân / Quản lý
+      io.emit("notification:staff", {
+        type: "info",
+        title: "Đơn gọi món mới",
+        message: `Bàn [${session.tableName}] vừa gửi yêu cầu đặt món. Cần xác nhận!`,
+        orderId: session._id,
+        sound: "bell_ring.mp3" // Gợi ý để FE phát âm thanh
+      });
+    }
     return session;
   }
 
@@ -462,21 +474,38 @@ class OrderService {
       updateFields["items.$.actionByName"] = user.name;
       updateFields["items.$.actionAt"] = new Date();
     }
+    
     const session = await Order.findOneAndUpdate(
       { _id: sessionId, "items._id": itemId },
       { $set: updateFields },
       { new: true },
     );
     if (!session) throw new NotFoundError("Session or Item not found");
-    if (io) io.emit("order-updated", session);
+
+    if (io) {
+      io.emit("order-updated", session);
+
+      // Nếu trạng thái đổi thành "cooking", báo cho Bếp
+      if (status === "cooking") {
+        const item = session.items.id(itemId);
+        io.emit("notification:kitchen", {
+          type: "warning",
+          title: "Bếp chú ý: Món được duyệt bổ sung",
+          message: `Món [${item.name}] của Bàn [${session.tableName}] vừa được duyệt xuống bếp.`,
+          orderId: session._id
+        });
+      }
+    }
     return session;
   }
 
-  async approveAllItems(sessionId, io, user = null) {
+async approveAllItems(sessionId, io, user = null) {
     const session = await Order.findById(sessionId);
     if (!session) throw new NotFoundError("Session not found");
 
     let updated = false;
+    let approvedCount = 0;
+
     session.items.forEach((item) => {
       if (item.status === "pending_approval") {
         item.status = "cooking";
@@ -486,12 +515,24 @@ class OrderService {
           item.actionAt = new Date();
         }
         updated = true;
+        approvedCount++;
       }
     });
 
     if (updated) {
       await session.save();
-      if (io) io.emit("order-updated", session);
+      if (io) {
+        io.emit("order-updated", session);
+        
+        // Bắn thông báo (Notification) cho Nhà Bếp
+        io.emit("notification:kitchen", {
+          type: "warning", // Màu vàng/cam cho bếp dễ chú ý
+          title: "Bếp chú ý: Có bill mới",
+          message: `Bàn [${session.tableName}] vừa được duyệt ${approvedCount} món xuống bếp.`,
+          orderId: session._id,
+          sound: "kitchen_ticket.mp3"
+        });
+      }
     }
     return session;
   }

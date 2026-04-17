@@ -60,12 +60,12 @@ class PaymentService {
     }
 
     try {
-      const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+      const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3001";
       const isKiosk = order.orderType === "delivery" || order.orderType === "takeaway";
       
-      // Định hướng URL quay về tùy theo loại đơn
+      // Kiosk → Success page, Bàn → Tracking page
       const redirectPath = isKiosk 
-        ? `/tracking/${order._id}` 
+        ? `/success?orderId=${order._id}` 
         : `/table/${order.tableId}/tracking`;
 
       const body = {
@@ -158,8 +158,22 @@ class PaymentService {
     order.completedByName = "Hệ thống tự động (PayOS)";
     await order.save();
 
-    const orderData = await Order.findById(order._id).populate("tableId");
-    const tableNameStr = orderData?.tableName || orderData?.tableId?.name || "Bàn không xác định";
+    const orderData = await Order.findById(order._id);
+    let tableNameStr = orderData?.tableName;
+    if (!tableNameStr && orderData?.tableId) {
+      // Dự phòng: Nếu order cũ không có tableName, tìm trong bảng Table
+      try {
+        const table = await Table.findById(orderData.tableId);
+        if (table) tableNameStr = table.name;
+        else if (mongoose.Types.ObjectId.isValid(orderData.tableId)) {
+           const t2 = await Table.findById(orderData.tableId);
+           if (t2) tableNameStr = t2.name;
+        }
+      } catch (e) {
+        tableNameStr = orderData.tableId; // Dùng ID làm fallback
+      }
+    }
+    tableNameStr = tableNameStr || "Bàn không xác định";
 
     const defaultBank = await BankAccount.findOne({ isDefault: true });
     let bankNameSnapshotStr = "MBBank / Không rõ STK";

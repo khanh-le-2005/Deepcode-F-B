@@ -38,9 +38,20 @@ export const AdminTableManagement = () => {
     variant: 'warning'
   });
 
+  const filterRealTables = (allTables: Table[]) => {
+    return (allTables || []).filter((t: any) => {
+      // Ưu tiên field isVirtual (mới), fallback kiểm tra tên cho bàn ảo cũ
+      if (t.isVirtual) return false;
+      const name = (t.name || '').toLowerCase();
+      if (name.startsWith('mang về') || name.startsWith('giao hàng') 
+        || name.startsWith('mang đi') || name.startsWith('tại quầy')) return false;
+      return true;
+    });
+  };
+
   useEffect(() => {
     fetchTables();
-    socket.on('tables-updated', setTables);
+    socket.on('tables-updated', (data: Table[]) => setTables(filterRealTables(data)));
     return () => {
       socket.off('tables-updated');
     };
@@ -48,7 +59,7 @@ export const AdminTableManagement = () => {
 
   const fetchTables = () => {
     axios.get('/api/tables')
-      .then(res => setTables(res.data))
+      .then(res => setTables(filterRealTables(res.data)))
       .catch(err => console.error("Failed to fetch tables:", err));
   };
 

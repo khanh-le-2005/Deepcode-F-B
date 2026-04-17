@@ -29,6 +29,7 @@ router.put("/:sessionId/item/:itemId/status", authorize(["staff", "admin", "chef
 
 // FIX #1: PUT/DELETE toàn bộ order giờ yêu cầu token, ngăn khách xóa bill người khác
 router.put("/:id", authorize(["staff", "admin"]), orderController.updateOrder);
+router.post("/:id/complete", authorize(["staff", "admin"]), orderController.completeOrder);
 router.delete("/:id", authorize(["admin"]), orderController.deleteOrder);
 
 export default router;

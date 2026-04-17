@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from '@/src/lib/axiosClient';
 import { motion, AnimatePresence } from 'framer-motion';
+import { toast } from 'react-toastify';
 import { ChevronLeft, ShoppingBag, Heart, Star, X, Minus, Plus, Trash2 } from 'lucide-react';
 import { MenuItem } from '../../types';
 import { CustomerHeader } from '../../components/CustomerHeader';
@@ -65,6 +66,8 @@ export const MenuItemDetailPage = () => {
     : totalPrice;
   const newItems = displayCart.filter((i: any) => i.status === 'in_cart');
   const orderedItems = displayCart.filter((i: any) => i.status !== 'in_cart');
+  const hasTableCartItems = tableId ? newItems.length > 0 : false;
+  const canCheckout = tableId ? hasTableCartItems : displayCart.length > 0;
 
   const handleAddToCart = async () => {
     if (!item) return;
@@ -155,7 +158,7 @@ export const MenuItemDetailPage = () => {
       />
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-16">
-        <div className="bg-white rounded-4xl sm:rounded-[3rem] p-6 sm:p-10 md:p-16 shadow-2xl flex flex-col lg:flex-row gap-8 lg:gap-16 relative overflow-hidden text-center lg:text-left border border-gray-100">
+        <div className="bg-white rounded-2xl p-6 sm:p-10 md:p-16 shadow-2xl flex flex-col lg:flex-row gap-8 lg:gap-16 relative overflow-hidden text-center lg:text-left border border-gray-100">
           <div className="absolute top-0 right-0 w-64 h-64 bg-red-50 rounded-full -translate-y-1/2 translate-x-1/2 mix-blend-multiply opacity-50 blur-3xl"></div>
           
           <div className="w-full lg:w-1/2 flex items-center justify-center relative z-10">
@@ -163,12 +166,12 @@ export const MenuItemDetailPage = () => {
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ duration: 0.5 }}
-              className="w-full max-w-sm md:max-w-md aspect-4/3 rounded-3xl sm:rounded-4xl overflow-hidden shadow-2xl bg-gray-100"
+              className="w-full max-w-sm md:max-w-md rounded-none overflow-hidden bg-white/50"
             >
               <img
                 src={item.images?.[0] ? `/api/images/${item.images[0]}` : ''}
                 alt={item.name}
-                className="w-full h-full object-cover hover:scale-110 transition-transform duration-700"
+                className="w-full h-auto object-contain hover:scale-105 transition-transform duration-700"
               />
             </motion.div>
           </div>
@@ -176,7 +179,7 @@ export const MenuItemDetailPage = () => {
           <div className="w-full lg:w-1/2 flex flex-col justify-center relative z-10">
             <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.2 }}>
               <div className="flex items-center gap-2 mb-4 justify-center lg:justify-start">
-                <span className="bg-red-100 text-red-600 text-xs font-black uppercase px-3 py-1 rounded-full">{getMenuItemCategoryName(item)}</span>
+                <span className="bg-red-100 text-red-600 text-[10px] font-black uppercase px-3 py-1 rounded-md">{getMenuItemCategoryName(item)}</span>
                 <span className="flex text-yellow-500"><Star className="w-4 h-4 fill-current" /><Star className="w-4 h-4 fill-current" /><Star className="w-4 h-4 fill-current" /><Star className="w-4 h-4 fill-current" /><Star className="w-4 h-4 fill-current" /></span>
               </div>
               
@@ -205,7 +208,7 @@ export const MenuItemDetailPage = () => {
                       <button
                         key={opt.name}
                         onClick={() => setSelectedOption(selectedOption?.name === opt.name ? null : opt)}
-                        className={`px-5 py-3 rounded-2xl font-bold border-2 transition-all ${
+                        className={`px-5 py-3 rounded-xl font-bold border-2 transition-all ${
                           selectedOption?.name === opt.name
                             ? 'border-red-600 bg-red-600 text-white shadow-lg shadow-red-200'
                             : 'border-gray-100 bg-white text-gray-600 hover:border-gray-200'
@@ -229,7 +232,7 @@ export const MenuItemDetailPage = () => {
                         <button
                           key={addon.name}
                           onClick={() => handleToggleAddon(addon)}
-                          className={`px-5 py-3 rounded-2xl font-bold border-2 transition-all ${
+                          className={`px-5 py-3 rounded-xl font-bold border-2 transition-all ${
                             isSelected
                               ? 'border-gray-900 bg-gray-900 text-white shadow-lg'
                               : 'border-gray-100 bg-white text-gray-600 hover:border-gray-200'
@@ -244,7 +247,7 @@ export const MenuItemDetailPage = () => {
               )}
 
               <div className="flex flex-col sm:flex-row gap-6 items-center">
-                <div className="flex items-center border-2 border-gray-200 rounded-full h-14 bg-white hover:border-red-200 transition-colors">
+                <div className="flex items-center border-2 border-gray-200 rounded-xl h-14 bg-white hover:border-red-200 transition-colors">
                   <button onClick={() => setQuantity(Math.max(1, quantity - 1))} className="px-6 h-full flex items-center hover:text-red-600 font-black text-xl transition-colors">-</button>
                   <span className="px-4 font-black text-xl w-12 text-center text-gray-900">{quantity}</span>
                   <button onClick={() => setQuantity(quantity + 1)} className="px-6 h-full flex items-center hover:text-red-600 font-black text-xl transition-colors">+</button>
@@ -252,13 +255,13 @@ export const MenuItemDetailPage = () => {
                 
                 <button 
                   onClick={handleAddToCart}
-                  className="bg-[#111] hover:bg-red-600 text-white px-10 h-14 rounded-full font-black uppercase tracking-widest flex items-center justify-center gap-3 transition-colors shadow-[0_10px_40px_-10px_rgba(220,38,38,0.5)] w-full sm:w-auto"
+                  className="bg-[#111] hover:bg-red-600 text-white px-8 h-14 rounded-xl font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-colors shadow-[0_10px_40px_-10px_rgba(220,38,38,0.5)] flex-1 sm:flex-none min-w-[180px] whitespace-nowrap"
                 >
-                  <ShoppingBag className="w-5 h-5" />
+                  <ShoppingBag className="w-5 h-5 shrink-0" />
                   Thêm vào giỏ
                 </button>
 
-                <button className="h-14 w-14 flex items-center justify-center rounded-full border-2 border-gray-200 text-gray-400 hover:text-red-600 hover:border-red-600 hover:bg-red-50 transition-all bg-white shrink-0">
+                <button className="h-14 w-14 flex items-center justify-center rounded-xl border-2 border-gray-200 text-gray-400 hover:text-red-600 hover:border-red-600 hover:bg-red-50 transition-all bg-white shrink-0">
                   <Heart className="w-6 h-6" />
                 </button>
               </div>
@@ -284,7 +287,7 @@ export const MenuItemDetailPage = () => {
               exit={{ y: "100%", opacity: 0.98 }}
               transition={{ type: "spring", damping: 28, stiffness: 260, mass: 0.9 }}
               style={{ willChange: 'transform' }}
-              className="fixed right-0 bottom-0 w-full sm:max-w-md bg-white z-[201] flex flex-col shadow-[0_-16px_40px_rgba(0,0,0,0.18)] rounded-t-[2rem] sm:rounded-t-[2.5rem] overflow-hidden"
+              className="fixed right-0 bottom-0 w-full sm:max-w-md bg-white z-[201] flex flex-col shadow-[0_-16px_40px_rgba(0,0,0,0.18)] rounded-t-2xl overflow-hidden"
             >
               <div className="pt-3 pb-2 px-6 sm:px-8 bg-[#111] text-white shrink-0">
                 <div className="mx-auto h-1.5 w-12 rounded-full bg-white/30 mb-4" />
@@ -298,89 +301,219 @@ export const MenuItemDetailPage = () => {
                 {displayCart.length === 0 ? (
                   <div className="text-center py-20 text-gray-400 font-bold uppercase italic border-2 border-dashed border-gray-100 rounded-3xl">Giỏ hàng trống</div>
                 ) : (
-                  <>
+                  <div className="space-y-10">
                     {newItems.length > 0 && (
                       <div className="space-y-4">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 mb-4">
                           <div className="h-0.5 flex-1 bg-red-100" />
                           <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-red-600">Món mới chọn</h3>
                           <div className="h-0.5 flex-1 bg-red-100" />
                         </div>
-                        {newItems.map((cartItem: any, idx: number) => (
-                          <div key={(cartItem._id || cartItem.menuItemId) + idx} className="flex gap-4 border-b border-gray-100 pb-5">
-                            <img src={cartItem.image ?? ''} className="w-20 h-20 rounded-2xl object-cover" alt="" />
-                            <div className="flex-1">
-                              <h4 className="font-bold italic text-lg" style={{ fontFamily: "'Playfair Display', serif" }}>{cartItem.name}</h4>
-                              {(cartItem.selectedOption || (cartItem.selectedAddons && cartItem.selectedAddons.length > 0)) && (
-                                <div className="mt-1 space-y-0.5">
-                                  {cartItem.selectedOption && <p className="text-[10px] text-gray-500 italic">• {cartItem.selectedOption.name}</p>}
-                                  {cartItem.selectedAddons?.map((addon: any, addonIdx: number) => (
-                                    <p key={addonIdx} className="text-[10px] text-gray-500 italic">• {addon.name}</p>
-                                  ))}
+                        {(() => {
+                           const groupedNewItems = newItems.reduce((acc: any[], item: any) => {
+                             const addonKey = (item.selectedAddons || []).map((a: any) => a.name).sort().join(',');
+                             const optionKey = item.selectedOption?.name || '';
+                             const key = `${item.name}-${optionKey}-${addonKey}`;
+                             const existing = acc.find(i => i.groupKey === key);
+                             if (existing) {
+                               existing.quantity += item.quantity;
+                               existing.totalPrice += item.totalPrice;
+                               existing.ids.push(item._id || item.menuItemId);
+                             } else {
+                               acc.push({ ...item, groupKey: key, ids: [item._id || item.menuItemId] });
+                             }
+                             return acc;
+                           }, []);
+
+                           return groupedNewItems.map((cartItem, idx) => (
+                             <motion.div 
+                               layout
+                               key={cartItem.groupKey + idx} 
+                               className="bg-white rounded-[2rem] p-4 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100/50 flex gap-4 group hover:border-red-100 transition-all duration-300"
+                             >
+                                <div className="relative w-24 h-24 shrink-0 rounded-none overflow-hidden shadow-inner">
+                                  <img src={cartItem.image ?? ''} className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-700" alt="" />
                                 </div>
-                              )}
-                              <p className="text-red-600 font-bold mt-1">{(Number(cartItem.totalPrice || 0) / Number(cartItem.quantity || 1)).toLocaleString()}đ</p>
-                              <div className="flex items-center gap-4 mt-2">
-                                <div className="flex items-center border border-gray-200 rounded-lg bg-white overflow-hidden">
-                                  {tableId ? (
-                                    <>
-                                      <button className="px-3 py-1 hover:bg-red-50 hover:text-red-600 font-bold" onClick={() => handleUpdateTableCartItemQuantity(cartItem._id || cartItem.menuItemId, -1)}><Minus className="w-3 h-3" /></button>
-                                      <span className="px-4 font-bold">{cartItem.quantity}</span>
-                                      <button className="px-3 py-1 hover:bg-red-50 hover:text-red-600 font-bold" onClick={() => handleUpdateTableCartItemQuantity(cartItem._id || cartItem.menuItemId, 1)}><Plus className="w-3 h-3" /></button>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <button className="px-3 py-1 hover:bg-red-50 hover:text-red-600 font-bold" onClick={() => updateQuantity(cartItem.menuItemId, -1)}>-</button>
-                                      <span className="px-4 font-bold">{cartItem.quantity}</span>
-                                      <button className="px-3 py-1 hover:bg-red-50 hover:text-red-600 font-bold" onClick={() => updateQuantity(cartItem.menuItemId, 1)}>+</button>
-                                    </>
-                                  )}
+                                <div className="flex-1 flex flex-col justify-between py-1">
+                                  <div>
+                                    <div className="flex justify-between items-start">
+                                      <h4 className="font-bold italic text-base leading-tight pr-2" style={{ fontFamily: "'Playfair Display', serif" }}>{cartItem.name}</h4>
+                                      <button 
+                                        onClick={() => tableId ? handleRemoveTableCartItem(cartItem.ids[0]) : removeFromCart(cartItem.menuItemId)}
+                                        className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </button>
+                                    </div>
+                                    
+                                    {(cartItem.selectedOption || (cartItem.selectedAddons && cartItem.selectedAddons.length > 0)) && (
+                                      <div className="mt-2 flex flex-wrap gap-1.5">
+                                        {cartItem.selectedOption && (
+                                          <span className="bg-slate-50 text-slate-500 text-[9px] font-black uppercase px-2 py-0.5 rounded-md border border-slate-100">
+                                            {cartItem.selectedOption.name}
+                                          </span>
+                                        )}
+                                        {cartItem.selectedAddons?.map((addon: any, aIdx: number) => (
+                                          <span key={aIdx} className="bg-amber-50 text-amber-600 text-[9px] font-black uppercase px-2 py-0.5 rounded-md border border-amber-100">
+                                            {addon.name}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  <div className="flex items-center justify-between mt-3">
+                                    <p className="text-red-600 font-black text-base italic" style={{ fontFamily: "'Playfair Display', serif" }}>
+                                      {(Number(cartItem.totalPrice) / cartItem.quantity).toLocaleString()}đ
+                                    </p>
+                                    
+                                    <div className="flex items-center bg-[#fdfaf5] border border-[#f5efde] rounded-full p-1 shadow-sm">
+                                      {tableId ? (
+                                        <>
+                                          <button className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-white rounded-full transition-all active:scale-90" onClick={() => handleUpdateTableCartItemQuantity(cartItem.ids[0], -1)}><Minus className="w-3.5 h-3.5" /></button>
+                                          <span className="w-8 text-center font-bold text-sm">{cartItem.quantity}</span>
+                                          <button className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-white rounded-full transition-all active:scale-90" onClick={() => handleUpdateTableCartItemQuantity(cartItem.ids[0], 1)}><Plus className="w-3.5 h-3.5" /></button>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <button className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-white rounded-full transition-all active:scale-90" onClick={() => updateQuantity(cartItem.menuItemId, -1)}>-</button>
+                                          <span className="w-8 text-center font-bold text-sm">{cartItem.quantity}</span>
+                                          <button className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-white rounded-full transition-all active:scale-90" onClick={() => updateQuantity(cartItem.menuItemId, 1)}>+</button>
+                                        </>
+                                      )}
+                                    </div>
+                                  </div>
                                 </div>
-                                <Trash2 className="w-4 h-4 text-gray-300 cursor-pointer hover:text-red-600" onClick={() => tableId ? handleRemoveTableCartItem(cartItem._id || cartItem.menuItemId) : removeFromCart(cartItem.menuItemId)} />
-                              </div>
-                            </div>
-                          </div>
-                        ))}
+                             </motion.div>
+                           ));
+                        })()}
                       </div>
                     )}
 
                     {orderedItems.length > 0 && (
                       <div className="space-y-4">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 mb-4">
                           <div className="h-0.5 flex-1 bg-gray-100" />
-                          <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Món đang phục vụ</h3>
+                          <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Món đang phục vụ (Đã gửi bếp)</h3>
                           <div className="h-0.5 flex-1 bg-gray-100" />
                         </div>
-                        {orderedItems.map((cartItem: any, idx: number) => (
-                          <div key={(cartItem._id || cartItem.menuItemId) + idx} className="flex gap-4 border-b border-gray-100 pb-5 opacity-80 grayscale-[0.3]">
-                            <img src={cartItem.image ?? ''} className="w-16 h-16 rounded-2xl object-cover" alt="" />
-                            <div className="flex-1">
-                              <h4 className="font-bold italic text-base" style={{ fontFamily: "'Playfair Display', serif" }}>{cartItem.name}</h4>
-                              <p className="text-gray-500 font-medium text-xs mt-1">SL: <span className="font-bold text-[#111]">{cartItem.quantity}</span></p>
-                              <span className="inline-flex mt-2 px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-[8px] font-black uppercase tracking-widest">{cartItem.status}</span>
+                        {(() => {
+                           const groupedOrderedItems = orderedItems.reduce((acc: any[], item: any) => {
+                             const addonKey = (item.selectedAddons || []).map((a: any) => a.name).sort().join(',');
+                             const optionKey = item.selectedOption?.name || '';
+                             const key = `${item.name}-${optionKey}-${addonKey}-${item.status}`;
+                             const existing = acc.find(i => i.groupKey === key);
+                             if (existing) {
+                               existing.quantity += item.quantity;
+                             } else {
+                               acc.push({ ...item, groupKey: key });
+                             }
+                             return acc;
+                           }, []);
+
+                           return groupedOrderedItems.map((cartItem, idx) => (
+                            <div 
+                              key={cartItem.groupKey + idx} 
+                              className="bg-gray-50/50 rounded-[2rem] p-4 border border-gray-100 flex gap-4 opacity-80 grayscale-[0.2] group hover:grayscale-0 transition-all duration-500"
+                            >
+                              <div className="w-20 h-20 shrink-0 rounded-none overflow-hidden">
+                                <img src={cartItem.image ?? ''} className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-700" alt="" />
+                              </div>
+
+                              <div className="flex-1 flex flex-col justify-between py-1">
+                                <div>
+                                  <div className="flex justify-between items-start">
+                                    <h4 className="font-bold italic text-base leading-tight pr-2" style={{ fontFamily: "'Playfair Display', serif" }}>{cartItem.name}</h4>
+                                    <span className="px-2 py-0.5 bg-white text-gray-500 rounded-lg text-[8px] font-black uppercase tracking-widest border border-gray-100 shadow-sm whitespace-nowrap">
+                                      {cartItem.status}
+                                    </span>
+                                  </div>
+                                  
+                                  {(cartItem.selectedOption || (cartItem.selectedAddons && cartItem.selectedAddons.length > 0)) && (
+                                    <div className="mt-1.5 flex flex-wrap gap-1">
+                                      {cartItem.selectedOption && (
+                                        <span className="text-[9px] text-gray-400 italic">• {cartItem.selectedOption.name}</span>
+                                      )}
+                                      {cartItem.selectedAddons?.map((addon: any, aIdx: number) => (
+                                        <p key={aIdx} className="text-[9px] text-gray-400 italic pr-2">• {addon.name}</p>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="flex justify-between items-center mt-2">
+                                  <p className="text-gray-400 font-bold text-xs uppercase tracking-tighter">
+                                    Số lượng: <span className="text-[#111] text-sm font-black italic" style={{ fontFamily: "'Playfair Display', serif" }}>{cartItem.quantity}</span>
+                                  </p>
+                                  <div className="h-1.5 w-1.5 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.5)]" />
+                                </div>
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                           ));
+                        })()}
                       </div>
                     )}
-                  </>
+                  </div>
                 )}
               </div>
 
-              <div className="p-5 sm:p-8 bg-gray-50 space-y-4 border-t border-gray-100 shrink-0">
-                <div className="flex justify-between items-center px-1">
-                  <span className="text-gray-400 font-bold uppercase text-[10px] tracking-widest italic">Tổng cộng</span>
-                  <span className="text-2xl font-black text-red-600 italic" style={{ fontFamily: "'Playfair Display', serif" }}>
-                    {displayTotalPrice.toLocaleString()}đ
-                  </span>
+              <div className="p-5 sm:p-8 bg-white space-y-4 border-t border-gray-100 shrink-0">
+                <div className="bg-[#111] rounded-xl p-6 text-white shadow-xl relative overflow-hidden group">
+                  <div className="absolute inset-0 bg-gradient-to-br from-red-600/20 to-transparent opacity-50" />
+                  <div className="relative z-10 flex justify-between items-center">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 mb-1">Thanh toán</p>
+                      <h3 className="text-2xl font-black italic tracking-tight" style={{ fontFamily: "'Playfair Display', serif" }}>Tổng cộng</h3>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[10px] font-black text-red-400 mb-1 uppercase">{displayTotalItems} món ăn</p>
+                      <span className="text-3xl font-black text-white italic" style={{ fontFamily: "'Playfair Display', serif" }}>
+                        {displayTotalPrice.toLocaleString()}đ
+                      </span>
+                    </div>
+                  </div>
                 </div>
 
-                <button
-                  onClick={() => setIsCartOpen(false)}
-                  className="w-full bg-[#111] text-white py-4 rounded-2xl font-black italic uppercase transition-all shadow-xl text-xs active:scale-95"
-                >
-                  Đóng giỏ hàng
-                </button>
+                {orderedItems.length > 0 && (
+                  <button
+                    onClick={() => { setIsCartOpen(false); navigate(`/table/${tableId}/tracking`); }}
+                    className="w-full py-3 bg-blue-50 text-blue-600 rounded-xl font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-blue-100 transition-colors border border-blue-100 animate-pulse"
+                  >
+                    🔍 Theo dõi trạng thái món đã đặt
+                  </button>
+                )}
+
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <button
+                    onClick={() => setIsCartOpen(false)}
+                    className="w-full border-2 border-gray-200 text-gray-500 py-4 rounded-xl font-black italic uppercase transition-all text-xs active:scale-95"
+                  >
+                    Đóng
+                  </button>
+                  <button
+                    disabled={!canCheckout}
+                    onClick={async () => {
+                      if (tableId) {
+                        try {
+                          if (!hasTableCartItems || !activeSession) return;
+                          await axios.post(`/api/orders/${activeSession.id || activeSession._id}/checkout`);
+                          setIsCartOpen(false);
+                          navigate(`/table/${tableId}/tracking`);
+                        } catch (error) {
+                          alert("Không thể gửi món xuống bếp. Vui lòng thử lại!");
+                        }
+                      } else {
+                        setIsCartOpen(false);
+                        navigate('/checkout');
+                      }
+                    }}
+                    className={`w-full py-4 rounded-xl font-black italic uppercase transition-all shadow-xl text-xs flex items-center justify-center gap-2 ${
+                      canCheckout ? "bg-red-600 text-white active:scale-95" : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                    }`}
+                  >
+                    {tableId ? (hasTableCartItems ? 'Xác nhận đặt' : 'Đã gửi bếp') : 'Thanh toán'}
+                  </button>
+                </div>
               </div>
             </motion.div>
           </>

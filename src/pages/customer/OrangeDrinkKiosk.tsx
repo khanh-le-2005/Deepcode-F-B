@@ -3,11 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { 
   Search, MapPin, User, History, Heart, ShoppingBag, 
   Plus, ChevronRight, Truck, Package, 
-  CreditCard, Banknote, X, Loader2, ArrowRight, Leaf, Sparkles
+  CreditCard, Banknote, X, Loader2, ArrowRight, Leaf, Sparkles, Download
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 // --- Cấu hình API theo tài liệu ---
-const BASE_URL = 'http://localhost:3000/api';
+const BASE_URL = window.location.origin + '/api';
 const IMAGE_URL = (id: string) => `${BASE_URL}/images/${id}`;
 
 // Ảnh Banner phong cách trà chanh/trái cây tươi
@@ -111,7 +112,12 @@ export default function FreshLemonTeaKiosk() {
       if (res.ok) {
         const actualOrderId = result.qrData?.orderId || result._id || result.id;
         const actualTableId = result.tableId || result.qrData?.tableId;
+
         if (paymentMethod === 'transfer' && result.qrData) {
+          if (result.qrData.checkoutUrl) {
+            window.location.href = result.qrData.checkoutUrl;
+            return;
+          }
           console.log("Setting QR Response with orderId:", actualOrderId, "tableId:", actualTableId);
           setQrResponse({ ...result.qrData, orderId: actualOrderId, tableId: actualTableId });
         } else {
@@ -120,7 +126,10 @@ export default function FreshLemonTeaKiosk() {
           if (actualOrderId) navigate(`/success?orderId=${actualOrderId}`);
         }
       }
-    } catch (err) { alert("Lỗi gửi đơn."); }
+    } catch (err) { 
+      console.error("Lỗi gửi đơn:", err);
+      alert("Lỗi gửi đơn. Vui lòng kiểm tra kết nối mạng."); 
+    }
   };
 
   if (loading) return (
@@ -263,19 +272,102 @@ export default function FreshLemonTeaKiosk() {
           <div className="absolute inset-0 bg-[#4A3728]/40 backdrop-blur-md" onClick={() => setIsModalOpen(false)}></div>
           <div className="relative bg-white w-full max-w-5xl rounded-[50px] overflow-hidden shadow-3xl flex flex-col md:flex-row h-[85vh] border-8 border-white">
             {qrResponse ? (
-              <div className="w-full p-16 text-center flex flex-col items-center justify-center bg-[#FEF9E7]">
-                <h2 className="text-4xl font-black mb-4 text-green-600">Thanh toán ngay!</h2>
-                <img src={`data:image/png;base64,${qrResponse.qrBase64}`} className="w-72 h-72 shadow-2xl rounded-3xl mb-8 border-8 border-white" alt="QR" />
-                <div className="bg-orange-500 text-white px-8 py-4 rounded-2xl mb-10">
-                   <p className="text-xs font-bold uppercase tracking-widest mb-1">Nội dung chuyển khoản</p>
-                   <p className="text-3xl font-black font-mono">{qrResponse.paymentContent}</p>
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="w-full bg-slate-950 text-white p-8 sm:p-12 flex flex-col items-center justify-center overflow-y-auto"
+              >
+                <div className="max-w-4xl w-full flex flex-col md:flex-row items-center gap-10 md:gap-16">
+                  {/* QR side */}
+                  <div className="flex flex-col items-center">
+                    <div className="w-56 h-56 sm:w-64 sm:h-64 rounded-3xl bg-white p-4 flex items-center justify-center shrink-0 overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
+                      {(qrResponse.qrCode || qrResponse.qrBase64) ? (
+                        <img 
+                          src={
+                            qrResponse.qrCode
+                              ? `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(qrResponse.qrCode)}`
+                              : (qrResponse.qrBase64?.startsWith('data:') ? qrResponse.qrBase64 : `data:image/png;base64,${qrResponse.qrBase64}`)
+                          }
+                          className="w-full h-full object-contain" 
+                          alt="Mã QR thanh toán" 
+                        />
+                      ) : (
+                        <div className="text-slate-500 text-sm font-black uppercase tracking-widest text-center">
+                          Không có QR
+                        </div>
+                      )}
+                    </div>
+                    
+                    {qrResponse.checkoutUrl && (
+                      <a
+                        href={qrResponse.checkoutUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-6 w-full flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 text-white py-3.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-orange-500/20 active:scale-95"
+                      >
+                        <CreditCard size={14} /> Mở trang thanh toán
+                      </a>
+                    )}
+
+                    <button
+                      onClick={() => {
+                        const imgSrc = qrResponse.qrCode
+                          ? `https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(qrResponse.qrCode)}`
+                          : (qrResponse.qrBase64?.startsWith('data:') ? qrResponse.qrBase64 : `data:image/png;base64,${qrResponse.qrBase64}`);
+                        const link = document.createElement('a');
+                        link.href = imgSrc;
+                        link.download = `qr-payment-${qrResponse.orderId || 'kiosk'}.png`;
+                        link.click();
+                      }}
+                      className="mt-3 w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-white py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all"
+                    >
+                      <Download size={14} /> Lưu mã QR
+                    </button>
+                  </div>
+
+                  {/* Text side */}
+                  <div className="flex-1 text-center md:text-left">
+                    <div className="flex items-center justify-center md:justify-start gap-2 mb-4">
+                      <div className="h-0.5 w-8 bg-orange-500" />
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-orange-400">Thanh toán PayOS</p>
+                    </div>
+                    
+                    <h2 className="text-4xl sm:text-5xl font-black italic mb-4" style={{ fontFamily: "'Playfair Display', serif" }}>
+                      Quét để <span className="text-orange-500">Đặt hàng</span>
+                    </h2>
+                    
+                    <p className="text-slate-400 font-medium mb-8 leading-relaxed">
+                      Vui lòng sử dụng ứng dụng Ngân hàng hoặc Ví điện tử để quét mã QR và hoàn tất thanh toán. 
+                      Đơn hàng của bạn sẽ được tự động nhận sau 1-3 giây.
+                    </p>
+
+                    <div className="grid grid-cols-1 gap-4 mb-8">
+                      <div className="p-5 rounded-2xl bg-white/5 border border-white/10">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Số tiền thanh toán</p>
+                        <p className="text-3xl font-black text-white">{cart.reduce((s,i) => s + (i.price * i.quantity), 0).toLocaleString()}đ</p>
+                      </div>
+                      <div className="p-5 rounded-2xl bg-orange-500/10 border border-orange-500/20">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-orange-400/70 mb-2">Nội dung chuyển khoản</p>
+                        <p className="text-2xl font-black text-orange-500 font-mono tracking-wider">{qrResponse.paymentContent}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col md:flex-row items-center gap-4">
+                      <div className="flex items-center gap-3 text-emerald-400 bg-emerald-400/5 px-5 py-3 rounded-full border border-emerald-400/20 w-fit">
+                        <Loader2 className="animate-spin" size={18} />
+                        <span className="text-xs font-black uppercase tracking-[0.15em] animate-pulse">Đang chờ nhận tiền...</span>
+                      </div>
+                      
+                      <button 
+                        onClick={() => setQrResponse(null)} 
+                        className="text-xs font-bold text-slate-500 underline hover:text-white transition-colors"
+                      >
+                        Đổi phương thức thanh toán
+                      </button>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex flex-col items-center gap-3">
-                  <Loader2 className="animate-spin text-green-600 mb-2" size={36} />
-                  <p className="text-green-700 font-bold animate-pulse tracking-widest uppercase text-sm">Hệ thống đang chờ nhận tiền...</p>
-                  <button onClick={() => setQrResponse(null)} className="text-sm font-bold text-yellow-800/60 underline hover:text-yellow-800 mt-2">Đổi phương thức thanh toán</button>
-                </div>
-              </div>
+              </motion.div>
             ) : (
               <>
                 <div className="flex-1 p-12 overflow-y-auto">

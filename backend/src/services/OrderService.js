@@ -182,7 +182,7 @@ class OrderService {
         data.tableName ||
         "Mang đi - " + new Date().getHours() + "h" + new Date().getMinutes();
       const slug = crypto.randomBytes(4).toString("hex");
-      const table = new Table({ name: tableName, status: "occupied", slug });
+      const table = new Table({ name: tableName, status: "occupied", slug, isVirtual: true });
       await table.save();
       tableIdStr = String(table._id);
     }
@@ -314,7 +314,7 @@ class OrderService {
     }
 
     const slug = crypto.randomBytes(4).toString("hex");
-    const table = new Table({ name: tableName, status: "occupied", slug });
+    const table = new Table({ name: tableName, status: "occupied", slug, isVirtual: true });
     await table.save();
     const tableIdStr = String(table._id);
 

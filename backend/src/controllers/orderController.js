@@ -165,6 +165,11 @@ export const deleteOrder = async (req, res) => {
   res.json({ message: "Session deleted" });
 };
 
+export const completeOrder = async (req, res) => {
+  const order = await OrderService.completeOrder(req.params.id, req.io);
+  res.json(order);
+};
+
 export const getKitchenOrders = async (req, res) => {
   const orders = await OrderService.getKitchenOrders();
   res.json(orders);

@@ -49,7 +49,7 @@ export const MenuPage = () => {
     try {
       const res = await axios.get(`/api/orders/table/${tableId}/active-session`);
       // Nếu đơn đã thanh toán hoặc hoàn tất thì coi như không còn session đặt món active
-      const isStillActive = res.data && res.data.status !== 'paid' && res.data.status !== 'completed' && res.data.paymentStatus !== 'paid';
+      const isStillActive = res.data && res.data.status === 'active' && res.data.paymentStatus !== 'paid';
       setActiveSession(isStillActive ? res.data : null);
     } catch (error: any) {
       if (error.response?.status === 404) {
@@ -77,7 +77,7 @@ export const MenuPage = () => {
     const handleOrderUpdate = (updatedOrder: Order) => {
       const slugify = (str?: string) => str ? String(str).toLowerCase().trim().replace(/[\s\W-]+/g, '-') : '';
       if (tableId && (updatedOrder.tableId === tableId || updatedOrder.tableId === slugify(tableId))) {
-        const isStillActive = updatedOrder.status === 'active' && updatedOrder.status !== 'paid' && updatedOrder.status !== 'completed' && updatedOrder.paymentStatus !== 'paid';
+        const isStillActive = updatedOrder.status === 'active' && updatedOrder.paymentStatus !== 'paid';
         setActiveSession(isStillActive ? updatedOrder : null);
       }
     };
@@ -107,7 +107,7 @@ export const MenuPage = () => {
   }
 
   const visibleMenu = menu;
-  const categories = ['Tất cả', ...new Set(visibleMenu.map(item => getMenuItemCategoryName(item)))];
+  const categories = ['Tất cả', ...Array.from(new Set(visibleMenu.map(item => getMenuItemCategoryName(item))))] as string[];
   const filteredMenu = visibleMenu.filter(item => {
     const matchesCategory = selectedCategory === 'Tất cả' || getMenuItemCategoryName(item) === selectedCategory;
     const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
@@ -307,15 +307,15 @@ export const MenuPage = () => {
                   key={item.id}
                   initial={{ opacity: 0, y: 20 }}
                   whileInView={{ opacity: 1, y: 0 }}
-                  className="bg-white group rounded-4xl overflow-hidden border border-gray-100 hover:shadow-2xl transition-all duration-500 text-center flex flex-col items-center p-3 sm:p-6 relative"
+                  className="bg-white group rounded-2xl overflow-hidden border border-gray-100 hover:shadow-2xl transition-all duration-500 text-center flex flex-col items-center p-3 sm:p-6 relative"
                 >
                   <div className="absolute top-2 right-2 sm:top-4 sm:right-4 flex flex-col gap-2 translate-x-10 opacity-0 group-hover:translate-x-0 group-hover:opacity-100 transition-all duration-300">
-                    <button className="p-1.5 sm:p-2 bg-white shadow-md rounded-full text-gray-400 hover:text-red-600 hover:bg-red-50"><Heart className="w-3 h-3 sm:w-4 sm:h-4" /></button>
-                    <button className="p-1.5 sm:p-2 bg-white shadow-md rounded-full text-gray-400 hover:text-red-600 hover:bg-red-50" onClick={() => handleAddToCart(item)}><ShoppingBag className="w-3 h-3 sm:w-4 sm:h-4" /></button>
+                    <button className="p-1.5 sm:p-2 bg-white shadow-md rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50"><Heart className="w-3 h-3 sm:w-4 sm:h-4" /></button>
+                    <button className="p-1.5 sm:p-2 bg-white shadow-md rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50" onClick={() => handleAddToCart(item)}><ShoppingBag className="w-3 h-3 sm:w-4 sm:h-4" /></button>
                   </div>
 
-                  <div className="w-full aspect-4/3 rounded-2xl sm:rounded-3xl overflow-hidden mb-3 sm:mb-6 group-hover:shadow-lg transition-all duration-500 cursor-pointer relative" onClick={() => navigate(tableId ? `/table/${tableId}/menu/${item.id}` : `/menu/${item.id}`)}>
-                    <img src={getItemImageUrl(item)} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt={item.name} />
+                  <div className="w-full rounded-none overflow-hidden mb-3 sm:mb-6 transition-all duration-500 cursor-pointer relative" onClick={() => navigate(tableId ? `/table/${tableId}/menu/${item.id}` : `/menu/${item.id}`)}>
+                    <img src={getItemImageUrl(item)} className="w-full h-auto object-contain group-hover:scale-105 transition-transform duration-500" alt={item.name} />
                   </div>
 
                   <h3 className="text-base sm:text-lg font-bold text-gray-900 group-hover:text-red-600 transition-colors mb-0.5 sm:mb-1 italic cursor-pointer line-clamp-1" style={{ fontFamily: "'Playfair Display', serif" }} onClick={() => navigate(tableId ? `/table/${tableId}/menu/${item.id}` : `/menu/${item.id}`)}>
@@ -413,43 +413,86 @@ export const MenuPage = () => {
                           <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-red-600">Món mới chọn</h3>
                           <div className="h-0.5 flex-1 bg-red-100" />
                         </div>
-                        {newItems.map((item, idx) => (
-                          <div key={item.menuItemId + idx} className="flex gap-4 border-b border-gray-100 pb-6 group">
-                            <img src={item.image ?? ''} className="w-20 h-20 rounded-2xl object-cover" alt="" />
-                            <div className="flex-1">
-                              <h4 className="font-bold italic text-lg" style={{ fontFamily: "'Playfair Display', serif" }}>{item.name}</h4>
-                              
-                              {(item.selectedOption || (item.selectedAddons && item.selectedAddons.length > 0)) && (
-                                <div className="mt-1 space-y-0.5">
-                                  {item.selectedOption && <p className="text-[15px] text-gray-500 italic">• {item.selectedOption.name}</p>}
-                                  {item.selectedAddons?.map((addon: any, addonIdx: number) => (
-                                    <p key={addonIdx} className="text-[15px] text-gray-500 italic">• {addon.name}</p>
-                                  ))}
-                                </div>
-                              )}
+                        {(() => {
+                          const groupedNewItems = newItems.reduce((acc: any[], item) => {
+                            const addonKey = (item.selectedAddons || []).map((a: any) => a.name).sort().join(',');
+                            const optionKey = item.selectedOption?.name || '';
+                            const key = `${item.name}-${optionKey}-${addonKey}`;
+                            const existing = acc.find(i => i.groupKey === key);
+                            if (existing) {
+                              existing.quantity += item.quantity;
+                              existing.totalPrice += item.totalPrice;
+                              existing.ids.push(item._id || item.menuItemId);
+                            } else {
+                              acc.push({ ...item, groupKey: key, ids: [item._id || item.menuItemId] });
+                            }
+                            return acc;
+                          }, []);
 
-                              <p className="text-red-600 font-bold mt-1 text-base">{(item.totalPrice / item.quantity).toLocaleString()}đ</p>
-                              <div className="flex items-center gap-4 mt-2">
-                                <div className="flex items-center border border-gray-200 rounded-lg bg-white overflow-hidden">
-                                  {tableId ? (
-                                    <>
-                                      <button className="px-3 py-1 hover:bg-red-50 hover:text-red-600 font-bold" onClick={() => handleUpdateTableCartItemQuantity(item._id || item.menuItemId, -1)}><Minus className="w-3 h-3" /></button>
-                                      <span className="px-4 font-bold">{item.quantity}</span>
-                                      <button className="px-3 py-1 hover:bg-red-50 hover:text-red-600 font-bold" onClick={() => handleUpdateTableCartItemQuantity(item._id || item.menuItemId, 1)}><Plus className="w-3 h-3" /></button>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <button className="px-3 py-1 hover:bg-red-50 hover:text-red-600 font-bold" onClick={() => updateQuantity(getUniqueCartKey(item), -1)}>-</button>
-                                      <span className="px-4 font-bold">{item.quantity}</span>
-                                      <button className="px-3 py-1 hover:bg-red-50 hover:text-red-600 font-bold" onClick={() => updateQuantity(getUniqueCartKey(item), 1)}>+</button>
-                                    </>
+                          return groupedNewItems.map((item, idx) => (
+                            <motion.div 
+                              layout
+                              key={item.groupKey + idx} 
+                              className="bg-white rounded-2xl p-4 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100/50 flex gap-4 group hover:border-red-100 transition-all duration-300"
+                            >
+                              <div className="relative w-24 h-24 shrink-0 rounded-none overflow-hidden">
+                                <img src={item.image ?? ''} className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-700" alt="" />
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                              </div>
+
+                              <div className="flex-1 flex flex-col justify-between py-1">
+                                <div>
+                                  <div className="flex justify-between items-start">
+                                    <h4 className="font-bold italic text-base leading-tight pr-2" style={{ fontFamily: "'Playfair Display', serif" }}>{item.name}</h4>
+                                    <button 
+                                      onClick={() => tableId ? handleRemoveTableCartItem(item.ids[0]) : removeFromCart(getUniqueCartKey(item))}
+                                      className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                  
+                                  {(item.selectedOption || (item.selectedAddons && item.selectedAddons.length > 0)) && (
+                                    <div className="mt-2 flex flex-wrap gap-1.5">
+                                      {item.selectedOption && (
+                                        <span className="bg-slate-50 text-slate-500 text-[9px] font-black uppercase px-2 py-0.5 rounded-md border border-slate-100">
+                                          {item.selectedOption.name}
+                                        </span>
+                                      )}
+                                      {item.selectedAddons?.map((addon: any, addonIdx: number) => (
+                                        <span key={addonIdx} className="bg-amber-50 text-amber-600 text-[9px] font-black uppercase px-2 py-0.5 rounded-md border border-amber-100">
+                                          {addon.name}
+                                        </span>
+                                      ))}
+                                    </div>
                                   )}
                                 </div>
-                                <Trash2 className="w-4 h-4 text-gray-300 cursor-pointer hover:text-red-600" onClick={() => tableId ? handleRemoveTableCartItem(item._id || item.menuItemId) : removeFromCart(getUniqueCartKey(item))} />
+
+                                <div className="flex items-center justify-between mt-3">
+                                  <p className="text-red-600 font-black text-base italic" style={{ fontFamily: "'Playfair Display', serif" }}>
+                                    {((item.totalPrice / item.quantity)).toLocaleString()}đ
+                                  </p>
+                                  
+                                  <div className="flex items-center bg-[#fdfaf5] border border-[#f5efde] rounded-full p-1 shadow-sm">
+                                    {tableId ? (
+                                      <>
+                                        <button className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-white rounded-full transition-all active:scale-90" onClick={() => handleUpdateTableCartItemQuantity(item.ids[0], -1)}><Minus className="w-3.5 h-3.5" /></button>
+                                        <span className="w-8 text-center font-bold text-sm">{item.quantity}</span>
+                                        <button className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-white rounded-full transition-all active:scale-90" onClick={() => handleUpdateTableCartItemQuantity(item.ids[0], 1)}><Plus className="w-3.5 h-3.5" /></button>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <button className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-white rounded-full transition-all active:scale-90" onClick={() => updateQuantity(getUniqueCartKey(item), -1)}>-</button>
+                                        <span className="w-8 text-center font-bold text-sm">{item.quantity}</span>
+                                        <button className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-white rounded-full transition-all active:scale-90" onClick={() => updateQuantity(getUniqueCartKey(item), 1)}>+</button>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
                               </div>
-                            </div>
-                          </div>
-                        ))}
+                            </motion.div>
+                          ));
+                        })()}
                       </div>
                     )}
                     {orderedItems.length > 0 && (
@@ -459,28 +502,60 @@ export const MenuPage = () => {
                           <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Món đang phục vụ (Đã gửi bếp)</h3>
                           <div className="h-0.5 flex-1 bg-gray-100" />
                         </div>
-                        {orderedItems.map((item, idx) => (
-                          <div key={item.menuItemId + idx} className="flex gap-4 border-b border-gray-100 pb-6 opacity-80 grayscale-[0.3]">
-                            <img src={item.image ?? ''} className="w-16 h-16 rounded-2xl object-cover" alt="" />
-                            <div className="flex-1">
-                              <h4 className="font-bold italic text-base" style={{ fontFamily: "'Playfair Display', serif" }}>{item.name}</h4>
-                              
-                              {(item.selectedOption || (item.selectedAddons && item.selectedAddons.length > 0)) && (
-                                <div className="mt-0.5 space-y-0.5 mb-1">
-                                  {item.selectedOption && <p className="text-[9px] text-gray-400 italic">• {item.selectedOption.name}</p>}
-                                  {item.selectedAddons?.map((addon: any, addonIdx: number) => (
-                                    <p key={addonIdx} className="text-[9px] text-gray-400 italic">• {addon.name}</p>
-                                  ))}
-                                </div>
-                              )}
+                        {(() => {
+                          const groupedOrderedItems = orderedItems.reduce((acc: any[], item) => {
+                            const addonKey = (item.selectedAddons || []).map((a: any) => a.name).sort().join(',');
+                            const optionKey = item.selectedOption?.name || '';
+                            const key = `${item.name}-${optionKey}-${addonKey}-${item.status}`;
+                            const existing = acc.find(i => i.groupKey === key);
+                            if (existing) {
+                              existing.quantity += item.quantity;
+                            } else {
+                              acc.push({ ...item, groupKey: key });
+                            }
+                            return acc;
+                          }, []);
 
-                              <div className="flex justify-between items-center mt-1">
-                                <p className="text-gray-500 font-medium text-xs">SL: <span className="font-bold text-[#111]">{item.quantity}</span></p>
-                                <span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-[8px] font-black uppercase tracking-widest">{item.status}</span>
+                          return groupedOrderedItems.map((item, idx) => (
+                            <div 
+                              key={item.groupKey + idx} 
+                              className="bg-gray-50/50 rounded-2xl p-4 border border-gray-100 flex gap-4 opacity-80 grayscale-[0.2] group hover:grayscale-0 transition-all duration-500"
+                            >
+                              <div className="w-20 h-20 shrink-0 rounded-none overflow-hidden">
+                                <img src={item.image ?? ''} className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-700" alt="" />
+                              </div>
+
+                              <div className="flex-1 flex flex-col justify-between py-1">
+                                <div>
+                                  <div className="flex justify-between items-start">
+                                    <h4 className="font-bold italic text-base leading-tight pr-2" style={{ fontFamily: "'Playfair Display', serif" }}>{item.name}</h4>
+                                    <span className="px-2 py-0.5 bg-white text-gray-500 rounded-lg text-[8px] font-black uppercase tracking-widest border border-gray-100 shadow-sm whitespace-nowrap">
+                                      {item.status}
+                                    </span>
+                                  </div>
+                                  
+                                  {(item.selectedOption || (item.selectedAddons && item.selectedAddons.length > 0)) && (
+                                    <div className="mt-1.5 flex flex-wrap gap-1">
+                                      {item.selectedOption && (
+                                        <span className="text-[9px] text-gray-400 italic">• {item.selectedOption.name}</span>
+                                      )}
+                                      {item.selectedAddons?.map((addon: any, addonIdx: number) => (
+                                        <p key={addonIdx} className="text-[9px] text-gray-400 italic pr-2">• {addon.name}</p>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="flex justify-between items-center mt-2">
+                                  <p className="text-gray-400 font-bold text-xs uppercase tracking-tighter">
+                                    Số lượng: <span className="text-[#111] text-sm font-black italic" style={{ fontFamily: "'Playfair Display', serif" }}>{item.quantity}</span>
+                                  </p>
+                                  <div className="h-1.5 w-1.5 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.5)]" />
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        ))}
+                          ));
+                        })()}
                       </div>
                     )}
                   </div>
@@ -491,17 +566,26 @@ export const MenuPage = () => {
                 "space-y-4 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] border-t border-gray-100",
                 isMobile ? "p-5 bg-white/95 backdrop-blur-md" : "p-8 bg-gray-50"
               )}>
-                <div className="flex justify-between items-center px-1">
-                  <span className="text-gray-400 font-bold uppercase text-[10px] tracking-widest italic">Tổng cộng</span>
-                  <span className="text-2xl font-black text-red-600 italic" style={{ fontFamily: "'Playfair Display', serif" }}>
-                    {displayTotalPrice.toLocaleString()}đ
-                  </span>
+                <div className="bg-[#111] rounded-2xl p-6 text-white shadow-xl relative overflow-hidden group">
+                  <div className="absolute inset-0 bg-gradient-to-br from-red-600/20 to-transparent opacity-50" />
+                  <div className="relative z-10 flex justify-between items-center">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 mb-1">Thanh toán</p>
+                      <h3 className="text-2xl font-black italic tracking-tight" style={{ fontFamily: "'Playfair Display', serif" }}>Tổng cộng</h3>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[10px] font-black text-red-400 mb-1 uppercase">{displayTotalItems} món ăn</p>
+                      <span className="text-3xl font-black text-white italic" style={{ fontFamily: "'Playfair Display', serif" }}>
+                        {displayTotalPrice.toLocaleString()}đ
+                      </span>
+                    </div>
+                  </div>
                 </div>
 
                 {orderedItems.length > 0 && (
                   <button
                     onClick={() => { setIsCartOpen(false); navigate(`/table/${tableId}/tracking`); }}
-                    className="w-full py-3 bg-blue-50 text-blue-600 rounded-2xl font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-blue-100 transition-colors border border-blue-100 animate-pulse"
+                    className="w-full py-3 bg-blue-50 text-blue-600 rounded-xl font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-blue-100 transition-colors border border-blue-100 animate-pulse"
                   >
                     🔍 Theo dõi trạng thái món đã đặt
                   </button>
@@ -526,7 +610,7 @@ export const MenuPage = () => {
                       }
                     }}
                     className={cn(
-                      "w-full py-4 rounded-2xl font-black italic uppercase transition-all shadow-xl text-xs flex items-center justify-center gap-2",
+                      "w-full py-4 rounded-xl font-black italic uppercase transition-all shadow-xl text-xs flex items-center justify-center gap-2",
                       canCheckout ? "bg-[#111] text-white hover:bg-red-600 active:scale-95" : "bg-gray-200 text-gray-400 cursor-not-allowed"
                     )}
                   >

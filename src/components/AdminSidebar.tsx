@@ -46,7 +46,6 @@ export const AdminSidebar = ({ isOpen, onClose }: AdminSidebarProps) => {
     { icon: ShoppingCart, label: 'Đơn hàng', path: '/admin/orders' },
     { icon: CreditCard, label: 'Thanh toán', path: '/admin/payments' },
     // { icon: HandCoins, label: 'Yêu cầu thanh toán', path: '/admin/payment-requests' },
-    { icon: Landmark, label: 'Ngân hàng', path: '/admin/bank-accounts' },
     { icon: UserIcon, label: 'Nhân viên', path: '/admin/users' },
     { icon: BarChart3, label: 'Báo cáo', path: '/admin/reports' },
     { icon: Bell, label: 'Thông báo', path: '/admin/notifications' },

@@ -4,7 +4,7 @@ import axios, { AxiosHeaders } from 'axios';
 import App from './App.tsx';
 import './index.css';
 
-axios.defaults.baseURL = 'http://localhost:3001';
+axios.defaults.baseURL = window.location.origin;
 
 const bootToken = localStorage.getItem('qr_dine_token');
 if (bootToken) {

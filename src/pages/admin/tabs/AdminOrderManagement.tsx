@@ -226,17 +226,30 @@ export const AdminOrderManagement = () => {
                   {/* Card Main Header */}
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-5">
-                      <div className="w-16 h-16 bg-slate-900 rounded-[2rem] flex items-center justify-center text-white shadow-xl shadow-slate-900/10 border-4 border-white">
-                        <span className="text-xl font-serif font-black">{tableNameMap[order.tableId] || order.tableId}</span>
+                      <div className={cn(
+                        "w-16 h-16 rounded-[2rem] flex items-center justify-center text-white shadow-xl border-4 border-white",
+                        order.orderType === 'delivery' ? "bg-red-600" : order.orderType === 'takeaway' ? "bg-amber-500" : "bg-slate-900"
+                      )}>
+                        <span className="text-xl font-serif font-black">
+                          {order.orderType === 'delivery' ? 'D' : order.orderType === 'takeaway' ? 'T' : (tableNameMap[order.tableId] || order.tableId).replace('Bàn ', '')}
+                        </span>
                       </div>
                       <div>
-                        <h4 className="text-xl font-bold font-serif text-gray-900">Bàn {tableNameMap[order.tableId] || order.tableId}</h4>
+                        <h4 className="text-xl font-bold font-serif text-gray-900">
+                          {order.orderType === 'delivery' ? 'Đơn Giao Hàng' : order.orderType === 'takeaway' ? 'Đơn Mang Về' : (tableNameMap[order.tableId] || order.tableId).startsWith('Bàn') ? (tableNameMap[order.tableId] || order.tableId) : `Bàn ${tableNameMap[order.tableId] || order.tableId}`}
+                        </h4>
                         <div className="flex items-center gap-2 mt-1">
                           <span className={cn(
                             "inline-flex items-center justify-center px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-[0.15em] border whitespace-nowrap",
                             getStatusColor(order.status)
                           )}>
                             {getStatusLabel(order.status)}
+                          </span>
+                          <span className={cn(
+                            "inline-flex items-center justify-center px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border",
+                            order.paymentMethod === 'transfer' ? "bg-purple-100 text-purple-600 border-purple-200" : "bg-blue-100 text-blue-600 border-blue-200"
+                          )}>
+                             {order.paymentMethod === 'transfer' ? 'Chuyển khoản' : 'Tiền mặt'}
                           </span>
                           <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest">#{orderId.slice(-6).toUpperCase()}</span>
                         </div>
@@ -256,37 +269,76 @@ export const AdminOrderManagement = () => {
                   <div className="bg-bg/50 rounded-[1.5rem] p-6 border border-gray-50">
                     <p className="text-[10px] font-black uppercase text-gray-400 tracking-[0.2em] mb-4">Chi tiết món ăn</p>
                     <div className="space-y-4 max-h-[200px] overflow-y-auto no-scrollbar pr-2">
-                      {order.items.map((item, idx) => (
-                        <div key={idx} className="flex items-center justify-between group">
-                          <div className="flex flex-col gap-1">
-                            <div className="flex items-center gap-3">
-                              <div className="w-1.5 h-1.5 bg-brand rounded-full opacity-40 group-hover:opacity-100 group-hover:scale-125 transition-all" />
-                              <p className="font-bold text-gray-800 text-sm">{item.name}</p>
+                      {(() => {
+                        // Grouping Logic
+                        const groupedItems = order.items.reduce((acc: any[], item) => {
+                          const addonKey = (item.selectedAddons || [])
+                            .map((a: any) => a.name)
+                            .sort()
+                            .join(',');
+                          const optionKey = item.selectedOption?.name || '';
+                          const key = `${item.name}-${optionKey}-${addonKey}`;
+
+                          const existing = acc.find(i => i.groupKey === key);
+                          if (existing) {
+                            existing.quantity += (item.quantity || 1);
+                            existing.totalPrice += (item.totalPrice ?? item.basePrice ?? item.price ?? 0);
+                          } else {
+                            acc.push({ 
+                              ...item, 
+                              groupKey: key,
+                              quantity: item.quantity || 1,
+                              totalPrice: item.totalPrice ?? item.basePrice ?? item.price ?? 0
+                            });
+                          }
+                          return acc;
+                        }, []);
+
+                        return groupedItems.map((item, idx) => (
+                          <div key={idx} className="bg-white rounded-2xl p-3 border border-gray-100 flex gap-4 group hover:border-brand/30 transition-all duration-300">
+                            {/* Item Image */}
+                            <div className="w-16 h-16 shrink-0 rounded-xl overflow-hidden shadow-sm">
+                               <img 
+                                 src={item.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=1760&auto=format&fit=crop'} 
+                                 className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" 
+                                 alt={item.name} 
+                               />
                             </div>
-                            {/* Options & Addons display for Kitchen */}
-                            {(item.selectedOption || (item.selectedAddons && item.selectedAddons.length > 0)) && (
-                              <div className="ml-5 flex flex-wrap gap-2">
-                                {item.selectedOption && (
-                                  <span className="text-[9px] font-black bg-slate-100 text-slate-500 px-2 py-0.5 rounded uppercase tracking-tighter">
-                                    Size: {item.selectedOption.name}
-                                  </span>
+
+                            <div className="flex-1 flex flex-col justify-between py-0.5">
+                              <div>
+                                <div className="flex justify-between items-start gap-2">
+                                  <p className="font-bold text-gray-800 text-sm leading-tight">{item.name}</p>
+                                  <span className="text-[10px] font-black text-gray-400 whitespace-nowrap">x{item.quantity}</span>
+                                </div>
+                                
+                                {/* Options & Addons display */}
+                                {(item.selectedOption || (item.selectedAddons && item.selectedAddons.length > 0)) && (
+                                  <div className="mt-1.5 flex flex-wrap gap-1">
+                                    {item.selectedOption && (
+                                      <span className="text-[8px] font-black bg-slate-50 text-slate-500 px-1.5 py-0.5 rounded border border-slate-100 uppercase">
+                                        {item.selectedOption.name}
+                                      </span>
+                                    )}
+                                    {item.selectedAddons?.map((addon: any, aIdx: number) => (
+                                      <span key={aIdx} className="text-[8px] font-black bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded border border-amber-100 uppercase">
+                                        + {addon.name}
+                                      </span>
+                                    ))}
+                                  </div>
                                 )}
-                                {item.selectedAddons?.map((addon: any, aIdx: number) => (
-                                  <span key={aIdx} className="text-[9px] font-black bg-amber-50 text-amber-600 px-2 py-0.5 rounded uppercase tracking-tighter">
-                                    + {addon.name}
-                                  </span>
-                                ))}
                               </div>
-                            )}
+
+                              <div className="flex items-center justify-between mt-1">
+                                <span className="text-xs font-black text-brand italic">
+                                  {Number(item.totalPrice).toLocaleString()}đ
+                                </span>
+                                <div className="h-1 w-1 bg-brand rounded-full opacity-30" />
+                              </div>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-4">
-                            <span className="text-[10px] font-black text-gray-400 uppercase">x{item.quantity}</span>
-                            <span className="text-xs font-bold text-gray-900">
-                              {Number(item.totalPrice ?? item.basePrice ?? item.price ?? 0).toLocaleString()}đ
-                            </span>
-                          </div>
-                        </div>
-                      ))}
+                        ));
+                      })()}
                     </div>
                   </div>
 
@@ -307,7 +359,7 @@ export const AdminOrderManagement = () => {
                         className="flex-1 bg-brand text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all shadow-lg shadow-brand/20 flex items-center justify-center gap-2"
                       >
                         <CreditCard className="w-4 h-4" />
-                        Thu tiền & Đóng bàn
+                        {order.paymentStatus === 'paid' ? 'Hoàn thành & Chốt đơn' : 'Thu tiền & Đóng bàn'}
                       </button>
                     )}
 

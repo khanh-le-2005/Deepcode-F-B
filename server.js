@@ -31,6 +31,7 @@ import bankAccountRoutes from "./backend/src/routes/bankAccountRoutes.js";
 import categoryRoutes from "./backend/src/routes/categoryRoutes.js";
 import weeklyMenuRoutes from "./backend/src/routes/weeklyMenuRoutes.js";
 import userRoutes from "./backend/src/routes/userRoutes.js";
+import { startAutoCleanup } from "./backend/src/jobs/autoCleanup.js";
 async function startServer() {
   // Connect to MongoDB
   await connectDB();
@@ -44,10 +45,9 @@ async function startServer() {
   const io = new Server(httpServer, {
     cors: {
       origin: [
-       
         "http://localhost:3000",
         "http://localhost:3001",
-
+        "http://150.95.115.212:3001",
       ],
       credentials: true,
     },
@@ -59,9 +59,9 @@ async function startServer() {
   app.use(
     cors({
       origin: [
-
         "http://localhost:3000",
         "http://localhost:3001",
+        "http://150.95.115.212:3001",
         "http://127.0.0.1:5500",
       ],
       methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
@@ -169,6 +169,9 @@ max: 1000,
 
   httpServer.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
+
+    // 🚀 Khởi động Auto-Cleanup: Tự hủy đơn Kiosk chuyển khoản quá 15 phút
+    startAutoCleanup(io);
   });
 }
 

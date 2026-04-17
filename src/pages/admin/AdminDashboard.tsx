@@ -12,7 +12,6 @@ import { AdminOrderManagement } from './tabs/AdminOrderManagement';
 import { AdminPayments } from './tabs/AdminPayments';
 import { AdminReports } from './tabs/AdminReports';
 import { AdminSettings } from './tabs/AdminSettings';
-import { AdminBankAccounts } from './tabs/AdminBankAccounts';
 import { AdminUserManagement } from './tabs/AdminUserManagement';
 import { AdminPaymentRequests } from './tabs/AdminPaymentRequests';
 import { AdminNotifications } from './tabs/AdminNotifications';
@@ -33,7 +32,6 @@ export const AdminDashboard = () => {
         <Route path="order-history" element={<AdminOrderHistory />} />
         <Route path="orders" element={<AdminOrderManagement />} />
         <Route path="payments" element={<AdminPayments />} />
-        <Route path="bank-accounts" element={<AdminBankAccounts />} />
         <Route path="reports" element={<AdminReports />} />
         <Route path="settings" element={<AdminSettings />} />
         <Route path="users" element={<AdminUserManagement />} />

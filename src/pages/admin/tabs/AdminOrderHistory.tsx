@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, CalendarRange, ChevronLeft, ChevronRight, History, ReceiptText, Clock3, CheckCircle2, XCircle } from 'lucide-react';
+import { Search, CalendarRange, ChevronLeft, ChevronRight, History, ReceiptText, Clock3, CheckCircle2, XCircle, MapPin } from 'lucide-react';
 import axios from '@/src/lib/axiosClient';
 import { Order, Payment } from '../../../types';
 import { Button } from '../../../components/Button';
 import { cn } from '../../../lib/cn';
 import axiosClient from '@/src/lib/axiosClient';
+import { io } from 'socket.io-client';
+
+const socket = io();
 
 type HistoryResponse = {
   orders: Order[];
@@ -28,6 +31,7 @@ export const AdminOrderHistory = () => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [meta, setMeta] = useState({ total: 0, totalPages: 1 });
+  const [selectedOrderDetails, setSelectedOrderDetails] = useState<Order | null>(null);
 
   // Payment tab states
   const [activeTab, setActiveTab] = useState<'orders' | 'payments'>('orders');
@@ -41,7 +45,23 @@ export const AdminOrderHistory = () => {
 
   useEffect(() => {
     if (activeTab === 'payments') fetchPayments();
-  }, [activeTab]);
+    
+    // Live update when a new payment via Kiosk/Transfer completes
+    const handleOrderPaid = () => {
+      if (activeTab === 'payments') {
+        fetchPayments();
+      }
+      if (activeTab === 'orders') {
+        fetchHistory(); // Re-fetch partially or fully to update the 'UNPAID' badge to 'PAID'
+      }
+    };
+    
+    socket.on('order-paid', handleOrderPaid);
+    
+    return () => {
+      socket.off('order-paid', handleOrderPaid);
+    };
+  }, [activeTab, page, limit, startDate, endDate]);
 
   const fetchHistory = async () => {
     setLoading(true);
@@ -115,8 +135,8 @@ export const AdminOrderHistory = () => {
   }, [payments, paymentSearch]);
 
   const statusLabel = (status: string) => {
-    if (status === 'completed') return 'Đã thanh toán';
-    if (status === 'cancelled') return 'Đã huỷ';
+    if (status === 'completed') return 'ĐÃ CHỐT ĐƠN';
+    if (status === 'cancelled') return 'ĐÃ HUỶ';
     return status;
   };
 
@@ -259,6 +279,7 @@ export const AdminOrderHistory = () => {
                     <th className="px-8 py-6 text-xs font-black uppercase tracking-widest text-gray-400">Số món</th>
                     <th className="px-8 py-6 text-xs font-black uppercase tracking-widest text-gray-400">Thời gian chốt</th>
                     <th className="px-8 py-6 text-xs font-black uppercase tracking-widest text-gray-400">Trạng thái</th>
+                    <th className="px-8 py-6 text-xs font-black uppercase tracking-widest text-gray-400 text-right">Thao tác</th>
                   </>
                 ) : (
                   <>
@@ -299,13 +320,20 @@ export const AdminOrderHistory = () => {
                         <td className="px-8 py-6">
                           <div className="space-y-1">
                             <span className="text-sm font-bold text-gray-900">#{orderId.slice(-8).toUpperCase()}</span>
-                            <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">{order.paymentStatus}</p>
                           </div>
                         </td>
                         <td className="px-8 py-6">
                           <div className="space-y-1">
-                            <p className="text-sm font-bold text-gray-800">{"Bàn " + order.tableName || 'Chưa xác định'}</p>
-                            {/* <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">{"bàn " + order.tableName}</p> */}
+                            <p className="text-sm font-bold text-gray-800">
+                              {order.orderType === 'delivery' ? 'Giao hàng' : order.orderType === 'takeaway' ? 'Mang về' : 'Tại bàn'}
+                              {' - '}
+                              {String(order.tableName || order.tableId || 'Không rõ').replace('Bàn ', 'Bàn ')}
+                            </p>
+                            {order.customerInfo && (order.orderType === 'delivery' || order.orderType === 'takeaway') && (
+                               <p className="text-[10px] font-black uppercase tracking-widest text-gray-500 line-clamp-2 max-w-[200px]">
+                                  {order.customerInfo.phone} {order.customerInfo.deliveryAddress && `- ${order.customerInfo.deliveryAddress}`}
+                               </p>
+                            )}
                           </div>
                         </td>
                         <td className="px-8 py-6">
@@ -329,6 +357,9 @@ export const AdminOrderHistory = () => {
                           <span className={cn("inline-flex items-center justify-center px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border whitespace-nowrap", statusColor(order.status))}>
                             {statusLabel(order.status)}
                           </span>
+                        </td>
+                        <td className="px-8 py-6 text-right">
+                          <button onClick={() => setSelectedOrderDetails(order)} className="px-5 py-2.5 bg-brand/10 text-brand hover:bg-brand hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap">Chi tiết</button>
                         </td>
                       </motion.tr>
                     );
@@ -470,6 +501,126 @@ export const AdminOrderHistory = () => {
               Sau <ChevronRight className="w-4 h-4 ml-2" />
             </Button>
           </div>
+        </div>
+      )}
+
+      {/* Order Details Modal */}
+      {selectedOrderDetails && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-slate-900/50 backdrop-blur-sm">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white w-full max-w-2xl rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]"
+          >
+            <div className="w-full flex items-center justify-between p-6 border-b border-gray-100 bg-gray-50 shrink-0">
+              <h3 className="text-xl font-black text-gray-900 font-serif">
+                Chi tiết Đơn hàng #{((selectedOrderDetails as any)._id || selectedOrderDetails.id)?.slice(-8).toUpperCase()}
+              </h3>
+              <button onClick={() => setSelectedOrderDetails(null)} className="p-2 hover:bg-gray-200 rounded-full transition-colors text-gray-500">
+                <XCircle className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+              <div className="grid grid-cols-2 gap-6 mb-8">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">Loại đơn & Bàn</p>
+                  <p className="font-bold text-gray-900 text-base">
+                    {selectedOrderDetails.orderType === 'delivery' ? '🚗 Giao hàng' : selectedOrderDetails.orderType === 'takeaway' ? '🥡 Mang về' : '🍽️ Tại bàn'}
+                    {' - '}
+                    {(() => {
+                      const name = String(selectedOrderDetails.tableName || selectedOrderDetails.tableId || 'Không rõ');
+                      // Nếu tên đã bắt đầu bằng "Mang về" hoặc "Giao hàng", hãy làm đẹp nó
+                      if (name.includes(' - ')) {
+                        return name.split(' - ').slice(1).join(' - '); // Chỉ lấy phần phone/address sau dấu gạch
+                      }
+                      return name.replace('Bàn ', '');
+                    })()}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">Thời gian tạo</p>
+                  <p className="font-bold text-gray-900 text-base">
+                    {new Date(selectedOrderDetails.createdAt).toLocaleString('vi-VN')}
+                  </p>
+                </div>
+              </div>
+
+              {selectedOrderDetails.customerInfo && (selectedOrderDetails.orderType === 'delivery' || selectedOrderDetails.orderType === 'takeaway') && (
+                <div className="bg-brand/5 border border-brand/20 rounded-2xl p-5 mb-8">
+                  <h4 className="text-[10px] font-black uppercase tracking-widest text-brand mb-4 flex items-center gap-2">
+                    <ReceiptText className="w-4 h-4" /> THÔNG TIN KHÁCH HÀNG (SHIPPER CHÚ Ý)
+                  </h4>
+                  <div className="space-y-3">
+                    {selectedOrderDetails.customerInfo.name && (
+                      <div className="flex justify-between items-start">
+                        <span className="text-sm font-medium text-gray-600">Tên khách:</span>
+                        <span className="text-sm font-bold text-gray-900 text-right">{selectedOrderDetails.customerInfo.name}</span>
+                      </div>
+                    )}
+                    {selectedOrderDetails.customerInfo.phone && (
+                      <div className="flex justify-between items-start">
+                        <span className="text-sm font-medium text-gray-600">Điện thoại:</span>
+                        <span className="text-sm font-bold text-brand bg-white px-2 py-0.5 border rounded-md shadow-sm">{selectedOrderDetails.customerInfo.phone}</span>
+                      </div>
+                    )}
+                    {selectedOrderDetails.customerInfo.deliveryAddress && (
+                      <div className="flex flex-col gap-1 mt-2 p-4 bg-white rounded-xl border-2 border-brand/20 shadow-sm animate-pulse-slow">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-brand flex items-center gap-1">
+                          <MapPin className="w-3 h-3" /> ĐỊA CHỈ GIAO HÀNG TẬN TAY:
+                        </span>
+                        <span className="text-base font-black text-gray-900">{selectedOrderDetails.customerInfo.deliveryAddress}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-4">Danh sách món ({selectedOrderDetails.items.filter(i => i.status !== 'cancelled').reduce((acc, i) => acc + (i.quantity || 1), 0)} món)</p>
+                <div className="space-y-3">
+                  {selectedOrderDetails.items.filter(i => i.status !== 'cancelled').map((item, idx) => (
+                    <div key={idx} className="flex gap-4 p-4 border border-gray-100 rounded-xl items-center bg-gray-50/50">
+                      <div className="w-12 h-12 rounded-lg bg-gray-200 overflow-hidden shrink-0">
+                        <img 
+                          src={item.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=1760&auto=format&fit=crop'} 
+                          alt={item.name}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-bold text-gray-900 text-sm">{item.name}</p>
+                        {item.selectedOption && <p className="text-[10px] font-bold text-gray-500">Kích cỡ: {item.selectedOption.name}</p>}
+                        {item.selectedAddons && item.selectedAddons.length > 0 && (
+                          <p className="text-[10px] font-bold text-gray-500 line-clamp-1">
+                            Thêm: {item.selectedAddons.map(a => a.name).join(', ')}
+                          </p>
+                        )}
+                        {item.note && <p className="text-[10px] text-orange-500 italic mt-0.5 bg-orange-50 w-fit px-1.5 py-0.5 rounded">Ghi chú: {item.note}</p>}
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-xs font-black text-gray-400 mb-1">x{item.quantity}</p>
+                        <p className="text-sm font-black text-brand">{(item.totalPrice ?? item.basePrice ?? item.price ?? 0).toLocaleString()}đ</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            
+            <div className="p-6 border-t border-gray-100 bg-white flex justify-between items-center shrink-0">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">Tổng cộng hóa đơn</p>
+                <p className="text-2xl font-black text-brand tracking-tight">{Number(selectedOrderDetails.total || 0).toLocaleString()}đ</p>
+              </div>
+              <button 
+                onClick={() => setSelectedOrderDetails(null)}
+                className="px-6 py-3 bg-gray-100 text-gray-600 font-black text-xs uppercase tracking-widest hover:bg-gray-200 active:scale-95 transition-all rounded-xl"
+              >
+                Đóng lại
+              </button>
+            </div>
+          </motion.div>
         </div>
       )}
     </div>

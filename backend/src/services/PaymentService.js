@@ -146,9 +146,10 @@ class PaymentService {
       order.status = "active";
       order.items.forEach(item => {
         if (item.status === "awaiting_payment") {
-          item.status = "pending_approval";
+          item.status = "cooking";
         }
       });
+      order.markModified("items"); // ĐẢM BẢO MONGOOSE LƯU TRẠNG THÁI ITEMS
     } else {
       order.status = "completed";
       order.completedAt = new Date();
@@ -159,6 +160,7 @@ class PaymentService {
     await order.save();
 
     const orderData = await Order.findById(order._id);
+
     let tableNameStr = orderData?.tableName;
     if (!tableNameStr && orderData?.tableId) {
       // Dự phòng: Nếu order cũ không có tableName, tìm trong bảng Table
@@ -195,6 +197,21 @@ class PaymentService {
     if (io) {
       io.emit("order-paid", { orderId: order._id, paymentStatus: "paid" });
       io.emit("order-updated", order);
+      
+      // Nếu là Kiosk vừa mới được trả tiền (từ awaiting_payment -> pending_approval), 
+      // hệ thống phải đánh chuông BẾP như 1 đơn mới.
+      if (isKiosk) {
+        io.emit("new-order", order);
+        
+        io.emit("notification:kitchen", {
+          type: "warning",
+          title: "Bếp chú ý: Có đơn Kiosk mới",
+          message: `Đơn [${order.tableName}] vừa thanh toán thành công, vui lòng chuẩn bị món!`,
+          orderId: order._id,
+          sound: "kitchen_ticket.mp3"
+        });
+      }
+
       io.emit("tables-updated", await Table.find());
 
       // ---------- THÊM NOTIFICATION CHUẨN Ở ĐÂY ----------

@@ -62,9 +62,9 @@ async function cancelExpiredKioskOrders(io) {
       order.completedByName = "Hệ thống tự động (Auto-Cancel 15p)";
       await order.save();
 
-      // 2c. Giải phóng bàn ảo
+      // 2c. Xóa bàn ảo (vì là bàn Kiosk nên không cần giữ lại)
       if (order.tableId) {
-        await Table.findByIdAndUpdate(order.tableId, { status: "empty" });
+        await Table.findByIdAndDelete(order.tableId);
       }
 
       // 2d. Gửi Socket.io thông báo

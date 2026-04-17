@@ -49,7 +49,7 @@ export const KitchenDisplay = () => {
         const updatedId = (updatedOrder as any)._id || updatedOrder.id;
         const exists = prev.some(o => ((o as any)._id === updatedId || o.id === updatedId));
         if (!exists) {
-          const relevant = updatedOrder.items.some(i => i.status === 'pending_approval' || i.status === 'cooking');
+          const relevant = updatedOrder.items.some(i => i.status === 'cooking');
           if (relevant) return [updatedOrder, ...prev];
           return prev;
         }
@@ -81,7 +81,7 @@ export const KitchenDisplay = () => {
       .then(res => {
         const activeOrders = (res.data || []).filter((o: Order) => {
           if (o.status !== 'active') return false;
-          return o.items.some(i => i.status === 'pending_approval' || i.status === 'cooking');
+          return o.items.some(i => i.status === 'cooking');
         });
         setOrders(activeOrders);
       })
@@ -207,7 +207,7 @@ export const KitchenDisplay = () => {
           <AnimatePresence mode="popLayout">
             {orders.map((order, i) => {
               const orderId = (order as any)._id || order.id;
-              const kitchenItems = order.items.filter(i => i.status === 'pending_approval' || i.status === 'cooking');
+              const kitchenItems = order.items.filter(i => i.status === 'cooking');
               if (kitchenItems.length === 0) return null;
 
               const isAnyCooking = kitchenItems.some(i => i.status === 'cooking');
@@ -254,17 +254,7 @@ export const KitchenDisplay = () => {
 
                   {/* Items List */}
                   <div className="p-5 flex-1 flex flex-col gap-4">
-                    {kitchenItems.some(item => item.status === 'pending_approval') && (
-                      <button
-                        onClick={() => approveAllItems(orderId)}
-                        className={cn(
-                          "w-full py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all",
-                          isDark ? "bg-white/5 text-slate-300 hover:bg-white/10" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                        )}
-                      >
-                        Duyệt tất cả
-                      </button>
-                    )}
+                    {/* Nút Duyệt đã được gỡ bỏ để tránh nhầm lẫn với luồng Admin */}
 
                     <div className="space-y-3">
                       {kitchenItems.map((item, idx) => {
@@ -297,14 +287,7 @@ export const KitchenDisplay = () => {
                             </div>
 
                             <div className="mt-4 flex gap-2">
-                              {item.status === 'pending_approval' ? (
-                                <button
-                                  onClick={() => updateItemStatus(orderId, itemId, 'cooking')}
-                                  className="w-full h-11 bg-brand text-white rounded-xl font-bold text-[10px] uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-lg shadow-brand/20"
-                                >
-                                  <Play className="w-3.5 h-3.5 fill-current" /> Bắt đầu nấu
-                                </button>
-                              ) : (
+                              {isCooking && (
                                 <>
                                   <button
                                     onClick={() => updateItemStatus(orderId, itemId, 'pending_approval')}

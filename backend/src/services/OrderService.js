@@ -30,7 +30,7 @@ class OrderService {
   }
 
   async getOrders() {
-    return Order.find().sort({ createdAt: -1 });
+    return Order.find({ status: "active" }).sort({ updatedAt: -1 });
   }
 
   async getOrderById(id) {

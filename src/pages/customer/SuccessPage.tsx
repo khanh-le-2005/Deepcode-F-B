@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Check, ClipboardList } from 'lucide-react';
+import { Check, ClipboardList, X } from 'lucide-react';
 import axios from '@/src/lib/axiosClient';
 import { Button } from '../../components/Button';
 import { InvalidTable } from '../../components/InvalidTable';
@@ -11,6 +11,7 @@ export const SuccessPage = () => {
   const { tableId } = useParams();
   const [searchParams] = useSearchParams();
   const orderId = searchParams.get('orderId');
+  const isCancelled = searchParams.get('cancel') === 'true'; // Thêm check hủy thanh toán
   const navigate = useNavigate();
   const { status } = useTableValidation(tableId);
   const [order, setOrder] = useState<any>(null);
@@ -66,7 +67,7 @@ export const SuccessPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#8b7d51] flex flex-col items-center pt-12 pb-10 px-6 font-sans">
+    <div className={`min-h-screen ${isCancelled ? 'bg-rose-800' : 'bg-[#8b7d51]'} flex flex-col items-center pt-12 pb-10 px-6 font-sans transition-colors duration-500`}>
       {/* Icon & Status Section */}
       <motion.div
         initial={{ scale: 0.8, opacity: 0 }}
@@ -74,10 +75,18 @@ export const SuccessPage = () => {
         className="flex flex-col items-center mb-8"
       >
         <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center mb-4 shadow-lg">
-          <Check className="w-14 h-14 text-[#8b7d51] stroke-[3px]" />
+          {isCancelled ? (
+            <X className="w-14 h-14 text-rose-600 stroke-[3px]" />
+          ) : (
+            <Check className="w-14 h-14 text-[#8b7d51] stroke-[3px]" />
+          )}
         </div>
-        <h1 className="text-white text-3xl font-medium mb-1">Thanh toán xong!</h1>
-        <p className="text-white/80 text-sm">Hẹn gặp lại quý khách</p>
+        <h1 className="text-white text-3xl font-medium mb-1">
+          {isCancelled ? 'Thanh toán đã hủy' : 'Thanh toán xong!'}
+        </h1>
+        <p className="text-white/80 text-sm">
+          {isCancelled ? 'Bạn đã hủy quá trình thanh toán' : 'Hẹn gặp lại quý khách'}
+        </p>
       </motion.div>
 
       {/* Receipt Container */}
@@ -169,8 +178,16 @@ export const SuccessPage = () => {
         }}></div>
       </motion.div>
 
-      {/* Action Button */}
-      <div className="mt-16 w-full max-w-md">
+      {/* Action Buttons */}
+      <div className="mt-16 w-full max-w-md flex flex-col gap-4">
+        {(!isCancelled && (order?.id || order?._id)) && (
+          <Button 
+            onClick={() => navigate(`/tracking/${order.id || order._id}`)} 
+            className="w-full bg-white text-[#8b7d51] hover:bg-white/90 border-none py-5 rounded-2xl font-black uppercase tracking-widest shadow-xl active:scale-95 transition-all"
+          >
+            Theo dõi trạng thái món
+          </Button>
+        )}
         <Button 
           onClick={() => tableId ? navigate(`/table/${tableId}/menu`) : navigate('/kiosk')} 
           className="w-full bg-white/20 hover:bg-white/30 text-white border-white/40 border py-5 rounded-2xl font-black uppercase tracking-widest backdrop-blur-sm transition-all shadow-xl active:scale-95"

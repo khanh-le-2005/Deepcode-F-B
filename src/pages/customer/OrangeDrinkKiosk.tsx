@@ -6,6 +6,9 @@ import {
   CreditCard, Banknote, X, Loader2, ArrowRight, Leaf, Sparkles, Download
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { io } from 'socket.io-client';
+
+const socket = io();
 
 // --- Cấu hình API theo tài liệu ---
 const BASE_URL = window.location.origin + '/api';
@@ -33,32 +36,26 @@ export default function FreshLemonTeaKiosk() {
   const [customerInfo, setCustomerInfo] = useState({ name: '', phone: '', deliveryAddress: '', note: '' });
   const [qrResponse, setQrResponse] = useState<{ qrBase64: string; paymentContent: string; orderId?: string; tableId?: string } | null>(null);
 
-  // Cập nhật trạng thái thanh toán tự động
+  // Cập nhật trạng thái thanh toán tự động qua Socket.io
   useEffect(() => {
-    console.log("QR response changed:", qrResponse);
     if (!qrResponse?.orderId) return;
 
-    console.log("Starting polling for orderId:", qrResponse.orderId);
-    const interval = setInterval(async () => {
-      try {
-        console.log("Fetching status for order:", qrResponse.orderId);
-        const res = await fetch(`${BASE_URL}/orders/${qrResponse.orderId}/status`);
-        const data = await res.json();
-        console.log("Status API response:", data);
-        if (data && data.paymentStatus === 'paid') {
-          clearInterval(interval);
-          setQrResponse(null);
-          setCart([]);
-          setIsModalOpen(false);
-          setCustomerInfo({ name: '', phone: '', deliveryAddress: '', note: '' });
-          navigate(`/success?orderId=${qrResponse.orderId}`);
-        }
-      } catch (err) {
-        console.error("Lỗi mạng khi polling status", err);
+    const handleOrderPaid = (data: { orderId: string, paymentStatus: string }) => {
+      if (data.orderId === qrResponse.orderId && data.paymentStatus === 'paid') {
+        setQrResponse(null);
+        setCart([]);
+        setIsModalOpen(false);
+        setCustomerInfo({ name: '', phone: '', deliveryAddress: '', note: '' });
+        navigate(`/success?orderId=${qrResponse.orderId}`);
       }
-    }, 3000);
-    return () => clearInterval(interval);
-  }, [qrResponse]);
+    };
+
+    socket.on('order-paid', handleOrderPaid);
+
+    return () => {
+      socket.off('order-paid', handleOrderPaid);
+    };
+  }, [qrResponse, navigate]);
 
   useEffect(() => {
     const initData = async () => {
@@ -270,7 +267,7 @@ export default function FreshLemonTeaKiosk() {
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-[#4A3728]/40 backdrop-blur-md" onClick={() => setIsModalOpen(false)}></div>
-          <div className="relative bg-white w-full max-w-5xl rounded-[50px] overflow-hidden shadow-3xl flex flex-col md:flex-row h-[85vh] border-8 border-white">
+          <div className="relative bg-white w-full max-w-5xl rounded-3xl md:rounded-[50px] overflow-hidden shadow-3xl flex flex-col md:flex-row h-[90vh] md:h-[85vh] border-4 md:border-8 border-white">
             {qrResponse ? (
               <motion.div 
                 initial={{ opacity: 0, scale: 0.95 }}
@@ -370,35 +367,35 @@ export default function FreshLemonTeaKiosk() {
               </motion.div>
             ) : (
               <>
-                <div className="flex-1 p-12 overflow-y-auto">
-                  <div className="flex justify-between items-center mb-10">
-                    <h2 className="text-4xl font-black text-orange-600">Giỏ hàng tươi</h2>
+                <div className="flex-1 p-6 md:p-12 overflow-y-auto">
+                  <div className="flex justify-between items-center mb-8 md:mb-10">
+                    <h2 className="text-3xl md:text-4xl font-black text-orange-600">Giỏ hàng tươi</h2>
                     <button onClick={() => setIsModalOpen(false)} className="p-3 bg-yellow-50 rounded-full text-yellow-800"><X/></button>
                   </div>
                   
-                  <div className="grid grid-cols-2 gap-6 mb-12">
-                    <button onClick={() => setOrderType('takeaway')} className={`p-8 rounded-[35px] border-4 transition-all flex flex-col items-center gap-4 ${orderType === 'takeaway' ? 'border-orange-500 bg-orange-50 text-orange-600' : 'border-yellow-50 text-yellow-300'}`}>
-                      <Package size={40}/> <b className="uppercase tracking-widest text-sm">Mang về</b>
+                  <div className="grid grid-cols-2 gap-4 md:gap-6 mb-8 md:mb-12">
+                    <button onClick={() => setOrderType('takeaway')} className={`p-4 md:p-8 rounded-2xl md:rounded-[35px] border-4 transition-all flex flex-col items-center gap-2 md:gap-4 ${orderType === 'takeaway' ? 'border-orange-500 bg-orange-50 text-orange-600' : 'border-yellow-50 text-yellow-300'}`}>
+                      <Package size={32} className="md:w-10 md:h-10"/> <b className="uppercase tracking-widest text-xs md:text-sm">Mang về</b>
                     </button>
-                    <button onClick={() => setOrderType('delivery')} className={`p-8 rounded-[35px] border-4 transition-all flex flex-col items-center gap-4 ${orderType === 'delivery' ? 'border-green-500 bg-green-50 text-green-600' : 'border-yellow-50 text-yellow-300'}`}>
-                      <Truck size={40}/> <b className="uppercase tracking-widest text-sm">Giao hàng</b>
+                    <button onClick={() => setOrderType('delivery')} className={`p-4 md:p-8 rounded-2xl md:rounded-[35px] border-4 transition-all flex flex-col items-center gap-2 md:gap-4 ${orderType === 'delivery' ? 'border-green-500 bg-green-50 text-green-600' : 'border-yellow-50 text-yellow-300'}`}>
+                      <Truck size={32} className="md:w-10 md:h-10"/> <b className="uppercase tracking-widest text-xs md:text-sm">Giao hàng</b>
                     </button>
                   </div>
 
-                  <div className="space-y-6 mb-12">
-                    <input type="text" className="w-full px-8 py-5 bg-[#FEF9E7] border-none rounded-3xl focus:ring-4 focus:ring-orange-200 outline-none font-bold" placeholder="Tên khách hàng thân yêu" onChange={e => setCustomerInfo({...customerInfo, name: e.target.value})} />
-                    <input type="tel" className="w-full px-8 py-5 bg-[#FEF9E7] border-none rounded-3xl focus:ring-4 focus:ring-orange-200 outline-none font-bold" placeholder="Số điện thoại liên lạc" onChange={e => setCustomerInfo({...customerInfo, phone: e.target.value})} />
-                    {orderType === 'delivery' && <textarea className="w-full px-8 py-5 bg-[#FEF9E7] border-none rounded-3xl focus:ring-4 focus:ring-orange-200 outline-none font-bold" rows={2} placeholder="Địa chỉ giao hàng tận tay..." onChange={e => setCustomerInfo({...customerInfo, deliveryAddress: e.target.value})} />}
+                  <div className="space-y-4 md:space-y-6 mb-8 md:mb-12">
+                    <input type="text" className="w-full px-6 py-4 md:px-8 md:py-5 bg-[#FEF9E7] border-none rounded-2xl md:rounded-3xl focus:ring-4 focus:ring-orange-200 outline-none font-bold" placeholder="Tên khách hàng thân yêu" onChange={e => setCustomerInfo({...customerInfo, name: e.target.value})} />
+                    <input type="tel" className="w-full px-6 py-4 md:px-8 md:py-5 bg-[#FEF9E7] border-none rounded-2xl md:rounded-3xl focus:ring-4 focus:ring-orange-200 outline-none font-bold" placeholder="Số điện thoại liên lạc" onChange={e => setCustomerInfo({...customerInfo, phone: e.target.value})} />
+                    {orderType === 'delivery' && <textarea className="w-full px-6 py-4 md:px-8 md:py-5 bg-[#FEF9E7] border-none rounded-2xl md:rounded-3xl focus:ring-4 focus:ring-orange-200 outline-none font-bold" rows={2} placeholder="Địa chỉ giao hàng tận tay..." onChange={e => setCustomerInfo({...customerInfo, deliveryAddress: e.target.value})} />}
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
-                    <button onClick={() => setPaymentMethod('transfer')} className={`p-5 rounded-3xl border-2 transition-all font-bold flex items-center gap-3 justify-center ${paymentMethod === 'transfer' ? 'border-orange-500 bg-orange-500 text-white' : 'border-yellow-100 text-yellow-800'}`}><CreditCard size={18}/> Chuyển khoản</button>
-                    <button onClick={() => setPaymentMethod('cash')} className={`p-5 rounded-3xl border-2 transition-all font-bold flex items-center gap-3 justify-center ${paymentMethod === 'cash' ? 'border-orange-500 bg-orange-500 text-white' : 'border-yellow-100 text-yellow-800'}`}><Banknote size={18}/> Tiền mặt</button>
+                    <button onClick={() => setPaymentMethod('transfer')} className={`p-4 md:p-5 rounded-2xl md:rounded-3xl border-2 transition-all font-bold flex items-center gap-2 md:gap-3 justify-center text-sm md:text-base ${paymentMethod === 'transfer' ? 'border-orange-500 bg-orange-500 text-white' : 'border-yellow-100 text-yellow-800'}`}><CreditCard size={18}/> Chuyển khoản</button>
+                    <button onClick={() => setPaymentMethod('cash')} className={`p-4 md:p-5 rounded-2xl md:rounded-3xl border-2 transition-all font-bold flex items-center gap-2 md:gap-3 justify-center text-sm md:text-base ${paymentMethod === 'cash' ? 'border-orange-500 bg-orange-500 text-white' : 'border-yellow-100 text-yellow-800'}`}><Banknote size={18}/> Tiền mặt</button>
                   </div>
                 </div>
 
-                <div className="w-full md:w-[400px] bg-[#FEF9E7] p-12 flex flex-col border-l-4 border-white">
-                  <h3 className="font-black text-2xl mb-8 flex items-center gap-3 text-yellow-800"><ShoppingBag/> Tóm tắt</h3>
+                <div className="w-full md:w-[400px] bg-[#FEF9E7] p-6 md:p-12 flex flex-col border-t-4 md:border-t-0 md:border-l-4 border-white shrink-0 md:shrink">
+                  <h3 className="font-black text-xl md:text-2xl mb-6 md:mb-8 flex items-center gap-3 text-yellow-800"><ShoppingBag/> Tóm tắt</h3>
                   <div className="flex-1 overflow-y-auto space-y-6 pr-2 custom-scrollbar">
                     {cart.map((item, idx) => (
                       <div key={`${item._id || 'cart'}-${idx}`} className="flex justify-between items-center text-sm">

@@ -39,6 +39,24 @@ async function startServer() {
   // Seed initial data (Tables + Users) — handled by setup.js
   await seedInitialData();
 
+  // Migrate old virtual tables
+  try {
+    const migrationResult = await Table.updateMany(
+      {
+        $and: [
+          { isVirtual: { $ne: true } },
+          { name: { $regex: /^(mang về|giao hàng|mang đi|tại quầy)/i } }
+        ]
+      },
+      { $set: { isVirtual: true } }
+    );
+    if (migrationResult.modifiedCount > 0) {
+      console.log(`[Migration] Đã cập nhật ${migrationResult.modifiedCount} bàn ảo cũ (isVirtual: true)`);
+    }
+  } catch (err) {
+    console.error(`[Migration Error] Lỗi dọn rác DB:`, err);
+  }
+
   const app = express();
   app.set("trust proxy", 1);
   const httpServer = createServer(app);

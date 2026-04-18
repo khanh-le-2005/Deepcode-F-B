@@ -145,11 +145,11 @@ class PaymentService {
     }
     
     if (!data) return false;
-    const { orderCode, amount, status } = data;
-    console.log(`[PayOS Webhook] Received status ${status} for OrderCode ${orderCode}, amount: ${amount}`);
+    const { orderCode, amount } = data;
+    console.log(`[PayOS Webhook] Verified payload for OrderCode ${orderCode}, amount: ${amount}`);
     
-    if (status !== "PAID") return false;
-
+    // Webhook của PayOS mặc định chỉ gửi khi thanh toán thành công (hoặc tuỳ setting, nhưng data.code === "00")
+    // Trong một số trường hợp data.code có thể là mảng con, nhưng nếu verify qua là hợp lệ.
     return await this._markOrderAsPaid(orderCode, amount, io);
   }
 

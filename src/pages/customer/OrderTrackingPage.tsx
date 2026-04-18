@@ -112,21 +112,23 @@ export const OrderTrackingPage = () => {
     const statusParam = searchParams.get('status');
 
     if (code === '00' && statusParam === 'PAID') {
-      setShowSuccessModal(true);
-      // AUTO-SYNC (Đối soát) khi quay lại từ PayOS bằng orderId thay vì orderCode
+      // AUTO-SYNC: Phải chờ order được fetch về từ API để có orderId (VD: Với Dine-in, orderId lấy từ order)
       const currentOrderId = order?.id || (order as any)?._id || orderId;
-      if (currentOrderId) {
-        axios.get(`/api/payments/verify-by-order/${currentOrderId}`)
-          .then(() => console.log("Payment synced successfully via OrderId"))
-          .catch(err => console.error("Sync failed:", err));
-      }
+      if (!currentOrderId) return; // Đợi render tiếp nếu order chưa load
+
+      setShowSuccessModal(true);
+      
+      axios.get(`/api/payments/verify-by-order/${currentOrderId}`)
+        .then(() => console.log("Payment synced successfully via OrderId"))
+        .catch(err => console.error("Sync failed:", err));
+      
       // Xóa params để tránh hiện modal lặp lại khi refresh
       navigate(window.location.pathname, { replace: true });
     } else if (cancel === 'true') {
       toast.info("Giao dịch đã được hủy.");
       navigate(window.location.pathname, { replace: true });
     }
-  }, [searchParams, navigate]);
+  }, [searchParams, navigate, order?.id, (order as any)?._id, orderId]);
 
   // Backup polling for order status
   useEffect(() => {

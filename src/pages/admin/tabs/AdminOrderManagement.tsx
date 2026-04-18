@@ -291,7 +291,7 @@ export const AdminOrderManagement = () => {
                                 e.stopPropagation();
                                 try {
                                   toast.loading('Đang kiểm tra PayOS...');
-                                  const res = await axios.get(`/api/payments/verify/${order.orderCode}`);
+                                  const res = await axios.get(`/api/payments/verify-by-order/${orderId}`);
                                   toast.dismiss();
                                   if (res.data.success) {
                                     toast.success('Đã cập nhật thanh toán từ PayOS!');

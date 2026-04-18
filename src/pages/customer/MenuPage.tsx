@@ -529,9 +529,20 @@ export const MenuPage = () => {
                                 <div>
                                   <div className="flex justify-between items-start">
                                     <h4 className="font-bold italic text-base leading-tight pr-2" style={{ fontFamily: "'Playfair Display', serif" }}>{item.name}</h4>
-                                    <span className="px-2 py-0.5 bg-white text-gray-500 rounded-lg text-[8px] font-black uppercase tracking-widest border border-gray-100 shadow-sm whitespace-nowrap">
-                                      {item.status}
-                                    </span>
+                                    <div className="flex items-center gap-1 flex-wrap justify-end">
+                                      <span className="px-2 py-0.5 bg-white text-gray-500 rounded-lg text-[8px] font-black uppercase tracking-widest border border-gray-100 shadow-sm whitespace-nowrap">
+                                        {item.status}
+                                      </span>
+                                      {item.isPaid ? (
+                                        <span className="px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded-lg text-[8px] font-black uppercase tracking-widest border border-emerald-200 shadow-sm whitespace-nowrap">
+                                          Đã trả
+                                        </span>
+                                      ) : (
+                                        <span className="px-2 py-0.5 bg-red-50 text-red-600 rounded-lg text-[8px] font-black uppercase tracking-widest border border-red-200 shadow-sm whitespace-nowrap animate-pulse">
+                                          Chưa trả
+                                        </span>
+                                      )}
+                                    </div>
                                   </div>
                                   
                                   {(item.selectedOption || (item.selectedAddons && item.selectedAddons.length > 0)) && (

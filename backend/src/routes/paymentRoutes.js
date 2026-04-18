@@ -6,6 +6,7 @@ import {
   generateQR,
   receivePayosWebhook,
   verifyPayment,
+  verifyPaymentByOrderId,
   simulateSuccessfulPayment,
 } from "../controllers/paymentController.js";
 import { authorize } from "../security/SecurityMiddleware.js";
@@ -28,5 +29,6 @@ router.post(
 router.post("/generate-qr/:orderId", generateQR);
 router.post("/payos-webhook", receivePayosWebhook);
 router.get("/verify/:orderCode", verifyPayment);
+router.get("/verify-by-order/:orderId", verifyPaymentByOrderId);
 
 export default router;

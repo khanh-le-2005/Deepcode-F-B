@@ -113,10 +113,11 @@ export const OrderTrackingPage = () => {
 
     if (code === '00' && statusParam === 'PAID') {
       setShowSuccessModal(true);
-      // AUTO-SYNC (Đối soát) khi quay lại từ PayOS
-      if (order?.orderCode) {
-        axios.get(`/api/payments/verify/${order.orderCode}`)
-          .then(() => console.log("Payment synced successfully"))
+      // AUTO-SYNC (Đối soát) khi quay lại từ PayOS bằng orderId thay vì orderCode
+      const currentOrderId = order?.id || (order as any)?._id || orderId;
+      if (currentOrderId) {
+        axios.get(`/api/payments/verify-by-order/${currentOrderId}`)
+          .then(() => console.log("Payment synced successfully via OrderId"))
           .catch(err => console.error("Sync failed:", err));
       }
       // Xóa params để tránh hiện modal lặp lại khi refresh

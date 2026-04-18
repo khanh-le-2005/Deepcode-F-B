@@ -69,6 +69,12 @@ export const verifyPayment = catchAsync(async (req, res) => {
   res.json(result);
 });
 
+export const verifyPaymentByOrderId = catchAsync(async (req, res) => {
+  const { orderId } = req.params;
+  const result = await PaymentService.verifyPaymentByOrderId(orderId, req.io);
+  res.json(result);
+});
+
 export const simulateSuccessfulPayment = catchAsync(async (req, res) => {
   const { orderId } = req.params;
 

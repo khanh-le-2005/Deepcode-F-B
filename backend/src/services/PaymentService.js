@@ -75,8 +75,17 @@ class PaymentService {
         throw new BadRequestError("Đơn hàng này đã được thanh toán toàn bộ, không có số dư cần trả.");
       }
 
+      // [CRITICAL FIX] Mọi lần bấm thanh toán đều tạo 1 orderCode DUY NHẤT để không bị lỗi 'orderCode đã tồn tại' 
+      // hoặc bị mismatch khi frontend đối soát. Nạp đè orderCode vào DB trước khi gọi PayOS.
+      const timePart = String(Date.now()).slice(-6);
+      const randomPart = Math.floor(100 + Math.random() * 900);
+      const newOrderCode = Number(`${timePart}${randomPart}`);
+
+      order.orderCode = newOrderCode;
+      await order.save(); // Lưu ngay để DB biết orderCode mới nhất đang chờ đối soát
+
       const body = {
-        orderCode: order.orderCode,
+        orderCode: newOrderCode,
         amount: remainingAmountValue,
         description: `${order.orderCode} (No: ${order.items.length})`,
         items: unpaidItems.map(item => ({
@@ -145,6 +154,8 @@ class PaymentService {
   }
 
   async verifyPaymentStatus(orderCode, io) {
+    if (!orderCode) throw new BadRequestError("Thiếu orderCode để kiểm tra");
+    
     console.log(`[PayOS Verify] Manual/Auto check triggered for OrderCode ${orderCode}`);
     try {
       const paymentInfo = await payos.getPaymentLinkInformation(orderCode);
@@ -163,8 +174,10 @@ class PaymentService {
   }
 
   async _markOrderAsPaid(orderCode, amountPaid, io) {
+    // Tìm order theo orderCode vì webhook sẽ mang orderCode về
     const order = await Order.findOne({ orderCode: orderCode });
     if (!order) {
+
       console.error(`[PayOS Webhook/Verify] FAILED: Order with code ${orderCode} not found in DB.`);
       throw new NotFoundError(`Order với mã ${orderCode} không tồn tại`);
     }
@@ -255,6 +268,27 @@ class PaymentService {
     }
 
     return order;
+  }
+
+  async verifyPaymentByOrderId(orderId, io) {
+    // Được sử dụng bởi Frontend Auto-Sync để không phụ thuộc vào old orderCode trên URL
+    const order = await Order.findById(orderId);
+    if (!order) {
+      throw new NotFoundError("Không tìm thấy đơn hàng này để đối soát");
+    }
+
+    if (!order.orderCode) {
+      return { success: false, message: "Đơn hàng chưa từng tạo mã thanh toán PayOS." };
+    }
+
+    // Gọi hàm verifyPaymentStatus cũ (nhưng nay truyền vào orderCode mới nhất từ DB)
+    try {
+      const result = await this.verifyPaymentStatus(order.orderCode, io);
+      return result;
+    } catch (error) {
+       console.error(`[Verify] OrderId ${orderId} verify failed:`, error.message);
+       return { success: false, error: error.message };
+    }
   }
 }
 

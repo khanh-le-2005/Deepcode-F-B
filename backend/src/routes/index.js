@@ -7,7 +7,6 @@ import statsRoutes from "./statsRoutes.js";
 import authRoutes from "./authRoutes.js";
 import comboRoutes from "./ComboRoutes.js";
 import imageRoutes from "./imageRoutes.js";
-import bankAccountRoutes from "./bankAccountRoutes.js";
 import categoryRoutes from "./categoryRoutes.js";
 import weeklyMenuRoutes from "./weeklyMenuRoutes.js";
 
@@ -23,6 +22,6 @@ router.use("/tables", tableRoutes);
 router.use("/orders", orderRoutes);
 router.use("/payments", paymentRoutes);
 router.use("/stats", statsRoutes);
-router.use("/bank-accounts", bankAccountRoutes);
+
 
 export default router;

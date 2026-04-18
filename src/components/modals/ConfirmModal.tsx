@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, AlertCircle } from 'lucide-react';
 import { Button } from '../Button';
@@ -6,12 +6,18 @@ import { Button } from '../Button';
 interface ConfirmModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: () => void;
+  onConfirm: (val?: any) => void;
   title: string;
   message: string;
   confirmText?: string;
   cancelText?: string;
   variant?: 'danger' | 'warning' | 'info';
+  inputConfig?: {
+    type: 'number' | 'text';
+    min?: number;
+    max?: number;
+    defaultValue?: number | string;
+  };
 }
 
 export const ConfirmModal: React.FC<ConfirmModalProps> = ({
@@ -22,8 +28,17 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   message,
   confirmText = 'Xác nhận',
   cancelText = 'Hủy bỏ',
-  variant = 'warning'
+  variant = 'warning',
+  inputConfig
 }) => {
+  const [inputValue, setInputValue] = useState<string | number>('');
+
+  useEffect(() => {
+    if (isOpen && inputConfig?.defaultValue !== undefined) {
+      setInputValue(inputConfig.defaultValue);
+    }
+  }, [isOpen, inputConfig]);
+
   if (!isOpen) return null;
 
   const variantStyles = {
@@ -72,9 +87,27 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
               <h3 className="text-2xl font-black text-slate-900 mb-2 font-serif tracking-tight">
                 {title}
               </h3>
-              <p className="text-slate-500 font-medium">
+              <p className="text-slate-500 font-medium whitespace-pre-wrap">
                 {message}
               </p>
+
+              {inputConfig && (
+                <div className="mt-6 w-full">
+                  <input
+                    type={inputConfig.type}
+                    min={inputConfig.min}
+                    max={inputConfig.max}
+                    value={inputValue}
+                    onChange={(e) => setInputValue(e.target.value)}
+                    className="w-full text-center text-2xl font-black py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl focus:border-slate-800 focus:ring-0 transition-colors"
+                  />
+                  {inputConfig.max !== undefined && (
+                    <p className="text-xs font-bold text-slate-400 mt-2 uppercase tracking-widest">
+                      Tối đa: {inputConfig.max}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-4 mt-10">
@@ -87,7 +120,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
               </Button>
               <Button
                 onClick={() => {
-                  onConfirm();
+                  onConfirm(inputConfig ? Number(inputValue) : undefined);
                   onClose();
                 }}
                 className={`h-14 rounded-2xl shadow-xl font-black text-xs uppercase tracking-widest text-white border-none ${style.buttonBg}`}

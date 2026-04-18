@@ -113,27 +113,32 @@ class OrderService {
         basePrice: Number(dbItem.price),
         totalPrice,
         status: "in_cart",
+        isPaid: false,
       };
     }));
 
-    // FIX #3: Kiểm tra cả paymentStatus để tránh nhồi món vào bill đã thanh toán
+    // CHỈ kiểm tra status: "active", không quan tâm paymentStatus 
+    // để tránh việc khách đã trả 1 đợt rồi gọi món mới lại bị tách thành 2 bill (2 card)
     let session = await Order.findOne({
       tableId: String(table._id),
-      status: "active",
-      paymentStatus: "unpaid",
+      status: "active"
     });
 
+    let isNewSession = false;
     if (session) {
       // Nhồi món mới vào phiên cũ
       session = await Order.findByIdAndUpdate(
         session._id,
-        { $push: { items: { $each: newItems } } },
+        { 
+          $push: { items: { $each: newItems } },
+          $set: { paymentStatus: "unpaid" } // Có món mới -> bill lại thành chưa thanh toán hết
+        },
         { returnDocument: 'after' },
       );
-      // Update total
       session.total += newItemsTotal;
       await session.save();
     } else {
+      isNewSession = true;
       // Tạo phiên mới
       const sessionToken = crypto.randomBytes(16).toString("hex");
       let newOrder = new Order({
@@ -153,7 +158,11 @@ class OrderService {
     }
 
     if (io) {
-      io.emit("new-order", session);
+      if (isNewSession) {
+        io.emit("new-order", session);
+      } else {
+        io.emit("order-updated", session);
+      }
       io.emit("tables-updated", await Table.find());
     }
     return session;
@@ -232,6 +241,7 @@ class OrderService {
         basePrice: Number(dbItem.price),
         totalPrice,
         status: "pending_approval",
+        isPaid: false,
       };
     }));
 
@@ -240,6 +250,7 @@ class OrderService {
       status: "active",
     });
 
+    let isNewSession = false;
     if (session) {
       // Nhồi món mới nếu bàn này đã có session
       session = await Order.findByIdAndUpdate(
@@ -248,8 +259,10 @@ class OrderService {
         { returnDocument: 'after' },
       );
       session.total += newItemsTotal;
+      if (session.paymentStatus === "paid") session.paymentStatus = "unpaid";
       await session.save();
     } else {
+      isNewSession = true;
       // Bàn mới toanh
       const sessionToken = crypto.randomBytes(16).toString("hex");
       let newOrder = new Order({
@@ -263,8 +276,11 @@ class OrderService {
     }
 
     if (io) {
-      io.emit("new-order", session);
-      io.emit("order-updated", session);
+      if (isNewSession) {
+        io.emit("new-order", session);
+      } else {
+        io.emit("order-updated", session);
+      }
       io.emit("tables-updated", await Table.find());
     }
     return session;
@@ -363,6 +379,7 @@ class OrderService {
         basePrice:  Number(dbItem.price),
         totalPrice,
         status:     itemStatus,
+        isPaid:     false,
       };
     }));
 
@@ -472,6 +489,48 @@ class OrderService {
     return session;
   }
 
+  async adminUpdateItemQuantity(sessionId, itemId, delta, io, user = null) {
+    const session = await Order.findById(sessionId);
+    if (!session) throw new NotFoundError("Session not found");
+
+    const item = session.items.id(itemId);
+    if (!item) throw new NotFoundError("Item not found");
+
+    // Admin can change quantity regardless of status, but if they reduce it, we handle price subtraction
+    const pricePerUnit = item.totalPrice / (item.quantity || 1);
+    const newQuantity = (item.quantity || 1) + Number(delta);
+
+    if (newQuantity <= 0) {
+      // Mark as cancelled and subtract full price if it wasn't cancelled already
+      if (item.status !== 'cancelled') {
+        session.total -= item.totalPrice;
+      }
+      item.status = 'cancelled';
+      item.quantity = 0;
+      item.totalPrice = 0;
+    } else {
+      const oldTotalPrice = item.totalPrice;
+      item.quantity = newQuantity;
+      const newTotalPrice = pricePerUnit * newQuantity;
+      
+      // Update session total only if status is NOT cancelled
+      if (item.status !== 'cancelled') {
+        session.total = session.total - oldTotalPrice + newTotalPrice;
+      }
+      item.totalPrice = newTotalPrice;
+    }
+
+    if (user) {
+      item.actionBy = user.id;
+      item.actionByName = user.name;
+      item.actionAt = new Date();
+    }
+
+    await session.save();
+    if (io) io.emit("order-updated", session);
+    return session;
+  }
+
   async calculatePrice(data) {
     if (!data.items || data.items.length === 0) {
       return { calculatedItems: [], totalCartPrice: 0 };
@@ -507,19 +566,29 @@ class OrderService {
 
 
   async updateItemStatus(sessionId, itemId, status, io, user = null) {
-    const updateFields = { "items.$.status": status };
+    const session = await Order.findOne({ _id: sessionId, "items._id": itemId });
+    if (!session) throw new NotFoundError("Session or Item not found");
+
+    const item = session.items.id(itemId);
+    const oldStatus = item.status;
+
+    // IF CHANGING TO CANCELLED: Subtract from total if it was active
+    if (status === 'cancelled' && oldStatus !== 'cancelled') {
+      session.total -= item.totalPrice;
+    } 
+    // IF CHANGING FROM CANCELLED: Add back to total
+    else if (status !== 'cancelled' && oldStatus === 'cancelled') {
+      session.total += item.totalPrice;
+    }
+
+    item.status = status;
     if (user) {
-      updateFields["items.$.actionBy"] = user.id;
-      updateFields["items.$.actionByName"] = user.name;
-      updateFields["items.$.actionAt"] = new Date();
+      item.actionBy = user.id;
+      item.actionByName = user.name;
+      item.actionAt = new Date();
     }
     
-    const session = await Order.findOneAndUpdate(
-      { _id: sessionId, "items._id": itemId },
-      { $set: updateFields },
-      { returnDocument: 'after' },
-    );
-    if (!session) throw new NotFoundError("Session or Item not found");
+    await session.save();
 
     if (io) {
       io.emit("order-updated", session);
@@ -629,6 +698,10 @@ async approveAllItems(sessionId, io, user = null) {
     if (!order) throw new NotFoundError("Order not found");
 
     order.status = "completed"; // Đóng vòng đời phục vụ
+    order.paymentStatus = "paid";
+    order.items.forEach(item => {
+      item.isPaid = true;
+    });
     order.completedAt = new Date();
     await order.save();
 

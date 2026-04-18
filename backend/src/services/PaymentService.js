@@ -55,9 +55,12 @@ class PaymentService {
   async generatePaymentQR(orderId) {
     const order = await Order.findById(orderId);
     if (!order) throw new NotFoundError("Order not found");
-    if (order.paymentStatus === "paid") {
-      throw new BadRequestError("Đơn hàng này đã được thanh toán, không cần tạo QR mới");
-    }
+    // Bỏ qua check paymentStatus === "paid" ở đây vì chúng ta dùng remainingAmount thực tế phía dưới
+    // giúp hỗ trợ thanh toán thêm các món mới vào bill cũ.
+
+    // CHỈ TÍNH TIỀN CHO CÁC MÓN CHƯA TRẢ (Item-level Payment)
+    const unpaidItems = order.items.filter(item => !item.isPaid && item.status !== 'cancelled');
+    const remainingAmountValue = unpaidItems.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
 
     try {
       const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3001";
@@ -68,11 +71,15 @@ class PaymentService {
         ? `/success?orderId=${order._id}` 
         : `/table/${order.tableId}/tracking`;
 
+      if (remainingAmountValue <= 0) {
+        throw new BadRequestError("Đơn hàng này đã được thanh toán toàn bộ, không có số dư cần trả.");
+      }
+
       const body = {
         orderCode: order.orderCode,
-        amount: order.total,
-        description: `${order.orderCode}`,
-        items: order.items.map(item => ({
+        amount: remainingAmountValue,
+        description: `${order.orderCode} (No: ${order.items.length})`,
+        items: unpaidItems.map(item => ({
           name: item.name,
           quantity: item.quantity,
           price: item.basePrice
@@ -102,12 +109,11 @@ class PaymentService {
       
       return {
         orderId: order._id,
-        amount: order.total,
-        qrCode: "", // Để frontend hiện "Không có QR" hoặc dự phòng
-        qrBase64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+        amount: remainingAmountValue,
+        qrCode: "", 
         paymentContent: `DC ${order.orderCode}`,
         isMock: true,
-        gatewayWarning: `Cổng PayOS lỗi: ${errorDetail}`
+        gatewayWarning: `Hệ thống thanh toán trực tuyến đang gặp sự cố. Vui lòng thanh toán bằng TIỀN MẶT tại quầy. (Lỗi: ${errorDetail})`
       };
     }
   }
@@ -123,7 +129,7 @@ class PaymentService {
     // Xác thực chữ ký Webhook từ PayOS để bảo mật
     let data;
     try {
-      data = payos.webhooks.verify(payload);
+      data = await payos.webhooks.verify(payload);
     } catch (e) {
       console.error("Webhook verification failed:", e);
       return false;
@@ -131,17 +137,57 @@ class PaymentService {
     
     if (!data) return false;
     const { orderCode, amount, status } = data;
+    console.log(`[PayOS Webhook] Received status ${status} for OrderCode ${orderCode}, amount: ${amount}`);
+    
     if (status !== "PAID") return false;
 
+    return await this._markOrderAsPaid(orderCode, amount, io);
+  }
+
+  async verifyPaymentStatus(orderCode, io) {
+    console.log(`[PayOS Verify] Manual/Auto check triggered for OrderCode ${orderCode}`);
+    try {
+      const paymentInfo = await payos.getPaymentLinkInformation(orderCode);
+      console.log(`[PayOS Verify] Current status from API: ${paymentInfo.status}`);
+
+      if (paymentInfo.status === "PAID") {
+        const order = await this._markOrderAsPaid(orderCode, paymentInfo.amountPaid, io);
+        return { success: true, status: paymentInfo.status, order };
+      }
+
+      return { success: false, status: paymentInfo.status };
+    } catch (error) {
+      console.error(`[PayOS Verify] Error checking PayOS for ${orderCode}:`, error.message);
+      throw error;
+    }
+  }
+
+  async _markOrderAsPaid(orderCode, amountPaid, io) {
     const order = await Order.findOne({ orderCode: orderCode });
-    if (!order) throw new NotFoundError(`Order với mã ${orderCode} không tồn tại`);
+    if (!order) {
+      console.error(`[PayOS Webhook/Verify] FAILED: Order with code ${orderCode} not found in DB.`);
+      throw new NotFoundError(`Order với mã ${orderCode} không tồn tại`);
+    }
 
-    if (order.paymentStatus === "paid") return true;
+    // Nếu đã thanh toán rồi thì kiểm tra xem có payment record chưa, nếu chưa thì tạo (phòng trường hợp trùng)
+    // Nhưng vì item-level, chúng ta cần duyệt xem có món nào MỚI trả không.
+    
+    let hasNewPaidItems = false;
+    order.items.forEach(item => {
+      if (!item.isPaid) {
+        item.isPaid = true;
+        hasNewPaidItems = true;
+      }
+    });
 
+    if (hasNewPaidItems) {
+      order.markModified("items");
+    }
+
+    // Luôn đảm bảo paymentStatus là paid nếu có tiền về
     order.paymentStatus = "paid";
 
     const isKiosk = order.orderType === "delivery" || order.orderType === "takeaway";
-
     if (isKiosk) {
       order.status = "active";
       order.items.forEach(item => {
@@ -149,60 +195,42 @@ class PaymentService {
           item.status = "cooking";
         }
       });
-      order.markModified("items"); // ĐẢM BẢO MONGOOSE LƯU TRẠNG THÁI ITEMS
-    } else {
-      order.status = "completed";
-      order.completedAt = new Date();
-      await Table.findByIdAndUpdate(order.tableId, { status: "empty" });
-    }
+      order.markModified("items"); 
+    } 
 
     order.completedByName = "Hệ thống tự động (PayOS)";
     await order.save();
 
     const orderData = await Order.findById(order._id);
-
-    let tableNameStr = orderData?.tableName;
-    if (!tableNameStr && orderData?.tableId) {
-      // Dự phòng: Nếu order cũ không có tableName, tìm trong bảng Table
-      try {
-        const table = await Table.findById(orderData.tableId);
-        if (table) tableNameStr = table.name;
-        else if (mongoose.Types.ObjectId.isValid(orderData.tableId)) {
-           const t2 = await Table.findById(orderData.tableId);
-           if (t2) tableNameStr = t2.name;
-        }
-      } catch (e) {
-        tableNameStr = orderData.tableId; // Dùng ID làm fallback
-      }
-    }
-    tableNameStr = tableNameStr || "Bàn không xác định";
+    let tableNameStr = orderData?.tableName || "Bàn không xác định";
 
     const defaultBank = await BankAccount.findOne({ isDefault: true });
-    let bankNameSnapshotStr = "MBBank / Không rõ STK";
+    let bankNameSnapshotStr = "MBBank (PayOS)";
     if (defaultBank) {
       bankNameSnapshotStr = `${defaultBank.bankName} - ${defaultBank.accountNo} (${defaultBank.accountName})`;
     }
 
-    await Payment.create({
-      orderId: order._id,
-      amount: order.total,
-      method: "Chuyển khoản (PayOS)",
-      bankAccountId: defaultBank ? defaultBank._id : null,
-      tableName: tableNameStr,
-      bankNameSnapshot: bankNameSnapshotStr,
-      cashierName: "Hệ thống điện tử tự động",
-      status: "success",
-    });
+    // Ghi nhận lịch sử thanh toán (Tránh duplicate nếu đã xử lý rồi)
+    const existingPayment = await Payment.findOne({ orderId: order._id, amount: amountPaid, status: "success" });
+    if (!existingPayment) {
+      await Payment.create({
+        orderId: order._id,
+        amount: amountPaid,
+        method: "Chuyển khoản (PayOS)",
+        bankAccountId: defaultBank ? defaultBank._id : null,
+        tableName: tableNameStr,
+        bankNameSnapshot: bankNameSnapshotStr,
+        cashierName: "Hệ thống điện tử tự động",
+        status: "success",
+      });
+    }
 
     if (io) {
       io.emit("order-paid", { orderId: order._id, paymentStatus: "paid" });
       io.emit("order-updated", order);
       
-      // Nếu là Kiosk vừa mới được trả tiền (từ awaiting_payment -> pending_approval), 
-      // hệ thống phải đánh chuông BẾP như 1 đơn mới.
       if (isKiosk) {
         io.emit("new-order", order);
-        
         io.emit("notification:kitchen", {
           type: "warning",
           title: "Bếp chú ý: Có đơn Kiosk mới",
@@ -214,30 +242,19 @@ class PaymentService {
 
       io.emit("tables-updated", await Table.find());
 
-      // ---------- THÊM NOTIFICATION CHUẨN Ở ĐÂY ----------
-      if (isKiosk) {
-        const orderLabel = order.orderType === "delivery" ? "Giao hàng" : "Mang về";
-        const customerName = order.customerInfo?.name || "Khách vãng lai";
+      const orderLabel = order.orderType === "delivery" ? "Giao hàng" : (order.orderType === "takeaway" ? "Mang về" : "Tại bàn");
+      const customerName = order.customerInfo?.name || "Khách vãng lai";
 
-        io.emit("notification:staff", {
-          type: "success",
-          title: `💰 Khách chuyển khoản thành công`,
-          message: `Đơn [${orderLabel}] của khách ${customerName} đã thanh toán ${order.total.toLocaleString('vi-VN')}đ. Vui lòng duyệt món xuống bếp!`,
-          orderId: order._id,
-          sound: "success"
-        });
-      } else {
-        io.emit("notification:staff", {
-          type: "success",
-          title: `💸 Bàn đã thanh toán`,
-          message: `Bàn [${tableNameStr}] tự quét mã QR thanh toán thành công ${order.total.toLocaleString('vi-VN')}đ. Đã chốt bàn.`,
-          orderId: order._id,
-          sound: "success"
-        });
-      }
+      io.emit("notification:staff", {
+        type: "success",
+        title: `💰 Thanh toán thành công`,
+        message: `[${orderLabel}] ${tableNameStr} đã thanh toán ${amountPaid.toLocaleString('vi-VN')}đ qua PayOS.`,
+        orderId: order._id,
+        sound: "success"
+      });
     }
 
-    return true;
+    return order;
   }
 }
 

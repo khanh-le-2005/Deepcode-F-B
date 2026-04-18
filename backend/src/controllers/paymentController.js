@@ -1,6 +1,5 @@
 import PaymentService from "../services/PaymentService.js";
 import OrderService from "../services/OrderService.js";
-import BankAccountService from "../services/BankAccountService.js";
 import { catchAsync } from "../utils/catchAsync.js";
 import { BadRequestError, NotFoundError } from "../utils/AppError.js";
 
@@ -29,18 +28,14 @@ export const mockPayment = catchAsync(async (req, res) => {
   }
 
   const amount = order.total || 0;
-  const defaultBank = await BankAccountService.getDefaultAccount();
-  const bankAccountId = defaultBank ? defaultBank._id : null;
-  const methodName = defaultBank
-    ? `QR ${defaultBank.bankName} (Giả lập)`
-    : "QR VNPAY/MOMO (Giả lập Thành Công)";
+  const methodName = "QR PayOS (Giả lập)";
 
   const payment = await PaymentService.processPayment(
     {
       orderId,
       amount,
       method: methodName,
-      bankAccountId: bankAccountId,
+      bankAccountId: null,
     },
     req.user,
   );
@@ -66,6 +61,12 @@ export const receivePayosWebhook = catchAsync(async (req, res) => {
     console.error("Lỗi xử lý Webhook PayOS:", error);
     res.status(400).json({ success: false, message: "Webhook Signature Invalid" });
   }
+});
+
+export const verifyPayment = catchAsync(async (req, res) => {
+  const { orderCode } = req.params;
+  const result = await PaymentService.verifyPaymentStatus(orderCode, req.io);
+  res.json(result);
 });
 
 export const simulateSuccessfulPayment = catchAsync(async (req, res) => {

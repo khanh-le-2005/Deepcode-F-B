@@ -132,6 +132,13 @@ export const updateOrderItemQuantity = async (req, res) => {
   res.json(session);
 };
 
+export const adminUpdateItemQuantity = async (req, res) => {
+  const { sessionId, itemId } = req.params;
+  const { delta } = req.body;
+  const session = await OrderService.adminUpdateItemQuantity(sessionId, itemId, delta, req.io, req.user);
+  res.json(session);
+};
+
 export const calculatePrice = async (req, res) => {
   const result = await OrderService.calculatePrice(req.body);
   res.json(result);

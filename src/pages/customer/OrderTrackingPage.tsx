@@ -113,6 +113,12 @@ export const OrderTrackingPage = () => {
 
     if (code === '00' && statusParam === 'PAID') {
       setShowSuccessModal(true);
+      // AUTO-SYNC (Đối soát) khi quay lại từ PayOS
+      if (order?.orderCode) {
+        axios.get(`/api/payments/verify/${order.orderCode}`)
+          .then(() => console.log("Payment synced successfully"))
+          .catch(err => console.error("Sync failed:", err));
+      }
       // Xóa params để tránh hiện modal lặp lại khi refresh
       navigate(window.location.pathname, { replace: true });
     } else if (cancel === 'true') {
@@ -195,7 +201,11 @@ export const OrderTrackingPage = () => {
 
   // Tính index step hiện tại
   const currentStepIndex = steps.findIndex(s => s.id === overallStatus);
-  const isPaid = order.paymentStatus === 'paid' || order.status === 'completed' || order.status === 'paid';
+  
+  // KIỂM TRA THANH TOÁN THÔNG MINH (Tất cả món active đều đã trả tiền)
+  const activeItems = order.items.filter(i => i.status !== 'cancelled');
+  const allPaid = activeItems.length > 0 && activeItems.every(i => i.isPaid);
+  const isPaid = order.paymentStatus === 'paid' || order.status === 'completed' || order.status === 'paid' || allPaid;
 
   const handleRequestPayment = async () => {
     try {
@@ -338,37 +348,78 @@ export const OrderTrackingPage = () => {
               Chi tiết các món ({order.items.reduce((a, c) => a + c.quantity, 0)})
             </h3>
             <ul className="space-y-4">
-              {order.items.map((item, i) => (
-                <li key={i} className="flex justify-between items-center font-bold">
-                  <span className="flex items-center gap-4 text-gray-700">
-                    <span className="w-8 h-8 rounded-xl bg-red-600 text-white flex items-center justify-center text-sm font-black shadow-lg shadow-red-600/30 shrink-0">
-                      x{item.quantity}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <span className="truncate block text-gray-900">{item.name}</span>
-                      <div className="flex flex-wrap gap-x-2 text-[10px] text-gray-500 italic mt-0.5">
-                        {item.selectedOption && <span>• {item.selectedOption.name}</span>}
-                        {item.selectedAddons?.map((a, idx) => (
-                          <span key={idx}>• {a.name}</span>
-                        ))}
-                      </div>
-                      <span className="text-[10px] text-gray-400 uppercase mt-1 block">
-                        {item.status === 'in_cart' ? 'Trong giỏ' :
-                          item.status === 'pending_approval' ? 'Chờ duyệt' :
-                            item.status === 'cooking' ? 'Đang nấu' :
-                              item.status === 'served' ? 'Đã phục vụ' : 'Đã hủy'}
+              {(() => {
+                const groupedTrackingItems = (order.items || []).filter(i => i.status !== 'cancelled').reduce((acc: any[], item) => {
+                  const addonKey = (item.selectedAddons || []).map((a: any) => a.name).sort().join(',');
+                  const optionKey = item.selectedOption?.name || '';
+                  // Phân tách riêng trạng thái thanh toán VÀ trạng thái nấu bếp
+                  const key = `${item.name}-${optionKey}-${addonKey}-${item.isPaid}-${item.status}`;
+                  const existing = acc.find(i => i.groupKey === key);
+                  if (existing) {
+                    existing.quantity += (item.quantity || 1);
+                    existing.totalPrice += (item.totalPrice ?? item.basePrice ?? item.price ?? 0);
+                  } else {
+                    acc.push({ 
+                      ...item, 
+                      groupKey: key, 
+                      quantity: item.quantity || 1, 
+                      totalPrice: item.totalPrice ?? item.basePrice ?? item.price ?? 0 
+                    });
+                  }
+                  return acc;
+                }, []);
+
+                return groupedTrackingItems.map((item, i) => (
+                  <li key={i} className="flex justify-between items-center font-bold">
+                    <span className="flex items-center gap-4 text-gray-700">
+                      <span className="w-8 h-8 rounded-xl bg-red-600 text-white flex items-center justify-center text-sm font-black shadow-lg shadow-red-600/30 shrink-0">
+                        x{item.quantity}
                       </span>
-                    </div>
-                  </span>
-                  <span className="text-gray-900 underline decoration-red-600 decoration-2 underline-offset-4">
-                    {(item.totalPrice ?? 0).toLocaleString()}đ
-                  </span>
-                </li>
-              ))}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="truncate block text-gray-900">{item.name}</span>
+                          {item.isPaid && (
+                            <span className="flex items-center gap-0.5 px-1.5 py-0.5 bg-emerald-50 text-emerald-600 rounded text-[7px] font-black uppercase border border-emerald-100 italic">
+                              <CheckCircle2 className="w-2.5 h-2.5" /> Đã trả
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap gap-x-2 text-[10px] text-gray-500 italic mt-0.5">
+                          {item.selectedOption && <span>• {item.selectedOption.name}</span>}
+                          {item.selectedAddons?.map((a: any, idx: number) => (
+                            <span key={idx}>• {a.name}</span>
+                          ))}
+                        </div>
+                        <span className="text-[10px] text-gray-400 uppercase mt-1 block">
+                          {item.status === 'in_cart' ? 'Trong giỏ' :
+                            item.status === 'pending_approval' ? 'Chờ duyệt' :
+                              item.status === 'cooking' ? 'Đang nấu' :
+                                item.status === 'served' ? 'Đã phục vụ' : 'Đã hủy'}
+                        </span>
+                      </div>
+                    </span>
+                    <span className="text-gray-900 underline decoration-red-600 decoration-2 underline-offset-4">
+                      {(item.totalPrice ?? 0).toLocaleString()}đ
+                    </span>
+                  </li>
+                ));
+              })()}
             </ul>
-          <div className="flex justify-between items-center pt-6 border-t border-gray-200 text-2xl font-black italic shadow-[0_-15px_15px_-15px_rgba(0,0,0,0.05)]" style={{ fontFamily: "'Playfair Display', serif" }}>
-              <span className="text-gray-400 uppercase tracking-widest text-sm not-italic font-bold">Tổng cộng</span>
-              <span className="text-red-600">{(order.total ?? 0).toLocaleString()}đ</span>
+            <div className="space-y-2 pt-6 border-t border-gray-200">
+              <div className="flex justify-between items-center text-sm font-bold">
+                <span className="text-gray-400 uppercase tracking-widest">Tổng hóa đơn</span>
+                <span className="text-gray-900">{(order.total ?? 0).toLocaleString()}đ</span>
+              </div>
+              {order.items.some(i => i.isPaid) && (
+                <div className="flex justify-between items-center text-sm font-bold text-emerald-600">
+                  <span className="uppercase tracking-widest pl-4 border-l-2 border-emerald-200">Đã thanh toán</span>
+                  <span>-{order.items.filter(i => i.isPaid).reduce((sum, i) => sum + (i.totalPrice || 0), 0).toLocaleString()}đ</span>
+                </div>
+              )}
+              <div className="flex justify-between items-center pt-2 text-2xl font-black italic shadow-[0_-15px_15px_-15px_rgba(0,0,0,0.05)]" style={{ fontFamily: "'Playfair Display', serif" }}>
+                <span className="text-gray-400 uppercase tracking-widest text-sm not-italic font-bold">Cần trả thêm</span>
+                <span className="text-red-600">{order.items.filter(i => !i.isPaid && i.status !== 'cancelled').reduce((sum, i) => sum + (i.totalPrice || 0), 0).toLocaleString()}đ</span>
+              </div>
             </div>
           </div>
 

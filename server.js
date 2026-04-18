@@ -27,7 +27,7 @@ import statsRoutes from "./backend/src/routes/statsRoutes.js";
 import authRoutes from "./backend/src/routes/authRoutes.js";
 import comboRoutes from "./backend/src/routes/ComboRoutes.js";
 import imageRoutes from "./backend/src/routes/imageRoutes.js";
-import bankAccountRoutes from "./backend/src/routes/bankAccountRoutes.js";
+
 import categoryRoutes from "./backend/src/routes/categoryRoutes.js";
 import weeklyMenuRoutes from "./backend/src/routes/weeklyMenuRoutes.js";
 import userRoutes from "./backend/src/routes/userRoutes.js";
@@ -128,7 +128,7 @@ max: 1000,
   app.use("/api/tables", tableRoutes);
   app.use("/api/orders", orderRoutes);
   app.use("/api/payments", paymentRoutes);
-  app.use("/api/bank-accounts", bankAccountRoutes);
+
   app.use("/api/stats", statsRoutes);
   app.use("/api/users", userRoutes);
   // Global Error Handler

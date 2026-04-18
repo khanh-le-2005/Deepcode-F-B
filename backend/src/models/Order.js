@@ -29,6 +29,8 @@ const orderItemSchema = new mongoose.Schema({
   actionBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   actionByName: { type: String },
   actionAt: { type: Date },
+  
+  isPaid: { type: Boolean, default: false },
 });
 
 const orderSchema = new mongoose.Schema(

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShoppingCart, Search, Filter, Clock, CheckCircle2, XCircle, MoreVertical, CreditCard, Receipt, ChevronRight, User, MapPin } from 'lucide-react';
+import { ShoppingCart, Search, Filter, Clock, CheckCircle2, XCircle, MoreVertical, CreditCard, Receipt, ChevronRight, User, MapPin, RefreshCw } from 'lucide-react';
 import axios from '@/src/lib/axiosClient';
 import { toast } from 'react-toastify';
 import { io } from 'socket.io-client';
@@ -21,8 +21,14 @@ export const AdminOrderManagement = () => {
     isOpen: boolean;
     title: string;
     message: string;
-    onConfirm: () => void;
+    onConfirm: (val?: any) => void;
     variant: 'danger' | 'warning' | 'info';
+    inputConfig?: {
+      type: 'number' | 'text';
+      min?: number;
+      max?: number;
+      defaultValue?: number | string;
+    };
   }>({
     isOpen: false,
     title: '',
@@ -31,11 +37,29 @@ export const AdminOrderManagement = () => {
     variant: 'warning'
   });
 
+  // Tự động cập nhật selectedOrderDetails khi orders thay đổi (để Modal không bị cũ)
+  useEffect(() => {
+    if (selectedOrderDetails) {
+      const updatedOrder = orders.find(o => ((o as any)._id || (o as any).id) === ((selectedOrderDetails as any)._id || (selectedOrderDetails as any).id));
+      if (updatedOrder) {
+        setSelectedOrderDetails(updatedOrder);
+      } else {
+        setSelectedOrderDetails(null);
+      }
+    }
+  }, [orders]);
+
   useEffect(() => {
     fetchOrders();
     fetchTables();
     socket.on('new-order', (newOrder) => {
-      setOrders(prev => [newOrder, ...prev]);
+      setOrders(prev => {
+        const orderId = (newOrder as any)._id || newOrder.id;
+        if (prev.some(o => ((o as any)._id || o.id) === orderId)) {
+          return prev.map(o => ((o as any)._id || o.id) === orderId ? newOrder : o);
+        }
+        return [newOrder, ...prev];
+      });
     });
     socket.on('order-updated', (updatedOrder) => {
       const updated_id = updatedOrder._id || updatedOrder.id;
@@ -224,7 +248,7 @@ export const AdminOrderManagement = () => {
                 <div className={cn("h-2 w-full rounded-t-[2rem]", normalizeStatus(order.status) === 'active' ? 'bg-brand' : normalizeStatus(order.status) === 'completed' ? 'bg-emerald-500' : 'bg-rose-500')} />
 
                 <div className="p-8 space-y-8 flex-1">
-                  {/* Card Main Header */}
+                  {/* Header Row with Total */}
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-5">
                       <div className={cn(
@@ -240,7 +264,6 @@ export const AdminOrderManagement = () => {
                           {order.orderType === 'delivery' ? 'Đơn Giao Hàng' : order.orderType === 'takeaway' ? 'Đơn Mang Về' : (tableNameMap[order.tableId] || order.tableId).startsWith('Bàn') ? (tableNameMap[order.tableId] || order.tableId) : `Bàn ${tableNameMap[order.tableId] || order.tableId}`}
                         </h4>
                         
-                        {/* Hiển thị chi tiết khách hàng của Giao hàng & Mang về */}
                         {order.customerInfo && (order.orderType === 'delivery' || order.orderType === 'takeaway') && (
                           <div className="mt-3 bg-gray-50/80 p-3 rounded-xl border border-gray-100 space-y-1">
                             <h5 className="text-[10px] font-black uppercase tracking-[0.1em] text-gray-400 flex items-center gap-1.5">
@@ -249,14 +272,6 @@ export const AdminOrderManagement = () => {
                             <p className="text-xs font-bold text-gray-900">
                               {order.customerInfo.name || 'Khách Kiosk'} - {order.customerInfo.phone}
                             </p>
-                            {order.orderType === 'delivery' && order.customerInfo.deliveryAddress && (
-                              <div className="flex items-start gap-1.5 mt-1.5 pt-1.5 border-t border-gray-100 font-black text-brand">
-                                <MapPin className="w-3 h-3 mt-0.5 shrink-0" />
-                                <p className="text-[11px] leading-relaxed italic">
-                                  Địa chỉ: {order.customerInfo.deliveryAddress}
-                                </p>
-                              </div>
-                            )}
                           </div>
                         )}
 
@@ -267,29 +282,62 @@ export const AdminOrderManagement = () => {
                           )}>
                             {getStatusLabel(order.status)}
                           </span>
-                          <span className={cn(
-                            "inline-flex items-center justify-center px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border",
-                            order.paymentMethod === 'transfer' ? "bg-purple-100 text-purple-600 border-purple-200" : "bg-blue-100 text-blue-600 border-blue-200"
-                          )}>
-                             {order.paymentMethod === 'transfer' ? 'Chuyển khoản' : 'Tiền mặt'}
-                          </span>
                           <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest">#{orderId.slice(-6).toUpperCase()}</span>
+                          
+                          {/* Sync PayOS Button */}
+                          {normalizeStatus(order.status) === 'active' && order.orderCode && (
+                            <button 
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                try {
+                                  toast.loading('Đang kiểm tra PayOS...');
+                                  const res = await axios.get(`/api/payments/verify/${order.orderCode}`);
+                                  toast.dismiss();
+                                  if (res.data.success) {
+                                    toast.success('Đã cập nhật thanh toán từ PayOS!');
+                                    fetchOrders();
+                                  } else {
+                                    toast.info('Chưa có thông tin thanh toán mới.');
+                                  }
+                                } catch (err) {
+                                  toast.dismiss();
+                                  toast.error('Lỗi khi kiểm tra PayOS');
+                                }
+                              }}
+                              className="ml-2 p-1.5 bg-slate-50 border border-slate-200 text-slate-400 hover:text-brand hover:border-brand/40 rounded-lg transition-all"
+                              title="Kiểm tra trạng thái PayOS"
+                            >
+                              <RefreshCw className="w-3 h-3" />
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
 
-                    <div className="text-right flex flex-col items-end">
-                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 flex items-center justify-end gap-1.5">
-                        <Clock className="w-3.5 h-3.5" />
-                        {new Date(order.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
-                      </p>
-                      {order.paymentStatus === 'paid' && (
-                        <div className="mb-2 px-3 py-1 bg-emerald-500 text-white text-[10px] font-black uppercase tracking-widest rounded-lg flex items-center gap-1.5 shadow-lg shadow-emerald-200 animate-bounce-subtle">
-                          <CheckCircle2 className="w-3 h-3" /> Đã trả tiền
+                    {/* Pre-calculate and display Total of ORDERED items */}
+                    {(() => {
+                      const relevantItems = order.items.filter(item => item.status !== 'in_cart' && item.status !== 'cancelled');
+                      const currentTotal = relevantItems.reduce((sum, item) => sum + (item.totalPrice ?? 0), 0);
+                      const unpaidAmount = relevantItems
+                        .filter(item => !item.isPaid)
+                        .reduce((sum, item) => sum + (item.totalPrice ?? 0), 0);
+                      const isFullyPaid = unpaidAmount <= 0 && relevantItems.length > 0;
+
+                      return (
+                        <div className="text-right flex flex-col items-end">
+                          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 flex items-center justify-end gap-1.5">
+                            <Clock className="w-3.5 h-3.5" />
+                            {new Date(order.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                          {isFullyPaid && (
+                            <div className="mb-2 px-3 py-1 bg-emerald-500 text-white text-[10px] font-black uppercase tracking-widest rounded-lg flex items-center gap-1.5 shadow-lg shadow-emerald-200 animate-bounce-subtle">
+                              <CheckCircle2 className="w-3 h-3" /> Đã trả hết
+                            </div>
+                          )}
+                          <p className="text-2xl font-black text-slate-900 tracking-tight">{currentTotal.toLocaleString()}đ</p>
                         </div>
-                      )}
-                      <p className="text-2xl font-black text-slate-900 tracking-tight">{Number(order.total || 0).toLocaleString()}đ</p>
-                    </div>
+                      );
+                    })()}
                   </div>
 
                   {/* Items Display */}
@@ -297,70 +345,114 @@ export const AdminOrderManagement = () => {
                     <p className="text-[10px] font-black uppercase text-gray-400 tracking-[0.2em] mb-4">Chi tiết món ăn</p>
                     <div className="space-y-4 max-h-[200px] overflow-y-auto no-scrollbar pr-2">
                       {(() => {
-                        // Grouping Logic
-                        const groupedItems = order.items.reduce((acc: any[], item) => {
-                          const addonKey = (item.selectedAddons || [])
-                            .map((a: any) => a.name)
-                            .sort()
-                            .join(',');
-                          const optionKey = item.selectedOption?.name || '';
-                          const key = `${item.name}-${optionKey}-${addonKey}`;
+                        const activeItems = order.items.filter(item => item.status !== 'in_cart' && item.status !== 'cancelled');
 
+                        if (activeItems.length === 0) {
+                          return <p className="text-xs italic text-gray-400 py-4 text-center">Chưa có món nào được đặt...</p>;
+                        }
+
+                        const groupedCardItems = activeItems.reduce((acc: any[], item) => {
+                          const addonKey = (item.selectedAddons || []).map((a: any) => a.name).sort().join(',');
+                          const optionKey = item.selectedOption?.name || '';
+                          const key = `${item.name}-${optionKey}-${addonKey}-${item.isPaid}`;
                           const existing = acc.find(i => i.groupKey === key);
                           if (existing) {
                             existing.quantity += (item.quantity || 1);
                             existing.totalPrice += (item.totalPrice ?? item.basePrice ?? item.price ?? 0);
+                            existing.rawItems.push({ id: item._id, isPaid: item.isPaid });
                           } else {
                             acc.push({ 
                               ...item, 
-                              groupKey: key,
-                              quantity: item.quantity || 1,
-                              totalPrice: item.totalPrice ?? item.basePrice ?? item.price ?? 0
+                              groupKey: key, 
+                              quantity: item.quantity || 1, 
+                              totalPrice: item.totalPrice ?? item.basePrice ?? item.price ?? 0, 
+                              rawItems: [{ id: item._id, isPaid: item.isPaid }] 
                             });
                           }
                           return acc;
                         }, []);
 
-                        return groupedItems.map((item, idx) => (
+                        return groupedCardItems.map((item, idx) => (
                           <div key={idx} className="bg-white rounded-2xl p-3 border border-gray-100 flex gap-4 group hover:border-brand/30 transition-all duration-300">
-                            {/* Item Image */}
-                            <div className="w-16 h-16 shrink-0 rounded-xl overflow-hidden shadow-sm">
-                               <img 
-                                 src={item.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=1760&auto=format&fit=crop'} 
-                                 className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" 
-                                 alt={item.name} 
-                               />
+                            <div className="w-16 h-16 shrink-0 rounded-xl overflow-hidden shadow-sm relative mt-0.5">
+                               <img src={item.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=1760&auto=format&fit=crop'} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt={item.name} />
+                               <div className="absolute inset-0 bg-black/5 rounded-xl"></div>
                             </div>
-
                             <div className="flex-1 flex flex-col justify-between py-0.5">
                               <div>
                                 <div className="flex justify-between items-start gap-2">
-                                  <p className="font-bold text-gray-800 text-sm leading-tight">{item.name}</p>
-                                  <span className="text-[10px] font-black text-gray-400 whitespace-nowrap">x{item.quantity}</span>
+                                  <div className="flex items-center gap-2">
+                                    <p className="font-bold text-gray-800 text-sm leading-tight">
+                                      {item.name}
+                                      {item.isPaid && (
+                                        <span className="ml-2 inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-emerald-50 text-emerald-600 rounded text-[8px] font-black uppercase border border-emerald-100 shadow-sm">
+                                          <CheckCircle2 className="w-2.5 h-2.5" /> Đã trả
+                                        </span>
+                                      )}
+                                    </p>
+                                  </div>
+                                  <div className="bg-gray-50 px-2 py-0.5 rounded-md border border-gray-200">
+                                    <span className="text-[11px] font-black text-gray-600 whitespace-nowrap">x{item.quantity}</span>
+                                  </div>
                                 </div>
-                                
-                                {/* Options & Addons display */}
                                 {(item.selectedOption || (item.selectedAddons && item.selectedAddons.length > 0)) && (
                                   <div className="mt-1.5 flex flex-wrap gap-1">
                                     {item.selectedOption && (
-                                      <span className="text-[8px] font-black bg-slate-50 text-slate-500 px-1.5 py-0.5 rounded border border-slate-100 uppercase">
+                                      <span className="text-[9px] font-black bg-slate-50 text-slate-500 px-1.5 py-0.5 rounded border border-slate-100 uppercase">
                                         {item.selectedOption.name}
                                       </span>
                                     )}
                                     {item.selectedAddons?.map((addon: any, aIdx: number) => (
-                                      <span key={aIdx} className="text-[8px] font-black bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded border border-amber-100 uppercase">
+                                      <span key={aIdx} className="text-[9px] font-black bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded border border-amber-100 uppercase">
                                         + {addon.name}
                                       </span>
                                     ))}
                                   </div>
                                 )}
+                                {item.note && <p className="text-[9px] text-orange-500 italic mt-1 bg-orange-50 w-fit px-1.5 py-0.5 rounded">Ghi chú: {item.note}</p>}
                               </div>
-
-                              <div className="flex items-center justify-between mt-1">
-                                <span className="text-xs font-black text-brand italic">
-                                  {Number(item.totalPrice).toLocaleString()}đ
-                                </span>
-                                <div className="h-1 w-1 bg-brand rounded-full opacity-30" />
+                              <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-50">
+                                <span className="text-sm font-black text-brand tracking-tight">{Number(item.totalPrice).toLocaleString()}đ</span>
+                                {!item.isPaid && (
+                                  <button
+                                    onClick={() => {
+                                      const unpaidItems = item.rawItems.filter(i => !i.isPaid);
+                                      if (unpaidItems.length === 0) return;
+                                      
+                                      const sessionId = (order as any)._id || order.id;
+                                      setConfirmConfig({
+                                        isOpen: true,
+                                        title: 'Hủy bớt món',
+                                        message: `Nhập số lượng ${item.name} cần hủy:`,
+                                        variant: 'danger',
+                                        inputConfig: {
+                                          type: 'number',
+                                          min: 1,
+                                          max: unpaidItems.length,
+                                          defaultValue: 1
+                                        },
+                                        onConfirm: async (cancelAmount?: number) => {
+                                          try {
+                                            const amount = Math.min(Math.max(1, cancelAmount || 1), unpaidItems.length);
+                                            const itemsToCancel = unpaidItems.slice(-amount);
+                                            
+                                            await Promise.all(itemsToCancel.map(targetItem => 
+                                              axios.put(`/api/orders/${sessionId}/item/${targetItem.id}/status`, { status: 'cancelled' })
+                                            ));
+                                            fetchOrders();
+                                            toast.success(`Đã hủy ${amount} suất ${item.name}`);
+                                          } catch (err) {
+                                            console.error('Cancel item failed:', err);
+                                            toast.error('Lỗi khi hủy món');
+                                          }
+                                        }
+                                      });
+                                    }}
+                                    className="text-[10px] bg-rose-50 border border-rose-100 hover:bg-rose-100 text-rose-500 hover:text-rose-600 px-2.5 py-1 rounded-[6px] font-bold uppercase transition-colors flex items-center gap-1 opacity-0 group-hover:opacity-100 shadow-sm"
+                                  >
+                                    <XCircle className="w-3 h-3" /> Hủy bớt
+                                  </button>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -372,23 +464,79 @@ export const AdminOrderManagement = () => {
                   {/* Actions Area */}
                   <div className="flex items-center gap-4 pt-4 border-t border-gray-50">
                     {order.items.some(item => item.status === 'pending_approval') && (
-                      <button
-                        onClick={() => approveAll(orderId)}
-                        className="px-5 bg-white border border-gray-100 text-gray-600 rounded-2xl hover:bg-gray-50 transition-all flex items-center justify-center h-[52px] font-black text-[10px] uppercase tracking-widest"
-                      >
+                      <button onClick={() => approveAll(orderId)} className="px-5 bg-white border border-gray-100 text-gray-600 rounded-2xl hover:bg-gray-50 transition-all flex items-center justify-center h-[52px] font-black text-[10px] uppercase tracking-widest">
                         Duyệt tất cả
                       </button>
                     )}
 
-                    {order.status === 'active' && (
-                      <button
-                        onClick={() => handlePayment(order)}
-                        className="flex-1 bg-brand text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all shadow-lg shadow-brand/20 flex items-center justify-center gap-2"
-                      >
-                        <CreditCard className="w-4 h-4" />
-                        {order.paymentStatus === 'paid' ? 'Hoàn tất & Đóng bàn' : 'Thu tiền & Đóng bàn'}
-                      </button>
-                    )}
+                    {order.status === 'active' && (() => {
+                      const relevantItems = order.items.filter(item => item.status !== 'in_cart' && item.status !== 'cancelled');
+                      const unpaidAmount = relevantItems
+                        .filter(item => !item.isPaid)
+                        .reduce((sum, item) => sum + (item.totalPrice ?? 0), 0);
+                      const isFullyPaid = unpaidAmount <= 0 && relevantItems.length > 0;
+                      const hasNoItems = relevantItems.length === 0;
+
+                      return (
+                        <button
+                          onClick={() => {
+                            const orderId = (order as any)._id || order.id;
+                            
+                            // Nếu chưa gọi món gì (chỉ có in_cart), cho phép Hủy/Đóng bàn luôn
+                            if (hasNoItems) {
+                              setConfirmConfig({
+                                isOpen: true,
+                                title: 'Xác nhận Đóng bàn',
+                                message: 'Khách chưa đặt món nào. Xác nhận đóng bàn và giải phóng bàn?',
+                                variant: 'info',
+                                onConfirm: async () => {
+                                  try {
+                                    // Hủy luôn đơn hàng vì chưa có món
+                                    await axios.put(`/api/orders/${orderId}`, { status: 'cancelled' });
+                                    fetchOrders();
+                                    toast.success('Đã giải phóng bàn!');
+                                  } catch (err) {
+                                    console.error('Cancellation failed:', err);
+                                    toast.error('Lỗi khi đóng bàn!');
+                                  }
+                                }
+                              });
+                              return;
+                            }
+
+                            setConfirmConfig({
+                              isOpen: true,
+                              title: isFullyPaid ? 'Xác nhận Đóng bàn' : 'Xác nhận Thu tiền',
+                              message: isFullyPaid 
+                                ? `Đơn hàng đã được thanh toán hết. Xác nhận hoàn tất và giải phóng bàn?`
+                                : `Đơn hàng còn thiếu ${unpaidAmount.toLocaleString()}đ (tiền mặt). Xác nhận thu và đóng bàn?`,
+                              variant: isFullyPaid ? 'info' : 'warning',
+                              onConfirm: async () => {
+                                try {
+                                  await axios.post(`/api/orders/${orderId}/complete`);
+                                  fetchOrders();
+                                  toast.success('Đơn hàng đã hoàn tất, bàn đã sẵn sàng!');
+                                } catch (err) {
+                                  console.error('Completion failed:', err);
+                                  toast.error('Lỗi khi chốt đơn hàng!');
+                                }
+                              }
+                            });
+                          }}
+                          className={cn(
+                            "flex-1 py-4 rounded-2xl font-black text-xs uppercase tracking-widest active:scale-95 transition-all shadow-lg flex items-center justify-center gap-2",
+                            hasNoItems
+                              ? "bg-gray-100 text-gray-500 hover:bg-gray-200 shadow-none border border-gray-200"
+                              : isFullyPaid ? "bg-emerald-600 text-white shadow-emerald-200 hover:bg-emerald-700" : "bg-brand text-white shadow-brand/20 hover:brightness-110"
+                          )}
+                        >
+                          {hasNoItems 
+                            ? <><XCircle className="w-4 h-4" /> Đóng bàn (Chưa đặt món)</>
+                            : <><CreditCard className="w-4 h-4" /> {isFullyPaid ? 'Hoàn tất & Đóng bàn' : 'Thu tiền & Đóng bàn'}</>
+                          }
+                        </button>
+                      );
+                    })()}
 
                     <div className="flex items-center gap-2">
                       <button 
@@ -435,11 +583,12 @@ export const AdminOrderManagement = () => {
 
       <ConfirmModal
         isOpen={confirmConfig.isOpen}
-        onClose={() => setConfirmConfig({ ...confirmConfig, isOpen: false })}
+        onClose={() => setConfirmConfig({ ...confirmConfig, isOpen: false, inputConfig: undefined })}
         onConfirm={confirmConfig.onConfirm}
         title={confirmConfig.title}
         message={confirmConfig.message}
         variant={confirmConfig.variant}
+        inputConfig={confirmConfig.inputConfig}
       />
 
       {/* Order Details Modal */}
@@ -508,31 +657,107 @@ export const AdminOrderManagement = () => {
               <div>
                 <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-4">Danh sách món ({selectedOrderDetails.items.filter(i => i.status !== 'cancelled').reduce((acc, i) => acc + (i.quantity || 1), 0)} món)</p>
                 <div className="space-y-3">
-                  {selectedOrderDetails.items.filter(i => i.status !== 'cancelled').map((item, idx) => (
-                    <div key={idx} className="flex gap-4 p-4 border border-gray-100 rounded-xl items-center bg-gray-50/50">
-                      <div className="w-12 h-12 rounded-lg bg-gray-200 overflow-hidden shrink-0">
-                        <img 
-                          src={item.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=1760&auto=format&fit=crop'} 
-                          alt={item.name}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-bold text-gray-900 text-sm">{item.name}</p>
-                        {item.selectedOption && <p className="text-[10px] font-bold text-gray-500">Kích cỡ: {item.selectedOption.name}</p>}
-                        {item.selectedAddons && item.selectedAddons.length > 0 && (
-                          <p className="text-[10px] font-bold text-gray-500 line-clamp-1">
-                            Thêm: {item.selectedAddons.map(a => a.name).join(', ')}
+                  {(() => {
+                    const groupedModalItems = (selectedOrderDetails.items || []).filter(i => i.status !== 'cancelled').reduce((acc: any[], item) => {
+                      const addonKey = (item.selectedAddons || []).map((a: any) => a.name).sort().join(',');
+                      const optionKey = item.selectedOption?.name || '';
+                      // Phân tách riêng món đã trả và chưa trả
+                      const key = `${item.name}-${optionKey}-${addonKey}-${item.isPaid}`;
+                      const existing = acc.find(i => i.groupKey === key);
+                      if (existing) {
+                        existing.quantity += (item.quantity || 1);
+                        existing.totalPrice += (item.totalPrice ?? item.basePrice ?? item.price ?? 0);
+                        existing.rawItems.push({ id: item._id, isPaid: item.isPaid, quantity: item.quantity || 1 });
+                      } else {
+                        acc.push({ 
+                          ...item, 
+                          groupKey: key, 
+                          quantity: item.quantity || 1, 
+                          totalPrice: item.totalPrice ?? item.basePrice ?? item.price ?? 0, 
+                          rawItems: [{ id: item._id, isPaid: item.isPaid, quantity: item.quantity || 1 }] 
+                        });
+                      }
+                      return acc;
+                    }, []);
+
+                    return groupedModalItems.map((item, idx) => (
+                      <div key={idx} className="flex gap-4 p-4 border border-gray-100 rounded-xl items-start bg-gray-50/50">
+                        <div className="w-12 h-12 rounded-lg bg-gray-200 overflow-hidden shrink-0 mt-1">
+                          <img 
+                            src={item.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=1760&auto=format&fit=crop'} 
+                            alt={item.name}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-bold text-gray-900 text-sm flex items-center gap-2">
+                            {item.name}
+                            {item.isPaid && (
+                              <span className="flex items-center gap-0.5 px-1.5 py-0.5 bg-emerald-50 text-emerald-600 rounded text-[8px] font-black uppercase border border-emerald-100 shadow-sm">
+                                <CheckCircle2 className="w-2.5 h-2.5" /> Đã trả
+                              </span>
+                            )}
                           </p>
-                        )}
-                        {item.note && <p className="text-[10px] text-orange-500 italic mt-0.5 bg-orange-50 w-fit px-1.5 py-0.5 rounded">Ghi chú: {item.note}</p>}
+                          {item.selectedOption && <p className="text-[10px] font-bold text-gray-500">Kích cỡ: {item.selectedOption.name}</p>}
+                          {item.selectedAddons && item.selectedAddons.length > 0 && (
+                            <p className="text-[10px] font-bold text-gray-500 line-clamp-1">
+                              Thêm: {item.selectedAddons.map(a => a.name).join(', ')}
+                            </p>
+                          )}
+                          {item.note && <p className="text-[10px] text-orange-500 italic mt-0.5 bg-orange-50 w-fit px-1.5 py-0.5 rounded">Ghi chú: {item.note}</p>}
+                        </div>
+                        <div className="text-right shrink-0 flex flex-col items-end gap-1.5">
+                          <div className="bg-white px-2 py-0.5 rounded-md border border-gray-200 shadow-sm shadow-gray-100">
+                             <p className="text-xs font-black text-gray-600">x{item.quantity}</p>
+                          </div>
+                          <p className="text-sm font-black text-brand">{(item.totalPrice).toLocaleString()}đ</p>
+                          
+                          {/* Nút Hủy giảm */}
+                          {!item.isPaid && (
+                            <button
+                               onClick={() => {
+                                 // Tìm một phần ăn chưa thanh toán từ mảng gốc để hủy bớt
+                                 const unpaidItems = item.rawItems.filter(i => !i.isPaid);
+                                 if (unpaidItems.length === 0) return;
+                                 
+                                 const sessionId = (selectedOrderDetails as any)._id || selectedOrderDetails.id;
+                                 setConfirmConfig({
+                                   isOpen: true,
+                                   title: 'Hủy bớt món',
+                                   message: `Nhập số lượng ${item.name} cần hủy:`,
+                                   variant: 'danger',
+                                   inputConfig: {
+                                     type: 'number',
+                                     min: 1,
+                                     max: unpaidItems.length,
+                                     defaultValue: 1
+                                   },
+                                   onConfirm: async (cancelAmount?: number) => {
+                                     try {
+                                       const amount = Math.min(Math.max(1, cancelAmount || 1), unpaidItems.length);
+                                       const itemsToCancel = unpaidItems.slice(-amount);
+                                       
+                                       await Promise.all(itemsToCancel.map(targetItem => 
+                                         axios.put(`/api/orders/${sessionId}/item/${targetItem.id}/status`, { status: 'cancelled' })
+                                       ));
+                                       fetchOrders(); // Reload orders in background. useEffect sẽ tự động update selectedOrderDetails nên không cần đóng modal.
+                                       toast.success(`Đã hủy ${amount} suất ${item.name}`);
+                                     } catch (err) {
+                                       console.error('Cancel item failed:', err);
+                                       toast.error('Lỗi khi hủy món');
+                                     }
+                                   }
+                                 });
+                               }}
+                               className="mt-1 px-2 py-1 bg-white border border-rose-100 text-rose-500 rounded-md text-[10px] font-black uppercase flex items-center gap-1 hover:bg-rose-50 hover:border-rose-200 transition-colors shadow-sm"
+                            >
+                              <XCircle className="w-3 h-3" /> Hủy bớt
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      <div className="text-right shrink-0">
-                        <p className="text-xs font-black text-gray-400 mb-1">x{item.quantity}</p>
-                        <p className="text-sm font-black text-brand">{(item.totalPrice ?? item.basePrice ?? item.price ?? 0).toLocaleString()}đ</p>
-                      </div>
-                    </div>
-                  ))}
+                    ));
+                  })()}
                 </div>
               </div>
             </div>

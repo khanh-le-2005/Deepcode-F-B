@@ -589,7 +589,14 @@ export const AdminOrderHistory = () => {
                         />
                       </div>
                       <div className="flex-1">
-                        <p className="font-bold text-gray-900 text-sm">{item.name}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-bold text-gray-900 text-sm">{item.name}</p>
+                          {item.isPaid && (
+                            <span className="flex items-center gap-0.5 px-1.5 py-0.5 bg-emerald-50 text-emerald-600 rounded text-[8px] font-black uppercase border border-emerald-100 shadow-sm">
+                              <CheckCircle2 className="w-2.5 h-2.5" /> Đã trả
+                            </span>
+                          )}
+                        </div>
                         {item.selectedOption && <p className="text-[10px] font-bold text-gray-500">Kích cỡ: {item.selectedOption.name}</p>}
                         {item.selectedAddons && item.selectedAddons.length > 0 && (
                           <p className="text-[10px] font-bold text-gray-500 line-clamp-1">

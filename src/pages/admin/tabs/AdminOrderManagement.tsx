@@ -272,6 +272,11 @@ export const AdminOrderManagement = () => {
                             <p className="text-xs font-bold text-gray-900">
                               {order.customerInfo.name || 'Khách Kiosk'} - {order.customerInfo.phone}
                             </p>
+                            {order.orderType === 'delivery' && order.customerInfo.deliveryAddress && (
+                              <p className="text-[11px] font-semibold text-brand mt-1 truncate" title={order.customerInfo.deliveryAddress}>
+                                📍 {order.customerInfo.deliveryAddress}
+                              </p>
+                            )}
                           </div>
                         )}
 
@@ -482,22 +487,25 @@ export const AdminOrderManagement = () => {
                           onClick={() => {
                             const orderId = (order as any)._id || order.id;
                             
+                            const isDineIn = order.orderType === 'dine_in' || !order.orderType;
+                            const orderTypeName = order.orderType === 'delivery' ? 'giao hàng' : order.orderType === 'takeaway' ? 'mang về' : 'bàn';
+                            
                             // Nếu chưa gọi món gì (chỉ có in_cart), cho phép Hủy/Đóng bàn luôn
                             if (hasNoItems) {
                               setConfirmConfig({
                                 isOpen: true,
-                                title: 'Xác nhận Đóng bàn',
-                                message: 'Khách chưa đặt món nào. Xác nhận đóng bàn và giải phóng bàn?',
+                                title: isDineIn ? 'Xác nhận Đóng bàn' : 'Xác nhận Hủy đơn',
+                                message: isDineIn ? 'Khách chưa đặt món nào. Xác nhận đóng bàn và giải phóng bàn?' : 'Khách chưa đặt món nào. Xác nhận hủy đơn hàng này?',
                                 variant: 'info',
                                 onConfirm: async () => {
                                   try {
                                     // Hủy luôn đơn hàng vì chưa có món
                                     await axios.put(`/api/orders/${orderId}`, { status: 'cancelled' });
                                     fetchOrders();
-                                    toast.success('Đã giải phóng bàn!');
+                                    toast.success(isDineIn ? 'Đã giải phóng bàn!' : 'Đã hủy đơn hàng!');
                                   } catch (err) {
                                     console.error('Cancellation failed:', err);
-                                    toast.error('Lỗi khi đóng bàn!');
+                                    toast.error('Lỗi thao tác!');
                                   }
                                 }
                               });
@@ -506,16 +514,18 @@ export const AdminOrderManagement = () => {
 
                             setConfirmConfig({
                               isOpen: true,
-                              title: isFullyPaid ? 'Xác nhận Đóng bàn' : 'Xác nhận Thu tiền',
+                              title: isFullyPaid 
+                                ? (isDineIn ? 'Xác nhận Đóng bàn' : 'Xác nhận Hoàn tất đơn') 
+                                : 'Xác nhận Thu tiền',
                               message: isFullyPaid 
-                                ? `Đơn hàng đã được thanh toán hết. Xác nhận hoàn tất và giải phóng bàn?`
-                                : `Đơn hàng còn thiếu ${unpaidAmount.toLocaleString()}đ (tiền mặt). Xác nhận thu và đóng bàn?`,
+                                ? (isDineIn ? `Đơn hàng đã được thanh toán hết. Xác nhận hoàn tất và giải phóng bàn?` : `Đơn hàng đã thanh toán. Xác nhận hoàn tất đơn ${orderTypeName}?`)
+                                : `Đơn hàng còn thiếu ${unpaidAmount.toLocaleString()}đ (tiền mặt). Xác nhận thu và ${isDineIn ? 'đóng bàn' : `hoàn tất đơn ${orderTypeName}`}?`,
                               variant: isFullyPaid ? 'info' : 'warning',
                               onConfirm: async () => {
                                 try {
                                   await axios.post(`/api/orders/${orderId}/complete`);
                                   fetchOrders();
-                                  toast.success('Đơn hàng đã hoàn tất, bàn đã sẵn sàng!');
+                                  toast.success(isDineIn ? 'Đơn hàng đã hoàn tất, bàn đã sẵn sàng!' : 'Đơn hàng đã hoàn tất!');
                                 } catch (err) {
                                   console.error('Completion failed:', err);
                                   toast.error('Lỗi khi chốt đơn hàng!');
@@ -531,8 +541,11 @@ export const AdminOrderManagement = () => {
                           )}
                         >
                           {hasNoItems 
-                            ? <><XCircle className="w-4 h-4" /> Đóng bàn (Chưa đặt món)</>
-                            : <><CreditCard className="w-4 h-4" /> {isFullyPaid ? 'Hoàn tất & Đóng bàn' : 'Thu tiền & Đóng bàn'}</>
+                            ? <><XCircle className="w-4 h-4" /> {(order.orderType === 'dine_in' || !order.orderType) ? 'Đóng bàn (Trống)' : 'Hủy đơn (Trống)'}</>
+                            : <><CreditCard className="w-4 h-4" /> {isFullyPaid 
+                                ? ((order.orderType === 'dine_in' || !order.orderType) ? 'Hoàn tất & Đóng bàn' : 'Hoàn tất đơn hàng') 
+                                : ((order.orderType === 'dine_in' || !order.orderType) ? 'Thu tiền & Đóng bàn' : (order.orderType === 'delivery' ? 'Thu COD & Hoàn tất' : 'Thu tiền & Hoàn tất'))
+                              }</>
                           }
                         </button>
                       );

@@ -48,8 +48,9 @@ export const MenuPage = () => {
     if (!tableId) return;
     try {
       const res = await axios.get(`/api/orders/table/${tableId}/active-session`);
-      // Nếu đơn đã thanh toán hoặc hoàn tất thì coi như không còn session đặt món active
-      const isStillActive = res.data && res.data.status === 'active' && res.data.paymentStatus !== 'paid';
+      // Chỉ ẩn session nếu bàn đã được đóng (completed/cancelled), không phụ thuộc paymentStatus
+      // Vì khách có thể trả từng món trước (paymentStatus=paid) nhưng vẫn có thể gọi thêm nếu muốn
+      const isStillActive = res.data && res.data.status === 'active';
       setActiveSession(isStillActive ? res.data : null);
     } catch (error: any) {
       if (error.response?.status === 404) {
@@ -77,7 +78,8 @@ export const MenuPage = () => {
     const handleOrderUpdate = (updatedOrder: Order) => {
       const slugify = (str?: string) => str ? String(str).toLowerCase().trim().replace(/[\s\W-]+/g, '-') : '';
       if (tableId && (updatedOrder.tableId === tableId || updatedOrder.tableId === slugify(tableId))) {
-        const isStillActive = updatedOrder.status === 'active' && updatedOrder.paymentStatus !== 'paid';
+        // Chỉ ẩn session nếu bàn đã được đóng (completed/cancelled)
+        const isStillActive = updatedOrder.status === 'active';
         setActiveSession(isStillActive ? updatedOrder : null);
       }
     };

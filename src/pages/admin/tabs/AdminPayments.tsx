@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CreditCard, Search, Filter, Clock, CheckCircle2, MoreVertical } from 'lucide-react';
+import { CreditCard, Search, Clock, Calendar } from 'lucide-react';
 import axios from '@/src/lib/axiosClient';
 import { Payment } from '../../../types';
 import { clsx, type ClassValue } from 'clsx';
@@ -13,6 +13,8 @@ function cn(...inputs: ClassValue[]) {
 export const AdminPayments = () => {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
 
   useEffect(() => {
     fetchPayments();
@@ -20,19 +22,37 @@ export const AdminPayments = () => {
 
   const fetchPayments = () => {
     axios.get('/api/payments')
-      .then(res => setPayments(res.data.reverse()))
+      .then(res => {
+        // Newest first
+        const sorted = [...res.data].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        setPayments(sorted);
+      })
       .catch(err => console.error("Failed to fetch payments:", err));
   };
 
-  const filteredPayments = payments.filter(p => {
-    const orderIdStr = String(typeof p.orderId === 'string' ? p.orderId : p.orderId?._id || p.orderId?.id || '');
+  const filtered = payments.filter(p => {
+    const orderIdStr = String(typeof p.orderId === 'string' ? p.orderId : (p.orderId as any)?._id || (p.orderId as any)?.id || '');
     const idStr = String(p.id || (p as any)._id || '');
-    return orderIdStr.includes(searchTerm) || idStr.includes(searchTerm);
+    const orderCodeStr = String((p as any).orderCode || '');
+    const tableStr = String(p.tableName || '').toLowerCase();
+    const cashierStr = String(p.cashierName || '').toLowerCase();
+    const term = searchTerm.toLowerCase();
+
+    const matchesText = !term || orderIdStr.includes(term) || idStr.includes(term) || orderCodeStr.includes(term) || tableStr.includes(term) || cashierStr.includes(term);
+
+    let matchesDate = true;
+    if (dateFrom) {
+      matchesDate = matchesDate && new Date(p.createdAt) >= new Date(dateFrom + 'T00:00:00');
+    }
+    if (dateTo) {
+      matchesDate = matchesDate && new Date(p.createdAt) <= new Date(dateTo + 'T23:59:59');
+    }
+    return matchesText && matchesDate;
   });
 
   const getOrderLabel = (payment: Payment) => {
     if (typeof payment.orderId === 'string') return payment.orderId;
-    return payment.orderId?._id || payment.orderId?.id || '';
+    return (payment.orderId as any)?._id || (payment.orderId as any)?.id || '';
   };
 
   return (
@@ -42,18 +62,41 @@ export const AdminPayments = () => {
           <h2 className="text-3xl font-black text-gray-900 tracking-tight">Lịch sử thanh toán</h2>
           <p className="text-gray-500 font-medium mt-1">Quản lý các giao dịch và doanh thu</p>
         </div>
+        <span className="px-4 py-2 bg-amber-50 text-amber-700 rounded-2xl text-sm font-bold border border-amber-100">
+          {filtered.length} giao dịch
+        </span>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-4">
+      {/* Filters */}
+      <div className="flex flex-col md:flex-row gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
           <input
             type="text"
-            placeholder="Tìm kiếm theo mã đơn hoặc mã giao dịch..."
+            placeholder="Tìm kiếm theo mã đơn, mã PayOS, bàn, thu ngân..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full bg-white border border-gray-100 rounded-2xl py-4 pl-12 pr-4 focus:outline-none focus:ring-2 focus:ring-amber-500/20 shadow-sm transition-all"
           />
+        </div>
+        <div className="flex items-center gap-2 bg-white border border-gray-100 rounded-2xl px-4 shadow-sm">
+          <Calendar className="w-4 h-4 text-gray-400 shrink-0" />
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+            className="py-3.5 text-sm text-gray-600 focus:outline-none bg-transparent"
+          />
+          <span className="text-gray-300 font-bold">→</span>
+          <input
+            type="date"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+            className="py-3.5 text-sm text-gray-600 focus:outline-none bg-transparent"
+          />
+          {(dateFrom || dateTo) && (
+            <button onClick={() => { setDateFrom(''); setDateTo(''); }} className="text-red-400 hover:text-red-600 text-xs font-bold ml-1">✕</button>
+          )}
         </div>
       </div>
 
@@ -74,19 +117,32 @@ export const AdminPayments = () => {
             </thead>
             <tbody>
               <AnimatePresence>
-                {filteredPayments.map((payment, i) => (
+                {filtered.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="px-8 py-16 text-center text-gray-400 font-bold">
+                      Không tìm thấy giao dịch nào
+                    </td>
+                  </tr>
+                ) : filtered.map((payment, i) => (
                   <motion.tr
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.05 }}
-                    key={payment.id}
+                    transition={{ delay: i * 0.03 }}
+                    key={payment.id || (payment as any)._id}
                     className="border-b border-gray-50 hover:bg-gray-50/50 transition-all group"
                   >
                     <td className="px-8 py-6">
-                      <span className="text-sm font-bold text-gray-900">#{String(payment.id || (payment as any)._id || '').toUpperCase()}</span>
+                      <span className="text-sm font-bold text-gray-900">#{String(payment.id || (payment as any)._id || '').slice(-8).toUpperCase()}</span>
                     </td>
                     <td className="px-8 py-6">
-                      <span className="text-sm font-bold text-gray-400">#{String(getOrderLabel(payment) || '').toUpperCase()}</span>
+                      <div className="space-y-1">
+                        <span className="text-xs font-bold text-gray-400 block">#{String(getOrderLabel(payment)).slice(-8).toUpperCase()}</span>
+                        {(payment as any).orderCode && (
+                          <span className="inline-flex items-center px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px] font-black uppercase tracking-widest border border-blue-100">
+                            PayOS #{(payment as any).orderCode}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-8 py-6">
                       <div className="space-y-1">

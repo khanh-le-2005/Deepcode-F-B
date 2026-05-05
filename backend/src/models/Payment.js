@@ -21,6 +21,8 @@ const paymentSchema = new mongoose.Schema(
     cashierName: { type: String, default: "Hệ thống tự động" }, // Thu ngân nào thao tác
 
     status: { type: String, default: "success" },
+    orderCode: { type: Number }, // Mã thanh toán PayOS (numeric)
+    transactionId: { type: String }, // Mã giao dịch gốc từ PayOS (nếu có nhãn này)
   },
   globalSchemaOptions,
 );

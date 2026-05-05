@@ -16,23 +16,11 @@ app.set("trust proxy", 1);
 app.use(
   cors({
     origin: [
-      "http://localhost:8000",
-      "http://localhost:8080",
-      "http://momangshow.vn",
-      "https://momangshow.vn",
-      "http://www.momangshow.vn",
-      "https://www.momangshow.vn",
-      "http://api.momangshow.vn",
-      "https://api.momangshow.vn",
-      "http://admin.momangshow.vn",
-      "https://admin.momangshow.vn",
-      "http://150.95.115.212:8080",
-      "http://150.95.115.212:8000",
-      "http://150.95.115.212",
+      "https://go.ulaedu.com/",
       "http://localhost:3000",
-      "http://localhost:3001",
-      "https://pay.momangshow.vn/api",
-      "http://127.0.0.1:5500",
+      "http://localhost:3002",
+
+
     ],
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allowedHeaders: ["Content-Type", "Authorization"],

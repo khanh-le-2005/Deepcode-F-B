@@ -158,7 +158,18 @@ class PaymentService {
     
     console.log(`[PayOS Verify] Manual/Auto check triggered for OrderCode ${orderCode}`);
     try {
-      const paymentInfo = await payos.getPaymentLinkInformation(orderCode);
+      // Tương thích cả SDK v1 và v2
+      const getInfo = payos.getPaymentLinkInformation || payos.paymentRequests?.get;
+      if (typeof getInfo !== 'function') {
+        // SDK không hỗ trợ check trực tiếp → thử check trong DB
+        const order = await Order.findOne({ orderCode });
+        if (order && order.paymentStatus === 'paid') {
+          return { success: true, status: 'PAID', order, source: 'db' };
+        }
+        return { success: false, status: 'UNKNOWN', message: 'SDK không hỗ trợ kiểm tra trực tiếp' };
+      }
+
+      const paymentInfo = await getInfo.call(payos, orderCode);
       console.log(`[PayOS Verify] Current status from API: ${paymentInfo.status}`);
 
       if (paymentInfo.status === "PAID") {
@@ -235,6 +246,7 @@ class PaymentService {
         bankNameSnapshot: bankNameSnapshotStr,
         cashierName: "Hệ thống điện tử tự động",
         status: "success",
+        orderCode: Number(orderCode), // Lưu lại mã thanh toán PayOS
       });
     }
 
@@ -271,17 +283,26 @@ class PaymentService {
   }
 
   async verifyPaymentByOrderId(orderId, io) {
-    // Được sử dụng bởi Frontend Auto-Sync để không phụ thuộc vào old orderCode trên URL
     const order = await Order.findById(orderId);
     if (!order) {
       throw new NotFoundError("Không tìm thấy đơn hàng này để đối soát");
+    }
+
+    // Ưu tiên kiểm tra trong DB trước: Nếu Webhook đã xử lý xong rồi thì không cần gọi API PayOS nữa
+    if (order.paymentStatus === 'paid') {
+      console.log(`[Verify] OrderId ${orderId} đã được đánh dấu PAID trong DB (webhook đã xử lý). Trả về thành công người dùng.`);
+      if (io) {
+        io.emit("order-paid", { orderId: order._id, paymentStatus: "paid" });
+        io.emit("order-updated", order);
+      }
+      return { success: true, status: 'PAID', order, source: 'db' };
     }
 
     if (!order.orderCode) {
       return { success: false, message: "Đơn hàng chưa từng tạo mã thanh toán PayOS." };
     }
 
-    // Gọi hàm verifyPaymentStatus cũ (nhưng nay truyền vào orderCode mới nhất từ DB)
+    // Nếu chưa PAID trong DB: Gọi PayOS API để đối soát (với tố độ hợp SDK)
     try {
       const result = await this.verifyPaymentStatus(order.orderCode, io);
       return result;

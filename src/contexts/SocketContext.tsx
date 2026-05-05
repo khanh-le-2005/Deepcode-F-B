@@ -17,8 +17,8 @@ interface SocketContextType {
 const SocketContext = createContext<SocketContextType | undefined>(undefined);
 
 // URL của server. Trong thực tế có thể lấy từ .env
-const SOCKET_URL = window.location.origin.includes('localhost') 
-  ? 'http://localhost:3000' 
+const SOCKET_URL = window.location.origin.includes('localhost')
+  ? 'http://localhost:3001'
   : window.location.origin;
 
 export const SocketProvider = ({ children }: { children: ReactNode }) => {

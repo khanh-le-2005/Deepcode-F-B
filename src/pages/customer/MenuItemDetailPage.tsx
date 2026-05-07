@@ -49,7 +49,7 @@ export const MenuItemDetailPage = () => {
   }, [itemId, status, tableId]);
 
   const handleToggleAddon = (addon: any) => {
-    setSelectedAddons(prev => 
+    setSelectedAddons(prev =>
       prev.find(a => a.name === addon.name)
         ? prev.filter(a => a.name !== addon.name)
         : [...prev, addon]
@@ -68,7 +68,7 @@ export const MenuItemDetailPage = () => {
 
   const handleAddToCart = async () => {
     if (!item) return;
-    
+
     const itemsToAdd = [{
       menuItemId: getMenuItemId(item),
       name: item.name,
@@ -97,10 +97,10 @@ export const MenuItemDetailPage = () => {
       }
     } else {
       // Local Cart cho Delivery
-      const unitPrice = Number(item.price) + 
-                        Number(selectedOption?.priceExtra || 0) + 
-                        selectedAddons.reduce((sum, addon) => sum + Number(addon.priceExtra || 0), 0);
-      
+      const unitPrice = Number(item.price) +
+        Number(selectedOption?.priceExtra || 0) +
+        selectedAddons.reduce((sum, addon) => sum + Number(addon.priceExtra || 0), 0);
+
       addToCart({
         ...itemsToAdd[0],
         totalPrice: unitPrice * quantity,
@@ -124,30 +124,30 @@ export const MenuItemDetailPage = () => {
   };
 
   if (status === 'loading') {
-     return <div className="min-h-screen flex items-center justify-center bg-[#fcf9f4]"><div className="w-10 h-10 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div></div>;
+    return <div className="min-h-screen flex items-center justify-center bg-[#fcf9f4]"><div className="w-10 h-10 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div></div>;
   }
 
   if (status === 'invalid') {
-     return <InvalidTable tableId={tableId} />;
+    return <InvalidTable tableId={tableId} />;
   }
 
   if (loading) {
-     return <div className="min-h-screen flex items-center justify-center bg-[#fcf9f4]"><div className="w-10 h-10 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div></div>;
+    return <div className="min-h-screen flex items-center justify-center bg-[#fcf9f4]"><div className="w-10 h-10 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div></div>;
   }
 
   if (!item) {
-     return (
-       <div className="min-h-screen flex flex-col items-center justify-center bg-[#fcf9f4]">
-         <h1 className="text-3xl font-bold italic mb-4" style={{ fontFamily: "'Playfair Display', serif" }}>Không tìm thấy món!</h1>
-         <button onClick={() => navigate(tableId ? `/table/${tableId}/menu` : `/menu`)} className="bg-red-600 text-white px-6 py-3 rounded uppercase font-bold text-sm">Quay lại thực đơn</button>
-       </div>
-     );
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#fcf9f4]">
+        <h1 className="text-3xl font-bold italic mb-4" style={{ fontFamily: "'Playfair Display', serif" }}>Không tìm thấy món!</h1>
+        <button onClick={() => navigate(tableId ? `/table/${tableId}/menu` : `/menu`)} className="bg-red-600 text-white px-6 py-3 rounded uppercase font-bold text-sm">Quay lại thực đơn</button>
+      </div>
+    );
   }
 
   return (
-    
+
     <div className="bg-[#fcf9f4] min-h-screen text-[#1a1a1a]" style={{ fontFamily: "'Be Vietnam Pro', sans-serif" }}>
-      <CustomerHeader 
+      <CustomerHeader
         tableId={tableId}
         showBackButton={true}
         totalItems={displayTotalItems}
@@ -157,9 +157,9 @@ export const MenuItemDetailPage = () => {
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-16">
         <div className="bg-white rounded-4xl sm:rounded-[3rem] p-6 sm:p-10 md:p-16 shadow-2xl flex flex-col lg:flex-row gap-8 lg:gap-16 relative overflow-hidden text-center lg:text-left border border-gray-100">
           <div className="absolute top-0 right-0 w-64 h-64 bg-red-50 rounded-full -translate-y-1/2 translate-x-1/2 mix-blend-multiply opacity-50 blur-3xl"></div>
-          
+
           <div className="w-full lg:w-1/2 flex items-center justify-center relative z-10">
-            <motion.div 
+            <motion.div
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ duration: 0.5 }}
@@ -179,19 +179,19 @@ export const MenuItemDetailPage = () => {
                 <span className="bg-red-100 text-red-600 text-xs font-black uppercase px-3 py-1 rounded-full">{getMenuItemCategoryName(item)}</span>
                 <span className="flex text-yellow-500"><Star className="w-4 h-4 fill-current" /><Star className="w-4 h-4 fill-current" /><Star className="w-4 h-4 fill-current" /><Star className="w-4 h-4 fill-current" /><Star className="w-4 h-4 fill-current" /></span>
               </div>
-              
+
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-black text-gray-900 mb-6 italic" style={{ fontFamily: "'Playfair Display', serif" }}>
                 {item.name}
               </h1>
-              
+
               <p className="text-gray-500 leading-relaxed mb-8 text-lg">
                 {item.description || "Hương vị tuyệt hảo được chế biến từ những nguyên liệu tươi ngon nhất, mang đến trải nghiệm ẩm thực khó quên dành cho bạn."}
               </p>
 
               <div className="text-4xl md:text-5xl font-black text-red-600 mb-8" style={{ fontFamily: "'Playfair Display', serif" }}>
                 {(
-                  Number(item.price || 0) + 
-                  Number(selectedOption?.priceExtra || 0) + 
+                  Number(item.price || 0) +
+                  Number(selectedOption?.priceExtra || 0) +
                   selectedAddons.reduce((sum, a) => sum + Number(a.priceExtra || 0), 0)
                 ).toLocaleString()}đ
               </div>
@@ -205,11 +205,10 @@ export const MenuItemDetailPage = () => {
                       <button
                         key={opt.name}
                         onClick={() => setSelectedOption(selectedOption?.name === opt.name ? null : opt)}
-                        className={`px-5 py-3 rounded-2xl font-bold border-2 transition-all ${
-                          selectedOption?.name === opt.name
+                        className={`px-5 py-3 rounded-2xl font-bold border-2 transition-all ${selectedOption?.name === opt.name
                             ? 'border-red-600 bg-red-600 text-white shadow-lg shadow-red-200'
                             : 'border-gray-100 bg-white text-gray-600 hover:border-gray-200'
-                        }`}
+                          }`}
                       >
                         {opt.name} {opt.priceExtra > 0 && `(+${opt.priceExtra.toLocaleString()}đ)`}
                       </button>
@@ -229,11 +228,10 @@ export const MenuItemDetailPage = () => {
                         <button
                           key={addon.name}
                           onClick={() => handleToggleAddon(addon)}
-                          className={`px-5 py-3 rounded-2xl font-bold border-2 transition-all ${
-                            isSelected
+                          className={`px-5 py-3 rounded-2xl font-bold border-2 transition-all ${isSelected
                               ? 'border-gray-900 bg-gray-900 text-white shadow-lg'
                               : 'border-gray-100 bg-white text-gray-600 hover:border-gray-200'
-                          }`}
+                            }`}
                         >
                           {addon.name} {addon.priceExtra > 0 && `(+${addon.priceExtra.toLocaleString()}đ)`}
                         </button>
@@ -249,8 +247,8 @@ export const MenuItemDetailPage = () => {
                   <span className="px-4 font-black text-xl w-12 text-center text-gray-900">{quantity}</span>
                   <button onClick={() => setQuantity(quantity + 1)} className="px-6 h-full flex items-center hover:text-red-600 font-black text-xl transition-colors">+</button>
                 </div>
-                
-                <button 
+
+                <button
                   onClick={handleAddToCart}
                   className="bg-[#111] hover:bg-red-600 text-white px-10 h-14 rounded-full font-black uppercase tracking-widest flex items-center justify-center gap-3 transition-colors shadow-[0_10px_40px_-10px_rgba(220,38,38,0.5)] w-full sm:w-auto"
                 >
@@ -289,8 +287,8 @@ export const MenuItemDetailPage = () => {
               <div className="pt-3 pb-2 px-6 sm:px-8 bg-[#111] text-white shrink-0">
                 <div className="mx-auto h-1.5 w-12 rounded-full bg-white/30 mb-4" />
                 <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold italic uppercase" style={{ fontFamily: "'Playfair Display', serif" }}>Giỏ hàng của bạn</h2>
-                <X className="w-6 h-6 cursor-pointer" onClick={() => setIsCartOpen(false)} />
+                  <h2 className="text-2xl font-bold italic uppercase" style={{ fontFamily: "'Playfair Display', serif" }}>Giỏ hàng của bạn</h2>
+                  <X className="w-6 h-6 cursor-pointer" onClick={() => setIsCartOpen(false)} />
                 </div>
               </div>
 

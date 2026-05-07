@@ -70,7 +70,7 @@ export const CustomerHeader = ({
               {showBackButton ? (
                 <button
                   onClick={() =>
-                    navigate(tableId ? `/table/${tableId}/menu` : "/menu")
+                    navigate(tableId ? `/table/${tableId}/menu` : "/")
                   }
                   className="flex items-center gap-2 hover:text-red-600 transition-colors uppercase font-bold text-sm"
                 >
@@ -90,7 +90,7 @@ export const CustomerHeader = ({
                   <h1
                     className="text-2xl sm:text-3xl font-black italic tracking-tighter text-red-600 cursor-pointer"
                     style={{ fontFamily: "'Playfair Display', serif" }}
-                    onClick={() => navigate(tableId ? `/table/${tableId}/menu` : "/menu")}
+                    onClick={() => navigate(tableId ? `/table/${tableId}/menu` : "/")}
                   >
                     BTEC
                   </h1>

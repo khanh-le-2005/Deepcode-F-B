@@ -2,7 +2,7 @@ import axios from 'axios';
 
 const axiosClient = axios.create({
   // baseURL: typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000',
-  baseURL:'http://localhost:3000',
+  baseURL:'http://localhost:3001',
 
   timeout: 30000,
   withCredentials: true, // Quan trọng: Cho phép gửi/nhận Cookie Http-Only (Refresh Token)

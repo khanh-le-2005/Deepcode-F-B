@@ -82,7 +82,7 @@ export interface Table {
 
 /** Món trong phiên (OrderItem Object) */
 export interface OrderItem {
-  _id: string;
+  _id?: string;
   menuItemId: string;
   isCombo?: boolean;
   name: string;
@@ -93,7 +93,7 @@ export interface OrderItem {
     name: string;
     priceExtra: number;
   };
-  selectedAddons: {
+  selectedAddons?: {
     name: string;
     priceExtra: number;
   }[];

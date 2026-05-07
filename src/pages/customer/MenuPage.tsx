@@ -71,7 +71,7 @@ export const MenuPage = () => {
       .catch(err => {
         console.error("Failed to fetch menu:", err);
         setMenu([]);
-    });
+      });
     fetchActiveSession();
 
     const handleOrderUpdate = (updatedOrder: Order) => {
@@ -321,12 +321,12 @@ export const MenuPage = () => {
                   <h3 className="text-base sm:text-lg font-bold text-gray-900 group-hover:text-red-600 transition-colors mb-0.5 sm:mb-1 italic cursor-pointer line-clamp-1" style={{ fontFamily: "'Playfair Display', serif" }} onClick={() => navigate(tableId ? `/table/${tableId}/menu/${item.id}` : `/menu/${item.id}`)}>
                     {item.name} {selectedOptionsMap[getMenuItemId(item)]?.name}
                   </h3>
-                  
+
                   <div className="flex flex-col items-center gap-2 mb-3 sm:mb-4">
                     <div className="text-sm sm:text-base font-black text-red-600 italic" style={{ fontFamily: "'Playfair Display', serif" }}>
                       {(item.price + Number(selectedOptionsMap[getMenuItemId(item)]?.priceExtra || 0)).toLocaleString()}đ
                     </div>
-                    
+
                     {/* Size Selection Pill Buttons */}
                     {item.options && item.options.length > 0 && (
                       <div className="flex gap-1.5 mt-1">
@@ -338,22 +338,22 @@ export const MenuPage = () => {
                               onClick={(e) => { e.stopPropagation(); toggleCardOption(getMenuItemId(item), opt); }}
                               className={cn(
                                 "px-2.5 py-1 rounded-full text-[12px] font-black uppercase tracking-tighter border transition-all",
-                                isSelected 
-                                  ? "bg-red-600 text-white border-red-600 shadow-sm" 
+                                isSelected
+                                  ? "bg-red-600 text-white border-red-600 shadow-sm"
                                   : "bg-gray-50 text-gray-400 border-gray-100 hover:border-gray-300"
                               )}
-                              >
-                                {opt.name} {opt.priceExtra > 0 && `(+${opt.priceExtra.toLocaleString()}đ)`}
-                              </button>
+                            >
+                              {opt.name} {opt.priceExtra > 0 && `(+${opt.priceExtra.toLocaleString()}đ)`}
+                            </button>
                           );
                         })}
                       </div>
                     )}
                   </div>
 
-                  <div className="w-full mt-auto space-y-2">                    
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); handleQuickAdd(item); }} 
+                  <div className="w-full mt-auto space-y-2">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleQuickAdd(item); }}
                       className="w-full py-2 sm:py-2.5 rounded-xl font-bold text-[10px] sm:text-xs uppercase tracking-widest transition-all hover:shadow-lg flex items-center justify-center gap-2 bg-red-600 text-white border border-transparent group/btn"
                     >
                       <ShoppingBag className="w-3 h-3 sm:w-4 sm:h-4 group-hover/btn:scale-110 transition-transform" />
@@ -418,7 +418,7 @@ export const MenuPage = () => {
                             <img src={item.image ?? ''} className="w-20 h-20 rounded-2xl object-cover" alt="" />
                             <div className="flex-1">
                               <h4 className="font-bold italic text-lg" style={{ fontFamily: "'Playfair Display', serif" }}>{item.name}</h4>
-                              
+
                               {(item.selectedOption || (item.selectedAddons && item.selectedAddons.length > 0)) && (
                                 <div className="mt-1 space-y-0.5">
                                   {item.selectedOption && <p className="text-[15px] text-gray-500 italic">• {item.selectedOption.name}</p>}
@@ -464,7 +464,7 @@ export const MenuPage = () => {
                             <img src={item.image ?? ''} className="w-16 h-16 rounded-2xl object-cover" alt="" />
                             <div className="flex-1">
                               <h4 className="font-bold italic text-base" style={{ fontFamily: "'Playfair Display', serif" }}>{item.name}</h4>
-                              
+
                               {(item.selectedOption || (item.selectedAddons && item.selectedAddons.length > 0)) && (
                                 <div className="mt-0.5 space-y-0.5 mb-1">
                                   {item.selectedOption && <p className="text-[9px] text-gray-400 italic">• {item.selectedOption.name}</p>}

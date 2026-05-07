@@ -16,6 +16,7 @@ import 'swiper/css/navigation';
 // Import required modules
 import { Autoplay, Pagination, Navigation } from 'swiper/modules';
 import Footer from '@/src/components/ui/Footer';
+import { useCart } from '../../contexts/CartContext';
 
 // --- Cấu hình API theo tài liệu ---
 const BASE_URL = 'http://localhost:3001/api';
@@ -29,19 +30,21 @@ export default function SummerMenuKiosk() {
     const navigate = useNavigate();
 
     // --- STATE ---
+    const {
+        cart,
+        addToCart: addToGlobalCart,
+        totalPrice: globalTotalPrice,
+        totalItems: globalTotalItems
+    } = useCart();
+
     const [categories, setCategories] = useState<Category[]>([]);
     const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedCatId, setSelectedCatId] = useState<string>('all');
     const [selectedOptionsMap, setSelectedOptionsMap] = useState<Record<string, any>>({});
-    const [cart, setCart] = useState<CartItem[]>([]);
-    const [isModalOpen, setIsModalOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedItemForDetail, setSelectedItemForDetail] = useState<MenuItem | null>(null);
 
-    const [orderType, setOrderType] = useState<'takeaway' | 'delivery'>('takeaway');
-    const [paymentMethod, setPaymentMethod] = useState<'transfer' | 'cash'>('transfer');
-    const [customerInfo, setCustomerInfo] = useState({ name: '', phone: '', deliveryAddress: '', note: '' });
     const [qrResponse, setQrResponse] = useState<{ qrBase64: string; paymentContent: string; orderId?: string; tableId?: string } | null>(null);
 
     const [currentSlide, setCurrentSlide] = useState(0);
@@ -101,49 +104,27 @@ export default function SummerMenuKiosk() {
 
     // --- FUNCTIONS ---
     const getItemId = (item: any) => item._id || item.id;
-    const getCartTotal = () => cart.reduce((s, item) => s + ((item.price + (item.selectedOption?.priceExtra || 0)) * item.quantity), 0);
 
     const addToCart = (item: MenuItem, selectedOption?: any) => {
-        setCart(prev => {
-            const cartItemId = `${getItemId(item)}${selectedOption ? `-${selectedOption.name}` : ''}`;
-            const existingIndex = prev.findIndex(i => `${getItemId(i)}${i.selectedOption ? `-${i.selectedOption.name}` : ''}` === cartItemId);
-            if (existingIndex >= 0) {
-                const newCart = [...prev]; newCart[existingIndex].quantity += 1; return newCart;
-            }
-            return [...prev, { ...item, quantity: 1, selectedOption }];
+        // Transform MenuItem to OrderItem structure for global CartContext
+        addToGlobalCart({
+            menuItemId: getItemId(item),
+            name: item.name,
+            basePrice: item.price,
+            quantity: 1,
+            totalPrice: item.price + (selectedOption?.priceExtra || 0),
+            selectedOption: selectedOption ? {
+                name: selectedOption.name,
+                priceExtra: selectedOption.priceExtra
+            } : undefined,
+            selectedAddons: [],
+            status: 'in_cart',
+            image: item.images?.length > 0 ? IMAGE_URL(item.images[0]) : 'https://placehold.co/400',
+            category: item.categoryId?.name || 'Món ngon'
         });
     };
 
-    const updateQuantity = (cartItemId: string, delta: number) => {
-        setCart(prev => prev.map(item => {
-            const iId = `${getItemId(item)}${item.selectedOption ? `-${item.selectedOption.name}` : ''}`;
-            return iId === cartItemId ? { ...item, quantity: Math.max(1, item.quantity + delta) } : item;
-        }));
-    };
 
-    const removeFromCart = (cartItemId: string) => {
-        setCart(prev => prev.filter(item => `${getItemId(item)}${item.selectedOption ? `-${item.selectedOption.name}` : ''}` !== cartItemId));
-    };
-
-    const handleCheckout = async () => {
-        const payload = {
-            orderType, paymentMethod, customerInfo,
-            items: cart.map(item => ({
-                menuItemId: getItemId(item), name: item.selectedOption ? `${item.name} (${item.selectedOption.name})` : item.name,
-                basePrice: item.price + (item.selectedOption?.priceExtra || 0), quantity: item.quantity, selectedOption: item.selectedOption
-            }))
-        };
-        try {
-            const res = await fetch(`${BASE_URL}/orders/kiosk`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-            const result = await res.json();
-            if (res.ok) {
-                const actualOrderId = result.qrData?.orderId || result._id || result.id;
-                const actualTableId = result.tableId || result.qrData?.tableId;
-                if (paymentMethod === 'transfer' && result.qrData) setQrResponse({ ...result.qrData, orderId: actualOrderId, tableId: actualTableId });
-                else { setCart([]); setIsModalOpen(false); if (actualOrderId) navigate(`/success?orderId=${actualOrderId}`); }
-            }
-        } catch (err) { alert("Lỗi gửi đơn."); }
-    };
 
     // Lọc sản phẩm
     // --- LOGIC LỌC SẢN PHẨM ĐÃ SỬA LỖI ---
@@ -179,7 +160,7 @@ export default function SummerMenuKiosk() {
                         <div className="w-10 h-10 bg-orange-500 rounded-full flex items-center justify-center text-white"><Leaf size={20} /></div>
                         <h1 className="text-xl md:text-2xl font-black tracking-tighter text-gray-900">BTEC<span className="text-orange-500">TEA</span></h1>
                     </div>
-
+                    {/* 
                     <nav className="hidden lg:flex items-center gap-8 text-sm font-bold text-gray-600">
                         <span className="hover:text-orange-500 cursor-pointer">HOME +</span>
                         <span className="hover:text-orange-500 cursor-pointer">ABOUT +</span>
@@ -187,15 +168,15 @@ export default function SummerMenuKiosk() {
                         <span className="hover:text-orange-500 cursor-pointer">PAGES +</span>
                         <span className="hover:text-orange-500 cursor-pointer">BLOG +</span>
                         <span className="hover:text-orange-500 cursor-pointer">CONTACT</span>
-                    </nav>
+                    </nav> */}
 
                     <div className="flex items-center gap-3 md:gap-5">
                         <button className="hidden md:flex p-2 hover:bg-gray-100 rounded-full transition-colors"><Search size={20} /></button>
-                        <button onClick={() => setIsModalOpen(true)} className="relative p-2 hover:bg-gray-100 rounded-full transition-colors">
+                        <button onClick={() => navigate('/cart')} className="relative p-2 hover:bg-gray-100 rounded-full transition-colors">
                             <ShoppingBag size={20} />
-                            {cart.length > 0 && <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-bold w-4 h-4 flex items-center justify-center rounded-full">{cart.reduce((s, i) => s + i.quantity, 0)}</span>}
+                            {cart.length > 0 && <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-bold w-4 h-4 flex items-center justify-center rounded-full">{globalTotalItems}</span>}
                         </button>
-                        <button onClick={() => setIsModalOpen(true)} className="bg-orange-500 text-white px-4 md:px-6 py-2 md:py-2.5 rounded text-xs md:text-sm font-bold flex items-center gap-2 hover:bg-orange-600 transition-colors">
+                        <button onClick={() => navigate('/cart')} className="flex lg:flex hidden  bg-orange-500 text-white px-4 md:px-6 py-2 md:py-2.5 rounded text-xs md:text-sm font-bold flex items-center gap-2 hover:bg-orange-600 transition-colors">
                             <ShoppingCart size={16} /> ORDER NOW
                         </button>
                     </div>
@@ -332,16 +313,6 @@ export default function SummerMenuKiosk() {
 
                 {/* === RIGHT CONTENT (GRID SẢN PHẨM) === */}
                 <div className="flex-1">
-                    {/* QUẢNG CÁO NHỎ TRÊN GRID THAY VÌ CAROUSEL LỚN */}
-                    {/* <div className="w-full h-[180px] rounded-xl overflow-hidden mb-8 relative shadow-md">
-                        <img src={heroSlides[0].image} className="w-full h-full object-cover" alt="" />
-                        <div className="absolute inset-0 bg-black/40 flex flex-col justify-center p-8">
-                            <span className="bg-orange-500 text-white text-[10px] font-bold px-2 py-1 rounded w-fit mb-2">{heroSlides[0].badge}</span>
-                            <h3 className="text-white text-3xl font-black">{heroSlides[0].title1}</h3>
-                        </div>
-                    </div> */}
-
-                    {/* PRODUCT GRID */}
                     {filteredItems.length === 0 ? (
                         <div className="text-center py-20 bg-white rounded-xl border border-gray-100">
                             <Search className="mx-auto text-gray-300 w-16 h-16 mb-4" />
@@ -350,25 +321,42 @@ export default function SummerMenuKiosk() {
                     ) : (
                         <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
                             {filteredItems.map((item, index) => (
-                                <div key={item._id || index} className="bg-white rounded-[16px] shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col overflow-hidden border border-gray-100 group">
+                                <div key={item._id || index} className="group bg-white rounded-[24px] shadow-sm hover:shadow-2xl transition-all duration-300 flex flex-col overflow-hidden border border-orange-50/50">
 
-                                    <div className="relative aspect-[4/3] bg-gray-50 cursor-pointer" onClick={() => setSelectedItemForDetail(item)}>
-                                        <img src={item.images?.length > 0 ? IMAGE_URL(item.images[0]) : 'https://placehold.co/400'} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt={item.name} />
-                                        <div className="absolute bottom-0 right-4 translate-y-1/2 bg-[#B32626] text-white text-[9px] md:text-[10px] font-bold px-3 py-1 rounded shadow-md uppercase tracking-wider z-10">
-                                            {item.categoryId?.name || 'Thức uống'}
+                                    {/* --- ẢNH SẢN PHẨM & BADGE --- */}
+                                    <div className="relative aspect-square md:aspect-[4/3] bg-[#FEF9E7] cursor-pointer overflow-hidden" onClick={() => setSelectedItemForDetail(item)}>
+                                        <img
+                                            src={item.images?.length > 0 ? IMAGE_URL(item.images[0]) : 'https://placehold.co/400'}
+                                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                                            alt={item.name}
+                                        />
+                                        {/* Overlay đen nhẹ khi hover */}
+                                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-300" />
+
+                                        {/* Tag Danh Mục: Chuyển lên góc trên trái, làm mờ hiện đại */}
+                                        <div className="absolute top-3 left-3 bg-orange-500/90 backdrop-blur-sm text-white text-[8px] md:text-[10px] font-black px-3 py-1.5 rounded-full shadow-sm uppercase tracking-widest z-10">
+                                            {item.categoryId?.name || 'Món ngon'}
                                         </div>
                                     </div>
 
-                                    <div className="p-4 md:p-5 flex-1 flex flex-col pt-6">
-                                        <div className="flex text-yellow-400 mb-2">
+                                    {/* --- NỘI DUNG THÔNG TIN --- */}
+                                    <div className="p-3 md:p-5 flex-1 flex flex-col">
+                                        {/* Đánh giá sao (Màu vàng mềm mại hơn) */}
+                                        <div className="flex gap-0.5 text-yellow-400 mb-1.5 md:mb-2">
                                             <Star size={12} fill="currentColor" /> <Star size={12} fill="currentColor" /> <Star size={12} fill="currentColor" /> <Star size={12} fill="currentColor" /> <Star size={12} fill="currentColor" />
                                         </div>
 
-                                        <h3 className="font-black text-sm md:text-base text-gray-900 mb-1 cursor-pointer hover:text-orange-500 line-clamp-1" onClick={() => setSelectedItemForDetail(item)}>{item.name}</h3>
-                                        <p className="text-gray-500 text-[10px] md:text-xs line-clamp-2 mb-4 leading-relaxed">{item.description}</p>
+                                        <h3 className="font-black text-sm md:text-lg text-gray-900 mb-0.5 md:mb-1 cursor-pointer hover:text-orange-600 line-clamp-1 transition-colors " onClick={() => setSelectedItemForDetail(item)}>
+                                            {item.name}
+                                        </h3>
 
+                                        <p className="text-gray-500 text-[11px] md:text-[13px] line-clamp-2 mb-2 md:mb-3 leading-snug">
+                                            {item.description || 'Thức uống giải nhiệt mùa hè sảng khoái.'}
+                                        </p>
+
+                                        {/* --- CÁC TÙY CHỌN (OPTIONS) --- */}
                                         {item.options && item.options.length > 0 && (
-                                            <div className="flex flex-wrap gap-1.5 mb-4">
+                                            <div className="flex flex-wrap gap-1.5 md:gap-2 mb-3 md:mb-4">
                                                 {item.options.map(opt => {
                                                     const isSelected = selectedOptionsMap[getItemId(item)]?.name === opt.name;
                                                     return (
@@ -378,29 +366,44 @@ export default function SummerMenuKiosk() {
                                                                 e.stopPropagation();
                                                                 setSelectedOptionsMap(prev => ({ ...prev, [getItemId(item)]: prev[getItemId(item)]?.name === opt.name ? null : opt }));
                                                             }}
-                                                            className={`px-2 py-1 rounded text-[9px] font-bold uppercase transition-all ${isSelected ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                                                            // Giao diện Option mềm mại hơn
+                                                            className={`px-2.5 md:px-3 py-1 md:py-1.5 rounded-full text-[12px] md:text-[15px] font-bold transition-all ${isSelected
+                                                                ? 'bg-orange-500 text-white shadow-md shadow-orange-200'
+                                                                : 'bg-gray-50 text-gray-500 hover:bg-orange-50 hover:text-orange-600 cursor-pointer'
+                                                                }`}
                                                         >
-                                                            {opt.name}
+                                                            {opt.name} {opt.priceExtra > 0 && `(+${(opt.priceExtra / 1000)}k)`}
                                                         </button>
                                                     )
                                                 })}
                                             </div>
                                         )}
 
+                                        {/* --- FOOTER: GIÁ & NÚT THÊM VÀO GIỎ --- */}
                                         {(() => {
                                             const selectedOption = selectedOptionsMap[getItemId(item)];
                                             const displayPrice = item.price + (selectedOption?.priceExtra || 0);
                                             return (
-                                                <div className="mt-auto pt-4 border-t border-gray-100 flex items-center justify-between">
-                                                    <button
-                                                        onClick={() => addToCart(item, selectedOption)}
-                                                        className="text-[10px] md:text-xs font-black text-gray-600 hover:text-orange-600 transition-colors uppercase"
-                                                    >
-                                                        Add to cart
-                                                    </button>
-                                                    <div className="flex items-center gap-1 md:gap-2">
-                                                        <span className="font-black text-sm md:text-lg text-orange-600">{displayPrice.toLocaleString()}đ</span>
+                                                <div className="mt-auto pt-4 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 md:gap-0">
+                                                    <div className="flex flex-col">
+                                                        <span className="text-[8px] md:text-[9px] text-gray-400 font-bold uppercase tracking-widest mb-0.5">Giá bán</span>
+                                                        <div className="flex items-baseline text-orange-600">
+                                                            <span className="font-black text-base md:text-xl leading-none">{displayPrice.toLocaleString()}</span>
+                                                            <span className="font-bold text-[10px] md:text-xs ml-0.5">đ</span>
+                                                        </div>
                                                     </div>
+
+                                                    {/* Nút bấm dạng Circle Button xịn xò */}
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation(); // Tránh click nhầm vào xem chi tiết
+                                                            addToCart(item, selectedOption);
+                                                        }}
+                                                        className="w-full sm:w-9 sm:h-9 md:w-11 md:h-11 py-2.5 sm:py-0 bg-orange-500 text-white rounded-xl sm:rounded-full flex items-center justify-center hover:bg-orange-600 hover:scale-105 sm:hover:scale-110 sm:hover:-rotate-6 transition-all shadow-lg shadow-orange-200 cursor-pointer"
+                                                    >
+                                                        <ShoppingCart size={18} className="md:w-5 md:h-5" />
+                                                        <span className="sm:hidden ml-2 font-black text-[10px] uppercase tracking-widest">Thêm vào giỏ</span>
+                                                    </button>
                                                 </div>
                                             );
                                         })()}
@@ -414,110 +417,21 @@ export default function SummerMenuKiosk() {
 
             {/* MODALS */}
             <AnimatePresence>
-                {cart.length > 0 && !isModalOpen && (
-                    <motion.div initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 50 }} className="fixed bottom-6 right-4 z-50 lg:hidden">
-                        <button onClick={() => setIsModalOpen(true)} className="flex items-center bg-orange-500 text-white rounded-full p-2 pr-4 shadow-2xl border-2 border-white">
+                {cart.length > 0 && (
+                    <motion.div initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 50 }} className="fixed bottom-6 right-4 z-50">
+                        <button onClick={() => navigate('/cart')} className="flex items-center bg-orange-500 text-white rounded-full p-2 pr-4 shadow-2xl border-2 border-white">
                             <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center relative">
                                 <ShoppingBag size={20} className="text-orange-500" />
-                                <span className="absolute -top-1 -right-1 bg-[#B32626] text-white text-[9px] font-black w-4 h-4 flex items-center justify-center rounded-full">{cart.length}</span>
+                                <span className="absolute -top-1 -right-1 bg-[#B32626] text-white text-[9px] font-black w-4 h-4 flex items-center justify-center rounded-full">{globalTotalItems}</span>
                             </div>
                             <div className="ml-3 flex flex-col items-start">
                                 <span className="text-[10px] font-black uppercase tracking-widest">Giỏ Hàng</span>
-                                <span className="text-sm font-black">{getCartTotal().toLocaleString()}đ</span>
+                                <span className="text-sm font-black">{globalTotalPrice.toLocaleString()}đ</span>
                             </div>
                         </button>
                     </motion.div>
                 )}
             </AnimatePresence>
-
-            {isModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsModalOpen(false)}></div>
-                    <div className="relative bg-[#FAF7F0] w-full max-w-5xl rounded-[20px] overflow-hidden shadow-2xl flex flex-col md:flex-row h-[90vh] md:h-[80vh]">
-                        {qrResponse ? (
-                            <div className="w-full p-8 md:p-16 text-center flex flex-col items-center justify-center bg-white overflow-y-auto">
-                                <h2 className="text-2xl md:text-3xl font-black mb-4 text-orange-600">Thanh toán ngay!</h2>
-                                <img src={`data:image/png;base64,${qrResponse.qrBase64}`} className="w-48 h-48 md:w-64 md:h-64 shadow-lg rounded-xl mb-6 border border-gray-100" alt="QR" />
-                                <div className="bg-[#FAF7F0] border border-[#F0E6D2] text-gray-900 px-6 py-4 rounded-xl mb-6 w-full max-w-sm">
-                                    <p className="text-[10px] font-bold uppercase tracking-widest mb-1 text-gray-500">Nội dung chuyển khoản</p>
-                                    <p className="text-xl md:text-2xl font-black font-mono">{qrResponse.paymentContent}</p>
-                                </div>
-                                <Loader2 className="animate-spin text-orange-500 mb-2" size={30} />
-                                <p className="text-orange-600 font-bold animate-pulse text-sm">Hệ thống đang chờ nhận tiền...</p>
-                                <button onClick={() => setQrResponse(null)} className="text-xs font-bold text-gray-500 underline hover:text-orange-600 mt-4">Đổi phương thức thanh toán</button>
-                            </div>
-                        ) : (
-                            <>
-                                <div className="flex-1 p-6 md:p-10 overflow-y-auto bg-white">
-                                    <div className="flex justify-between items-center mb-8">
-                                        <h2 className="text-2xl font-black text-gray-900 uppercase">Checkout</h2>
-                                        <button onClick={() => setIsModalOpen(false)} className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-600"><X size={20} /></button>
-                                    </div>
-
-                                    <div className="grid grid-cols-2 gap-4 mb-8">
-                                        <button onClick={() => setOrderType('takeaway')} className={`p-4 md:p-6 rounded-xl border-2 transition-all flex flex-col items-center gap-2 ${orderType === 'takeaway' ? 'border-orange-500 bg-orange-50 text-orange-600' : 'border-gray-100 text-gray-400'}`}>
-                                            <Package size={24} /> <b className="uppercase tracking-widest text-[10px]">Mang về</b>
-                                        </button>
-                                        <button onClick={() => setOrderType('delivery')} className={`p-4 md:p-6 rounded-xl border-2 transition-all flex flex-col items-center gap-2 ${orderType === 'delivery' ? 'border-orange-500 bg-orange-50 text-orange-600' : 'border-gray-100 text-gray-400'}`}>
-                                            <Truck size={24} /> <b className="uppercase tracking-widest text-[10px]">Giao hàng</b>
-                                        </button>
-                                    </div>
-
-                                    <div className="space-y-4 mb-8">
-                                        <input type="text" className="w-full px-5 py-3 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:border-orange-500 text-sm" placeholder="Tên khách hàng..." onChange={e => setCustomerInfo({ ...customerInfo, name: e.target.value })} />
-                                        <input type="tel" className="w-full px-5 py-3 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:border-orange-500 text-sm" placeholder="Số điện thoại..." onChange={e => setCustomerInfo({ ...customerInfo, phone: e.target.value })} />
-                                        {orderType === 'delivery' && <textarea className="w-full px-5 py-3 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:border-orange-500 text-sm" rows={2} placeholder="Địa chỉ giao hàng..." onChange={e => setCustomerInfo({ ...customerInfo, deliveryAddress: e.target.value })} />}
-                                    </div>
-
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <button onClick={() => setPaymentMethod('transfer')} className={`p-4 rounded-xl border-2 transition-all font-bold flex items-center gap-2 justify-center text-xs ${paymentMethod === 'transfer' ? 'border-orange-500 bg-orange-500 text-white' : 'border-gray-200 text-gray-500'}`}><CreditCard size={16} /> Chuyển khoản</button>
-                                        <button onClick={() => setPaymentMethod('cash')} className={`p-4 rounded-xl border-2 transition-all font-bold flex items-center gap-2 justify-center text-xs ${paymentMethod === 'cash' ? 'border-orange-500 bg-orange-500 text-white' : 'border-gray-200 text-gray-500'}`}><Banknote size={16} /> Tiền mặt</button>
-                                    </div>
-                                </div>
-
-                                <div className="w-full md:w-[380px] bg-[#FAF7F0] p-6 md:p-10 flex flex-col border-l border-[#F0E6D2]">
-                                    <h3 className="font-black text-lg mb-6 flex items-center gap-2 text-gray-900 uppercase"><ShoppingBag size={18} /> Cart Summary</h3>
-                                    <div className="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar">
-                                        {cart.map((item, idx) => {
-                                            const cartItemId = `${getItemId(item)}${item.selectedOption ? `-${item.selectedOption.name}` : ''}`;
-                                            return (
-                                                <div key={`${cartItemId}-${idx}`} className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex items-center gap-3">
-                                                    <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-50 shrink-0">
-                                                        <img src={item.images.length > 0 ? IMAGE_URL(item.images[0]) : 'https://placehold.co/100'} className="w-full h-full object-cover" alt={item.name} />
-                                                    </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <h4 className="font-bold text-xs text-gray-900 truncate">{item.name}</h4>
-                                                        {item.selectedOption && <p className="text-[9px] text-gray-500">Size {item.selectedOption.name}</p>}
-                                                        <p className="text-[10px] font-bold text-orange-600 mt-1">{(item.price + (item.selectedOption?.priceExtra || 0)).toLocaleString()}đ</p>
-                                                    </div>
-                                                    <div className="flex flex-col items-end gap-2 shrink-0">
-                                                        <div className="flex items-center bg-gray-50 rounded border border-gray-200">
-                                                            <button onClick={() => updateQuantity(cartItemId, -1)} className="w-6 h-6 flex items-center justify-center text-gray-600 hover:text-orange-600 font-bold">-</button>
-                                                            <span className="w-5 text-center font-bold text-xs">{item.quantity}</span>
-                                                            <button onClick={() => updateQuantity(cartItemId, 1)} className="w-6 h-6 flex items-center justify-center text-gray-600 hover:text-orange-600 font-bold">+</button>
-                                                        </div>
-                                                        <button onClick={() => removeFromCart(cartItemId)} className="text-red-400 hover:text-red-600"><Trash2 size={14} /></button>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                        {cart.length === 0 && <p className="text-center text-gray-400 font-bold py-10 uppercase text-xs">Giỏ hàng trống</p>}
-                                    </div>
-                                    <div className="pt-6 mt-6 border-t border-[#F0E6D2]">
-                                        <div className="flex justify-between text-2xl font-black text-gray-900 mb-6">
-                                            <span>Total</span>
-                                            <span className="text-orange-600">{getCartTotal().toLocaleString()}đ</span>
-                                        </div>
-                                        <button onClick={handleCheckout} disabled={cart.length === 0} className="w-full py-4 bg-orange-500 text-white font-black rounded-xl shadow-md uppercase tracking-widest text-sm hover:bg-orange-600 transition-all disabled:opacity-50">
-                                            Place Order
-                                        </button>
-                                    </div>
-                                </div>
-                            </>
-                        )}
-                    </div>
-                </div>
-            )}
 
             <AnimatePresence>
                 {selectedItemForDetail && (
@@ -536,7 +450,7 @@ export default function SummerMenuKiosk() {
                                 {selectedItemForDetail.options && selectedItemForDetail.options.length > 0 && (
                                     <div className="mb-6">
                                         <h4 className="font-bold text-xs text-gray-800 uppercase mb-3">Tùy chọn</h4>
-                                        <div className="flex flex-wrap gap-2">
+                                        <div className="flex flex-wrap gap-2 cursor-pointer">
                                             {selectedItemForDetail.options.map(opt => {
                                                 const isSelected = selectedOptionsMap[getItemId(selectedItemForDetail)]?.name === opt.name;
                                                 return (

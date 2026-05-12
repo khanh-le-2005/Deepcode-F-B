@@ -143,7 +143,7 @@ export const SuccessPage = () => {
               <span className="text-sm text-gray-400">Tạm tính</span>
               <span className="text-base">{(order?.total || 0).toLocaleString()} đ</span>
             </div>
-            
+
             <div className="flex justify-between font-black text-2xl pt-2 text-gray-900">
               <span>Tổng cộng</span>
               <span className="text-brand">{(order?.total || 0).toLocaleString()} đ</span>
@@ -181,15 +181,15 @@ export const SuccessPage = () => {
       {/* Action Buttons */}
       <div className="mt-16 w-full max-w-md flex flex-col gap-4">
         {(!isCancelled && (order?.id || order?._id)) && (
-          <Button 
-            onClick={() => navigate(`/tracking/${order.id || order._id}`)} 
+          <Button
+            onClick={() => navigate(`/tracking/${order.id || order._id}`)}
             className="w-full bg-white text-[#8b7d51] hover:bg-white/90 border-none py-5 rounded-2xl font-black uppercase tracking-widest shadow-xl active:scale-95 transition-all"
           >
             Theo dõi trạng thái món
           </Button>
         )}
-        <Button 
-          onClick={() => tableId ? navigate(`/table/${tableId}/menu`) : navigate('/kiosk')} 
+        <Button
+          onClick={() => tableId ? navigate(`/table/${tableId}/menu`) : navigate('/kiosk')}
           className="w-full bg-white/20 hover:bg-white/30 text-white border-white/40 border py-5 rounded-2xl font-black uppercase tracking-widest backdrop-blur-sm transition-all shadow-xl active:scale-95"
         >
           Quay lại Trang Chủ

@@ -148,6 +148,7 @@ class OrderService {
         items: newItems,
         total: newItemsTotal,
         status: "active",
+        paymentMethod: data.paymentMethod || "cash",
       });
       session = await newOrder.save();
       await Table.findByIdAndUpdate(
@@ -271,6 +272,7 @@ class OrderService {
         items: newItems,
         total: newItemsTotal,
         status: "active",
+        paymentMethod: data.paymentMethod || "cash",
       });
       session = await newOrder.save();
     }

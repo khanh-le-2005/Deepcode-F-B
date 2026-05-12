@@ -82,6 +82,7 @@ class PaymentService {
       const newOrderCode = Number(`${timePart}${randomPart}`);
 
       order.orderCode = newOrderCode;
+      order.paymentMethod = "transfer"; // Cập nhật phương thức ngay khi khách chọn thanh toán
       await order.save(); // Lưu ngay để DB biết orderCode mới nhất đang chờ đối soát
 
       const body = {
@@ -93,8 +94,8 @@ class PaymentService {
           quantity: item.quantity,
           price: item.basePrice
         })),
-        returnUrl: `${frontendUrl}${redirectPath}`,
-        cancelUrl: `${frontendUrl}${redirectPath}`,
+        returnUrl: `${frontendUrl}${redirectPath}${redirectPath.includes('?') ? '&' : '?'}success=true`,
+        cancelUrl: `${frontendUrl}${redirectPath}${redirectPath.includes('?') ? '&' : '?'}cancel=true`,
       };
 
       const paymentLink = await payos.paymentRequests.create(body);

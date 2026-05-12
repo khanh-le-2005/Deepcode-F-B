@@ -15,7 +15,22 @@ export const getOrderById = async (req, res) => {
 };
 
 export const getOrderStatus = async (req, res) => {
-  const order = await OrderService.getOrderById(req.params.id);
+  let order = await OrderService.getOrderById(req.params.id);
+  if (!order) throw new NotFoundError("Không tìm thấy đơn hàng");
+
+  // [HẬU CẦN] Tự động đối soát với PayOS khi khách kiểm tra trạng thái
+  // Nếu đơn chưa thanh toán nhưng đã từng tạo mã PayOS -> Thử Verify ngay để cập nhật DB
+  if (order.paymentStatus === "unpaid" && order.orderCode) {
+    try {
+      const verified = await PaymentService.verifyPaymentByOrderId(order._id, req.io);
+      if (verified && verified.success && verified.order) {
+        order = verified.order; // Dùng bản ghi mới nhất vừa được verify
+      }
+    } catch (err) {
+      console.warn(`[Auto-Verify] Lỗi nhẹ khi đối soát Order ${order._id}:`, err.message);
+    }
+  }
+
   res.json({
     _id: order._id,
     tableId: order.tableId,
@@ -23,6 +38,7 @@ export const getOrderStatus = async (req, res) => {
     total: order.total,
     status: order.status,
     paymentStatus: order.paymentStatus,
+    paymentMethod: order.paymentMethod, // Trả về để Frontend biết là Chuyển khoản (Fixed)
     completedAt: order.completedAt,
     items: order.items.map(i => ({
       _id: i._id,

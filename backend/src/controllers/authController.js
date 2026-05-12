@@ -17,3 +17,17 @@ export const login = catchAsync(async (req, res) => {
     refreshToken: result.refreshToken
   });
 });
+
+export const refreshToken = catchAsync(async (req, res) => {
+  const { refreshToken: token } = req.body;
+  if (!token) {
+    throw new BadRequestError('Refresh token không được để trống');
+  }
+
+  const result = await AuthService.refreshToken(token);
+  res.json({
+    success: true,
+    token: result.token,
+    refreshToken: result.refreshToken
+  });
+});

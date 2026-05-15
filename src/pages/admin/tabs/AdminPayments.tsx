@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CreditCard, Search, Filter, Clock, CheckCircle2, MoreVertical } from 'lucide-react';
+import { CreditCard, Search, Clock, CheckCircle2, Receipt, ChevronLeft, ChevronRight } from 'lucide-react';
 import axios from '@/src/api/axiosClient';
 import { Payment } from '../../../types';
 import { clsx, type ClassValue } from 'clsx';
@@ -14,29 +14,78 @@ export const AdminPayments = () => {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
 
+  // --- STATE QUẢN LÝ PHÂN TRANG ---
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalPayments, setTotalPayments] = useState(0);
+  const ITEMS_PER_PAGE = 10; // Số giao dịch trên 1 trang
+
   useEffect(() => {
-    fetchPayments();
-  }, []);
+    fetchPayments(currentPage);
+  }, [currentPage]);
 
-  const fetchPayments = () => {
-    axios.get('/api/payments')
-      .then(res => setPayments(res.data.reverse()))
-      .catch(err => console.error("Failed to fetch payments:", err));
+  // Reset về trang 1 nếu tìm kiếm thay đổi
+  useEffect(() => {
+    setCurrentPage(1);
+    fetchPayments(1);
+  }, [searchTerm]);
+
+  const fetchPayments = async (page: number = currentPage) => {
+    try {
+      // 1. Gửi request kèm theo params phân trang (nếu Backend có hỗ trợ)
+      const res = await axios.get('/api/payments', {
+        params: {
+          page: page,
+          limit: ITEMS_PER_PAGE,
+          search: searchTerm || undefined
+        }
+      });
+
+      // 2. Kiểm tra nếu Backend trả về chuẩn dữ liệu Pagination
+      if (res.data && res.data.data) {
+        setPayments(res.data.data);
+        setTotalPages(res.data.totalPages || 1);
+        setTotalPayments(res.data.totalItems || res.data.data.length);
+      } else {
+        // FALLBACK: Backend chỉ trả về mảng nguyên gốc (Chưa hỗ trợ Server Pagination)
+        const allPayments = Array.isArray(res.data) ? res.data.reverse() : [];
+
+        // 2.1. Lọc tay nội bộ (Search)
+        const filtered = allPayments.filter(p => {
+          const orderIdStr = String(typeof p.orderId === 'string' ? p.orderId : p.orderId?._id || p.orderId?.id || '');
+          const idStr = String(p.id || (p as any)._id || '');
+          return orderIdStr.includes(searchTerm) || idStr.includes(searchTerm);
+        });
+
+        // 2.2. Tính toán tổng số trang
+        const total = filtered.length;
+        setTotalPayments(total);
+        setTotalPages(Math.ceil(total / ITEMS_PER_PAGE) || 1);
+
+        // 2.3. Cắt mảng (Slice) cho trang hiện tại
+        const startIndex = (page - 1) * ITEMS_PER_PAGE;
+        const slicedPayments = filtered.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+        setPayments(slicedPayments);
+      }
+    } catch (err) {
+      console.error("Failed to fetch payments:", err);
+    }
   };
-
-  const filteredPayments = payments.filter(p => {
-    const orderIdStr = String(typeof p.orderId === 'string' ? p.orderId : p.orderId?._id || p.orderId?.id || '');
-    const idStr = String(p.id || (p as any)._id || '');
-    return orderIdStr.includes(searchTerm) || idStr.includes(searchTerm);
-  });
 
   const getOrderLabel = (payment: Payment) => {
     if (typeof payment.orderId === 'string') return payment.orderId;
     return payment.orderId?._id || payment.orderId?.id || '';
   };
 
+  // Nút chuyển trang (Previous / Next)
+  const handlePageChange = (newPage: number) => {
+    if (newPage > 0 && newPage <= totalPages) {
+      setCurrentPage(newPage);
+    }
+  };
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 pb-12">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-black text-gray-900 tracking-tight">Lịch sử thanh toán</h2>
@@ -62,31 +111,31 @@ export const AdminPayments = () => {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-gray-50/50 border-b border-gray-100">
-                <th className="px-8 py-6 text-xs font-black uppercase tracking-widest text-gray-400">Mã giao dịch</th>
-                <th className="px-8 py-6 text-xs font-black uppercase tracking-widest text-gray-400">Mã đơn hàng</th>
-                <th className="px-8 py-6 text-xs font-black uppercase tracking-widest text-gray-400">Bàn / Thu ngân</th>
-                <th className="px-8 py-6 text-xs font-black uppercase tracking-widest text-gray-400">Số tiền</th>
-                <th className="px-8 py-6 text-xs font-black uppercase tracking-widest text-gray-400">Phương thức</th>
-                <th className="px-8 py-6 text-xs font-black uppercase tracking-widest text-gray-400">Ngân hàng</th>
-                <th className="px-8 py-6 text-xs font-black uppercase tracking-widest text-gray-400">Thời gian</th>
-                <th className="px-8 py-6 text-xs font-black uppercase tracking-widest text-gray-400">Trạng thái</th>
+                <th className="px-8 py-6 text-xs font-black uppercase tracking-widest text-gray-400 whitespace-nowrap">Mã giao dịch</th>
+                <th className="px-8 py-6 text-xs font-black uppercase tracking-widest text-gray-400 whitespace-nowrap">Mã đơn hàng</th>
+                <th className="px-8 py-6 text-xs font-black uppercase tracking-widest text-gray-400 whitespace-nowrap">Bàn / Thu ngân</th>
+                <th className="px-8 py-6 text-xs font-black uppercase tracking-widest text-gray-400 whitespace-nowrap">Số tiền</th>
+                <th className="px-8 py-6 text-xs font-black uppercase tracking-widest text-gray-400 whitespace-nowrap">Phương thức</th>
+                <th className="px-8 py-6 text-xs font-black uppercase tracking-widest text-gray-400 whitespace-nowrap">Ngân hàng</th>
+                <th className="px-8 py-6 text-xs font-black uppercase tracking-widest text-gray-400 whitespace-nowrap">Thời gian</th>
+                <th className="px-8 py-6 text-xs font-black uppercase tracking-widest text-gray-400 whitespace-nowrap">Trạng thái</th>
               </tr>
             </thead>
             <tbody>
               <AnimatePresence>
-                {filteredPayments.map((payment, i) => (
+                {payments.map((payment, i) => (
                   <motion.tr
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: i * 0.05 }}
-                    key={payment.id}
+                    key={payment.id || (payment as any)._id || i}
                     className="border-b border-gray-50 hover:bg-gray-50/50 transition-all group"
                   >
                     <td className="px-8 py-6">
-                      <span className="text-sm font-bold text-gray-900">#{String(payment.id || (payment as any)._id || '').toUpperCase()}</span>
+                      <span className="text-sm font-bold text-gray-900">#{String(payment.id || (payment as any)._id || '').toUpperCase().slice(-6)}</span>
                     </td>
                     <td className="px-8 py-6">
-                      <span className="text-sm font-bold text-gray-400">#{String(getOrderLabel(payment) || '').toUpperCase()}</span>
+                      <span className="text-sm font-bold text-gray-400">#{String(getOrderLabel(payment) || '').toUpperCase().slice(-6)}</span>
                     </td>
                     <td className="px-8 py-6">
                       <div className="space-y-1">
@@ -99,14 +148,14 @@ export const AdminPayments = () => {
                     </td>
                     <td className="px-8 py-6">
                       <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 bg-blue-50 text-blue-500 rounded-lg flex items-center justify-center">
+                        <div className="w-8 h-8 bg-blue-50 text-blue-500 rounded-lg flex items-center justify-center shrink-0">
                           <CreditCard className="w-4 h-4" />
                         </div>
-                        <span className="text-sm font-bold text-gray-600">{payment.method}</span>
+                        <span className="text-sm font-bold text-gray-600 whitespace-nowrap">{payment.method}</span>
                       </div>
                     </td>
                     <td className="px-8 py-6">
-                      <div className="space-y-1 max-w-[260px]">
+                      <div className="space-y-1 min-w-[200px]">
                         <p className="text-sm font-bold text-gray-700 truncate">
                           {payment.bankNameSnapshot || 'Tiền mặt / Không áp dụng'}
                         </p>
@@ -118,7 +167,7 @@ export const AdminPayments = () => {
                       </div>
                     </td>
                     <td className="px-8 py-6">
-                      <div className="flex items-center gap-2 text-gray-400">
+                      <div className="flex items-center gap-2 text-gray-400 whitespace-nowrap">
                         <Clock className="w-4 h-4" />
                         <span className="text-xs font-bold">{new Date(payment.createdAt).toLocaleString('vi-VN')}</span>
                       </div>
@@ -133,8 +182,64 @@ export const AdminPayments = () => {
               </AnimatePresence>
             </tbody>
           </table>
+
+          {/* Trạng thái trống (Empty State) */}
+          {payments.length === 0 && (
+            <div className="py-20 flex flex-col items-center justify-center text-center">
+              <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mb-4">
+                <Receipt className="w-10 h-10 text-gray-300" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-800 mb-2">Không tìm thấy giao dịch nào</h3>
+              <p className="text-sm text-gray-500">Hãy thử tìm kiếm với từ khóa khác.</p>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* --- PHẦN PHÂN TRANG (PAGINATION CONTROLS) --- */}
+      {totalPages > 1 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between bg-white px-6 py-4 rounded-2xl border border-gray-100 shadow-sm gap-4">
+          <p className="text-sm font-bold text-gray-500">
+            Hiển thị trang <span className="text-gray-900">{currentPage}</span> / {totalPages} (Tổng: {totalPayments} giao dịch)
+          </p>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => handlePageChange(currentPage - 1)}
+              disabled={currentPage === 1}
+              className="p-3 bg-gray-50 text-gray-600 rounded-xl hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+
+            {/* Danh sách số trang */}
+            <div className="flex gap-1 mx-2">
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                <button
+                  key={page}
+                  onClick={() => handlePageChange(page)}
+                  className={cn(
+                    "w-10 h-10 rounded-xl font-black text-sm transition-all",
+                    currentPage === page
+                      ? "bg-amber-500 text-white shadow-md shadow-amber-200"
+                      : "bg-transparent text-gray-500 hover:bg-gray-100"
+                  )}
+                >
+                  {page}
+                </button>
+              ))}
+            </div>
+
+            <button
+              onClick={() => handlePageChange(currentPage + 1)}
+              disabled={currentPage === totalPages}
+              className="p-3 bg-gray-50 text-gray-600 rounded-xl hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+            >
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

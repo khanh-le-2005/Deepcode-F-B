@@ -1,17 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSocket } from '../../../contexts/SocketContext';
 import {
   Bell,
-  Check,
-  Trash2,
   Search,
-  Filter,
   ShoppingBag,
   CreditCard,
   AlertTriangle,
   ChevronRight,
-  MoreVertical,
-  CheckCircle2
+  ChevronLeft
 } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { vi } from 'date-fns/locale';
@@ -28,6 +24,16 @@ export const AdminNotifications = () => {
   const [selectedNotif, setSelectedNotif] = useState<Notification | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  // --- STATE PHÂN TRANG ---
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
+
+  // Reset về trang 1 khi đổi bộ lọc hoặc tìm kiếm
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filter, searchTerm]);
+
+  // Lọc dữ liệu tổng (Search + Filter)
   const filteredNotifications = notifications.filter(notif => {
     const matchesSearch = notif.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       notif.message.toLowerCase().includes(searchTerm.toLowerCase());
@@ -36,6 +42,14 @@ export const AdminNotifications = () => {
       (filter === 'read' && notif.isRead);
     return matchesSearch && matchesFilter;
   });
+
+  // Tính toán phân trang
+  const totalItems = filteredNotifications.length;
+  const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE) || 1;
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  
+  // Dữ liệu sẽ hiển thị trên trang hiện tại
+  const currentDisplayedNotifications = filteredNotifications.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
   const getIcon = (type: string) => {
     switch (type) {
@@ -54,8 +68,16 @@ export const AdminNotifications = () => {
     }
   };
 
+  // Hàm chuyển trang
+  const handlePageChange = (newPage: number) => {
+    if (newPage > 0 && newPage <= totalPages) {
+      setCurrentPage(newPage);
+      window.scrollTo({ top: 0, behavior: 'smooth' }); // Tùy chọn: Cuộn lên đầu khi sang trang
+    }
+  };
+
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-8 animate-in fade-in duration-500 pb-12">
       {/* Header Area */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -107,7 +129,7 @@ export const AdminNotifications = () => {
 
       {/* Notifications List */}
       <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/50 overflow-hidden min-h-[400px]">
-        {filteredNotifications.length === 0 ? (
+        {currentDisplayedNotifications.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-32 text-center px-6">
             <div className="w-24 h-24 bg-slate-50 rounded-3xl flex items-center justify-center mb-6">
               <Bell className="w-10 h-10 text-slate-200" />
@@ -120,7 +142,7 @@ export const AdminNotifications = () => {
         ) : (
           <div className="divide-y divide-slate-100">
             <AnimatePresence initial={false}>
-              {filteredNotifications.map((notif) => (
+              {currentDisplayedNotifications.map((notif) => (
                 <motion.div
                   layout
                   key={notif.id || notif._id}
@@ -129,7 +151,7 @@ export const AdminNotifications = () => {
                   whileHover={{ backgroundColor: '#f8fafc' }}
                   onClick={() => handleOpenDetail(notif)}
                   className={cn(
-                    "p-6 transition-all cursor-pointer flex items-center gap-6",
+                    "p-6 transition-all cursor-pointer flex items-center gap-6 group",
                     !notif.isRead && "relative before:absolute before:left-0 before:top-0 before:bottom-0 before:w-1 before:bg-brand"
                   )}
                 >
@@ -188,6 +210,51 @@ export const AdminNotifications = () => {
           </div>
         )}
       </div>
+
+      {/* --- ĐIỀU KHIỂN PHÂN TRANG (PAGINATION CONTROLS) --- */}
+      {totalPages > 1 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between bg-white px-6 py-4 rounded-2xl border border-slate-100 shadow-sm gap-4">
+          <p className="text-sm font-bold text-slate-500">
+            Hiển thị trang <span className="text-slate-900">{currentPage}</span> / {totalPages} (Tổng: {totalItems} thông báo)
+          </p>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => handlePageChange(currentPage - 1)}
+              disabled={currentPage === 1}
+              className="p-3 bg-slate-50 text-slate-600 rounded-xl hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+
+            {/* Danh sách số trang */}
+            <div className="flex gap-1 mx-2">
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                <button
+                  key={page}
+                  onClick={() => handlePageChange(page)}
+                  className={cn(
+                    "w-10 h-10 rounded-xl font-black text-sm transition-all",
+                    currentPage === page
+                      ? "bg-slate-900 text-white shadow-md shadow-slate-900/20"
+                      : "bg-transparent text-slate-500 hover:bg-slate-50"
+                  )}
+                >
+                  {page}
+                </button>
+              ))}
+            </div>
+
+            <button
+              onClick={() => handlePageChange(currentPage + 1)}
+              disabled={currentPage === totalPages}
+              className="p-3 bg-slate-50 text-slate-600 rounded-xl hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+            >
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Global Detail Modal */}
       <NotificationDetailModal

@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, CalendarRange, ChevronLeft, ChevronRight, History, ReceiptText, Clock3, CheckCircle2, XCircle } from 'lucide-react';
-import axios from '@/src/lib/axiosClient';
+import axios from '@/src/api/axiosClient';
 import { Order, Payment } from '../../../types';
 import { Button } from '../../../components/Button';
-import { cn } from '../../../lib/cn';
-import axiosClient from '@/src/lib/axiosClient';
+import { cn } from '../../../api/cn';
+import axiosClient from '@/src/api/axiosClient';
 
 type HistoryResponse = {
   orders: Order[];
@@ -135,24 +135,24 @@ export const AdminOrderHistory = () => {
         </div>
         <div className="flex flex-col gap-4 items-end">
           <div className="flex items-center gap-2 bg-gray-100/50 p-1 rounded-2xl w-fit border border-gray-100">
-             <button
-                onClick={() => setActiveTab('orders')}
-                 className={cn(
-                  "px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all",
-                  activeTab === 'orders' ? "bg-white text-slate-900 shadow border border-gray-200" : "text-gray-500 hover:text-slate-700"
-                )}
-             >
-                Đơn Hàng
-             </button>
-             <button
-                 onClick={() => setActiveTab('payments')}
-                 className={cn(
-                  "px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all",
-                  activeTab === 'payments' ? "bg-white text-slate-900 shadow border border-gray-200" : "text-gray-500 hover:text-slate-700"
-                )}
-             >
-                Thanh Toán
-             </button>
+            <button
+              onClick={() => setActiveTab('orders')}
+              className={cn(
+                "px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all",
+                activeTab === 'orders' ? "bg-white text-slate-900 shadow border border-gray-200" : "text-gray-500 hover:text-slate-700"
+              )}
+            >
+              Đơn Hàng
+            </button>
+            <button
+              onClick={() => setActiveTab('payments')}
+              className={cn(
+                "px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all",
+                activeTab === 'payments' ? "bg-white text-slate-900 shadow border border-gray-200" : "text-gray-500 hover:text-slate-700"
+              )}
+            >
+              Thanh Toán
+            </button>
           </div>
 
           {activeTab === 'orders' && (
@@ -353,23 +353,23 @@ export const AdminOrderHistory = () => {
                       </td>
                     </tr>
                   ) : filteredPayments.length > 0 ? filteredPayments.map((payment, index) => {
-                     const pIdStr = String(payment.id || (payment as any)._id || '').toUpperCase();
-                     const orderIdObj = payment.orderId as any;
-                     const orderIdLabel = typeof payment.orderId === 'string' ? payment.orderId : (orderIdObj?._id || orderIdObj?.id || '');
-                     
-                     // Xác định badge trạng thái thanh toán
-                     const getPStatusColor = (s: string) => {
-                       if (s === 'success') return 'bg-emerald-50 text-emerald-600 border-emerald-100';
-                       if (s === 'failed') return 'bg-rose-50 text-rose-600 border-rose-100';
-                       return 'bg-amber-50 text-amber-600 border-amber-100';
-                     };
-                     const getPStatusLabel = (s: string) => {
-                       if (s === 'success') return 'Thành công';
-                       if (s === 'failed') return 'Thất bại';
-                       return 'Đang xử lý';
-                     };
+                    const pIdStr = String(payment.id || (payment as any)._id || '').toUpperCase();
+                    const orderIdObj = payment.orderId as any;
+                    const orderIdLabel = typeof payment.orderId === 'string' ? payment.orderId : (orderIdObj?._id || orderIdObj?.id || '');
 
-                     return (
+                    // Xác định badge trạng thái thanh toán
+                    const getPStatusColor = (s: string) => {
+                      if (s === 'success') return 'bg-emerald-50 text-emerald-600 border-emerald-100';
+                      if (s === 'failed') return 'bg-rose-50 text-rose-600 border-rose-100';
+                      return 'bg-amber-50 text-amber-600 border-amber-100';
+                    };
+                    const getPStatusLabel = (s: string) => {
+                      if (s === 'success') return 'Thành công';
+                      if (s === 'failed') return 'Thất bại';
+                      return 'Đang xử lý';
+                    };
+
+                    return (
                       <motion.tr
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -377,24 +377,24 @@ export const AdminOrderHistory = () => {
                         key={pIdStr}
                         className="border-b border-gray-50 hover:bg-gray-50/50 transition-all font-medium"
                       >
-                         <td className="px-8 py-6">
-                           <span className="text-sm font-bold text-gray-900">#{pIdStr.slice(-8)}</span>
+                        <td className="px-8 py-6">
+                          <span className="text-sm font-bold text-gray-900">#{pIdStr.slice(-8)}</span>
                         </td>
                         <td className="px-8 py-6">
-                           <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                             #{orderIdLabel.slice(-8).toUpperCase()}
-                           </span>
+                          <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                            #{orderIdLabel.slice(-8).toUpperCase()}
+                          </span>
                         </td>
                         <td className="px-8 py-6">
-                           <span className={cn(
-                             "px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider border",
-                             payment.orderTypeSnapshot === 'takeaway' ? "bg-slate-900 text-white border-slate-900" : "bg-white text-slate-500 border-slate-100 shadow-sm"
-                           )}>
-                             {payment.orderTypeSnapshot === 'takeaway' ? 'Mang đi' : 'Tại chỗ'}
-                           </span>
+                          <span className={cn(
+                            "px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider border",
+                            payment.orderTypeSnapshot === 'takeaway' ? "bg-slate-900 text-white border-slate-900" : "bg-white text-slate-500 border-slate-100 shadow-sm"
+                          )}>
+                            {payment.orderTypeSnapshot === 'takeaway' ? 'Mang đi' : 'Tại chỗ'}
+                          </span>
                         </td>
                         <td className="px-8 py-6">
-                           <p className="text-sm font-bold text-gray-800">{payment.tableName || (payment.orderTypeSnapshot === 'takeaway' ? 'N/A' : 'Chưa rõ')}</p>
+                          <p className="text-sm font-bold text-gray-800">{payment.tableName || (payment.orderTypeSnapshot === 'takeaway' ? 'N/A' : 'Chưa rõ')}</p>
                         </td>
                         <td className="px-8 py-6">
                           <span className="text-lg font-black text-slate-900">{Number(payment.amount || 0).toLocaleString()}đ</span>
@@ -411,7 +411,7 @@ export const AdminOrderHistory = () => {
                           </div>
                         </td>
                         <td className="px-8 py-6">
-                           <p className="text-xs font-black uppercase tracking-widest text-gray-400">{payment.cashierName || 'Hệ thống'}</p>
+                          <p className="text-xs font-black uppercase tracking-widest text-gray-400">{payment.cashierName || 'Hệ thống'}</p>
                         </td>
                         <td className="px-8 py-6">
                           <div className="flex items-center gap-2 text-gray-400">
@@ -420,12 +420,12 @@ export const AdminOrderHistory = () => {
                           </div>
                         </td>
                         <td className="px-8 py-6">
-                           <span className={cn("inline-flex items-center justify-center px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border whitespace-nowrap", getPStatusColor(payment.status))}>
+                          <span className={cn("inline-flex items-center justify-center px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border whitespace-nowrap", getPStatusColor(payment.status))}>
                             {getPStatusLabel(payment.status)}
                           </span>
                         </td>
                       </motion.tr>
-                     );
+                    );
 
                   }) : (
                     <tr>
@@ -452,23 +452,69 @@ export const AdminOrderHistory = () => {
           <p className="text-sm text-gray-500 font-medium">
             Trang {page} / {meta.totalPages} - Tổng {meta.total} đơn
           </p>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 flex-wrap">
+
+            {/* Previous */}
             <Button
+              type="button"
               variant="outline"
               disabled={page <= 1}
               onClick={() => setPage(prev => Math.max(1, prev - 1))}
-              className="bg-white border-gray-100 text-slate-900 h-12 px-5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-50 transition-all shadow-card border-none"
+              className="
+      h-11 w-11 rounded-2xl border-0
+      bg-white text-slate-700
+      shadow-sm transition-all duration-300
+      hover:bg-orange-50 hover:text-orange-600
+      disabled:opacity-40 disabled:cursor-not-allowed
+    "
             >
-              <ChevronLeft className="w-4 h-4 mr-2" /> Trước
+              <ChevronLeft className="w-4 h-4" />
             </Button>
+
+            {/* Page numbers */}
+            {Array.from({ length: meta.totalPages }, (_, index) => {
+              const pageNumber = index + 1;
+
+              return (
+                <Button
+                  key={pageNumber}
+                  type="button"
+                  onClick={() => setPage(pageNumber)}
+                  variant="outline"
+                  className={`
+          h-11 min-w-[44px] px-3
+          rounded-2xl border-0
+          font-bold text-sm
+          transition-all duration-300
+          hover:scale-105
+          ${page === pageNumber
+                      ? "bg-orange-500 text-white shadow-lg shadow-orange-200"
+                      : "bg-white text-slate-700 hover:bg-orange-50 hover:text-orange-600"
+                    }
+        `}
+                >
+                  {pageNumber}
+                </Button>
+              );
+            })}
+
+            {/* Next */}
             <Button
+              type="button"
               variant="outline"
               disabled={page >= meta.totalPages}
               onClick={() => setPage(prev => Math.min(meta.totalPages, prev + 1))}
-              className="bg-white border-gray-100 text-slate-900 h-12 px-5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-50 transition-all shadow-card border-none"
+              className="
+      h-11 w-11 rounded-2xl border-0
+      bg-white text-slate-700
+      shadow-sm transition-all duration-300
+      hover:bg-orange-50 hover:text-orange-600
+      disabled:opacity-40 disabled:cursor-not-allowed
+    "
             >
-              Sau <ChevronRight className="w-4 h-4 ml-2" />
+              <ChevronRight className="w-4 h-4" />
             </Button>
+
           </div>
         </div>
       )}

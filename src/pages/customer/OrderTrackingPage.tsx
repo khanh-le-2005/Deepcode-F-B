@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { io } from 'socket.io-client';
-import axios from '@/src/lib/axiosClient';
+import axios from '@/src/api/axiosClient';
 import { motion } from 'framer-motion';
 import { CheckCircle2, Clock, ChefHat, Download, CreditCard } from 'lucide-react';
 import { toast } from 'react-toastify';
-import { cn } from '../../lib/cn';
+import { cn } from '../../api/cn';
 import { Order } from '../../types';
 import { CustomerHeader } from '../../components/CustomerHeader';
 import { InvalidTable } from '../../components/InvalidTable';
@@ -18,7 +18,7 @@ const socket = io();
 export const OrderTrackingPage = () => {
   const { tableId, orderId } = useParams();
   const navigate = useNavigate();
-  const { status, session: initialSession } = useTableValidation(tableId);
+  const { status, table, session: initialSession } = useTableValidation(tableId);
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [isGeneratingQr, setIsGeneratingQr] = useState(false);
@@ -29,10 +29,10 @@ export const OrderTrackingPage = () => {
     orderId: string;
     gatewayWarning?: string;
   } | null>(null);
-   const [paymentError, setPaymentError] = useState('');
-   const [showSuccessModal, setShowSuccessModal] = useState(false);
-   const [isRequestingCash, setIsRequestingCash] = useState(false);
-   const [cashRequestSent, setCashRequestSent] = useState(false);
+  const [paymentError, setPaymentError] = useState('');
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [isRequestingCash, setIsRequestingCash] = useState(false);
+  const [cashRequestSent, setCashRequestSent] = useState(false);
   const paymentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -105,9 +105,9 @@ export const OrderTrackingPage = () => {
   // Backup polling for order status
   useEffect(() => {
     if (status !== 'valid' || !order) return;
-    
+
     // Nếu đã thanh toán rồi thì không poll nữa
-    const isPaid = order.paymentStatus === 'paid' || order.status === 'completed' || order.status === 'paid';
+    const isPaid = order.paymentStatus === 'paid' || order.status === 'completed';
     if (isPaid) return;
 
     const currentOrderId = order.id || (order as any)._id;
@@ -116,7 +116,7 @@ export const OrderTrackingPage = () => {
     const pollInterval = setInterval(async () => {
       try {
         const res = await axios.get(`/api/orders/${currentOrderId}/status`);
-        const isActuallyPaid = res.data && (res.data.paymentStatus === 'paid' || res.data.status === 'completed' || res.data.status === 'paid');
+        const isActuallyPaid = res.data && (res.data.paymentStatus === 'paid' || res.data.status === 'completed');
         if (isActuallyPaid) {
           setOrder(prev => ({ ...prev, ...res.data }));
           setShowSuccessModal(true);
@@ -176,32 +176,36 @@ export const OrderTrackingPage = () => {
 
   // Tính index step hiện tại
   const currentStepIndex = steps.findIndex(s => s.id === overallStatus);
-  const isPaid = order.paymentStatus === 'paid' || order.status === 'completed' || order.status === 'paid';
+  const isPaid = order.paymentStatus === 'paid' || order.status === 'completed';
 
   const handleRequestPayment = async () => {
     try {
       setIsGeneratingQr(true);
       setPaymentError('');
-      setPaymentQr(null);
       const response = await axios.post(`/api/payments/generate-qr/${order.id || order._id}`);
-      setPaymentQr({
-        qrBase64: response.data?.qrBase64,
-        paymentContent: response.data?.paymentContent,
-        amount: response.data?.amount,
-        orderId: response.data?.orderId,
-        gatewayWarning: response.data?.gatewayWarning,
-      });
+      
+      if (response.data?.checkoutUrl) {
+        toast.info("Đang chuyển hướng đến cổng thanh toán...");
+        window.location.href = response.data.checkoutUrl;
+      } else {
+        // Dự phòng nếu không có checkoutUrl (không nên xảy ra)
+        setPaymentQr({
+          qrBase64: response.data?.qrBase64 || response.data?.qrCode,
+          paymentContent: response.data?.paymentContent,
+          amount: response.data?.amount,
+          orderId: response.data?.orderId,
+          gatewayWarning: response.data?.gatewayWarning,
+        });
+      }
     } catch (error) {
       let message = 'Không thể tạo mã thanh toán lúc này. Vui lòng thử lại sau.';
-      
       if (axiosLib.isAxiosError(error)) {
-        // Trích xuất message từ cấu trúc { success: false, error: { message, code } } của backend
         const backendError = error.response?.data?.error;
         message = typeof backendError === 'object' ? backendError.message : (error.response?.data?.message || error.message);
       }
-      
       console.error('Failed to generate payment QR:', message, error);
       setPaymentError(message);
+      toast.error(message);
     } finally {
       setIsGeneratingQr(false);
     }
@@ -210,7 +214,7 @@ export const OrderTrackingPage = () => {
   const handleRequestCashPayment = async () => {
     try {
       setIsRequestingCash(true);
-      
+
       // Gửi tín hiệu trực tiếp qua Socket.io để nhân viên nhận được ngay
       socket.emit('payment-requested', {
         tableId: tableId,
@@ -221,7 +225,7 @@ export const OrderTrackingPage = () => {
 
       // Giả lập delay một chút cho trải nghiệm người dùng
       await new Promise(resolve => setTimeout(resolve, 800));
-      
+
       setCashRequestSent(true);
       toast.success('Đã gửi yêu cầu thanh toán tiền mặt. Nhân viên sẽ sớm đến kiểm tra!');
     } catch (err) {
@@ -239,7 +243,7 @@ export const OrderTrackingPage = () => {
       : paymentQr.qrBase64.startsWith('http')
         ? paymentQr.qrBase64
         : `data:image/png;base64,${paymentQr.qrBase64}`;
-    
+
     link.href = imgSrc;
     link.download = `qr-order-${order?.id || order?._id}.png`;
     document.body.appendChild(link);
@@ -251,6 +255,7 @@ export const OrderTrackingPage = () => {
     <div className="bg-[#fcf9f4] min-h-screen text-[#1a1a1a]" style={{ fontFamily: "'Be Vietnam Pro', sans-serif" }}>
       <CustomerHeader
         tableId={tableId}
+        tableName={table?.name}
         showBackButton={true}
       />
 
@@ -262,7 +267,7 @@ export const OrderTrackingPage = () => {
               Trạng thái đơn hàng
             </h1>
             <p className="text-gray-500 font-bold uppercase tracking-widest text-xs sm:text-sm">
-              {tableId ? `Bàn ${tableId} • ` : 'Giao Hàng Tận Nơi • '} Mã đơn: <span className="text-gray-900">#{order.id?.slice(-6).toUpperCase() || order._id?.slice(-6).toUpperCase()}</span>
+              {table?.name ? `Bàn ${table.name} • ` : (tableId ? `Bàn ${tableId} • ` : 'Giao Hàng Tận Nơi • ')} Mã đơn: <span className="text-gray-900">#{order.id?.slice(-6).toUpperCase() || order._id?.slice(-6).toUpperCase()}</span>
             </p>
           </div>
 
@@ -339,13 +344,13 @@ export const OrderTrackingPage = () => {
                 </li>
               ))}
             </ul>
-          <div className="flex justify-between items-center pt-6 border-t border-gray-200 text-2xl font-black italic shadow-[0_-15px_15px_-15px_rgba(0,0,0,0.05)]" style={{ fontFamily: "'Playfair Display', serif" }}>
+            <div className="flex justify-between items-center pt-6 border-t border-gray-200 text-2xl font-black italic shadow-[0_-15px_15px_-15px_rgba(0,0,0,0.05)]" style={{ fontFamily: "'Playfair Display', serif" }}>
               <span className="text-gray-400 uppercase tracking-widest text-sm not-italic font-bold">Tổng cộng</span>
               <span className="text-red-600">{(order.total ?? 0).toLocaleString()}đ</span>
             </div>
           </div>
 
-          {(overallStatus === 'done' || order.status === 'completed' || order.status === 'paid') && order.status !== 'cancelled' && (
+          {(overallStatus === 'done' || order.status === 'completed' || order.paymentStatus === 'paid') && order.status !== 'cancelled' && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -365,7 +370,7 @@ export const OrderTrackingPage = () => {
                   {isGeneratingQr ? 'Đang tạo mã...' : 'Thanh Toán Chuyển Trước'}
                 </button>
               )}
-                
+
               <div className="mt-6">
                 {isPaid ? (
                   <div className="bg-emerald-50 border border-emerald-100 p-6 rounded-2xl flex flex-col items-center justify-center gap-3">
@@ -386,7 +391,7 @@ export const OrderTrackingPage = () => {
                     className="w-full sm:w-auto px-8 py-4 bg-white border-2 border-slate-200 text-slate-600 rounded-xl font-black uppercase tracking-widest hover:border-slate-300 hover:bg-slate-50 transition-all flex items-center justify-center gap-2"
                   >
                     {isRequestingCash ? (
-                       <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></div>
+                      <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></div>
                     ) : (
                       <CreditCard className="w-4 h-4" />
                     )}
@@ -402,73 +407,6 @@ export const OrderTrackingPage = () => {
           )}
 
 
-          {paymentQr && (
-            <motion.div
-              ref={paymentRef}
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mt-10 bg-slate-950 text-white rounded-4xl p-6 sm:p-8 shadow-2xl"
-            >
-              <div className="flex flex-col sm:flex-row items-center gap-6">
-                {/* QR side */}
-                <div className="flex flex-col items-center">
-                  <div className="w-44 h-44 rounded-3xl bg-white p-3 flex items-center justify-center shrink-0 overflow-hidden">
-                    {paymentQr.qrBase64 ? (
-                      <img
-                        src={
-                          paymentQr.qrBase64.startsWith('data:')
-                            ? paymentQr.qrBase64
-                            : paymentQr.qrBase64.startsWith('http')
-                              ? paymentQr.qrBase64
-                              : `data:image/png;base64,${paymentQr.qrBase64}`
-                        }
-                        alt="Mã QR thanh toán"
-                        className="w-full h-full object-contain"
-                      />
-                    ) : (
-                      <div className="text-slate-500 text-sm font-black uppercase tracking-widest text-center">
-                        Không có QR
-                      </div>
-                    )}
-                  </div>
-                  <button
-                    onClick={handleDownloadQR}
-                    className="mt-4 w-full flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
-                  >
-                    <Download className="w-3 h-3" />
-                    Lưu mã QR
-                  </button>
-                </div>
-
-                {/* Text side */}
-                <div className="flex-1 text-left">
-                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-400">Thanh toán QR</p>
-                  <h3 className="text-2xl sm:text-3xl font-black italic mt-2" style={{ fontFamily: "'Playfair Display', serif" }}>
-                    Quét mã để thanh toán
-                  </h3>
-                  <p className="text-sm text-slate-300 mt-3">
-                    Số tiền: <span className="text-white font-black">{Number(paymentQr.amount || order.total).toLocaleString()}đ</span>
-                  </p>
-                  {paymentQr.orderId && (
-                    <p className="text-xs text-slate-500 mt-2 break-all">
-                      Mã phiên: {paymentQr.orderId}
-                    </p>
-                  )}
-                  {paymentQr.paymentContent && (
-                    <div className="mt-4 p-4 rounded-2xl bg-white/5 border border-white/5">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Nội dung chuyển khoản</p>
-                      <p className="text-sm font-bold text-white wrap-break-word">{paymentQr.paymentContent}</p>
-                    </div>
-                  )}
-                  {paymentQr.gatewayWarning && (
-                    <p className="text-xs text-amber-300 mt-3">
-                      Đang dùng QR dự phòng vì cổng thanh toán tạm thời không phản hồi.
-                    </p>
-                  )}
-                </div>
-              </div>
-            </motion.div>
-          )}
         </div>
       </main>
 

@@ -1,18 +1,18 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  ChefHat, Clock, CheckCircle2, Play, ArrowLeft, LogOut, 
+import {
+  ChefHat, Clock, CheckCircle2, Play, ArrowLeft, LogOut,
   ShoppingCart, Utensils, AlertCircle, Timer, Coffee,
   Sun, Moon // Thêm icon cho mode
 } from 'lucide-react';
-import axiosInstance from '@/src/lib/axiosClient';
+import axiosInstance from '@/src/api/axiosClient';
 import axios from 'axios';
 import { io } from 'socket.io-client';
 import { useNavigate } from 'react-router-dom';
 import { Order, OrderItem } from '../../types';
 import { useAuth } from '../../AuthContext';
 import { Button } from '../../components/Button';
-import { cn } from '../../lib/cn';
+import { cn } from '../../api/cn';
 
 import { useSocket } from '../../contexts/SocketContext';
 
@@ -33,7 +33,7 @@ export const KitchenDisplay = () => {
   useEffect(() => {
     fetchOrders();
     fetchTables();
-    
+
     socket.on('new-order', (newOrder: Order) => {
       setOrders(prev => {
         const orderId = (newOrder as any)._id || newOrder.id;
@@ -66,7 +66,7 @@ export const KitchenDisplay = () => {
       // Khi có bàn chốt đơn (pending_approval), tự động load để bếp thấy đơn mới
       fetchOrders();
     });
- 
+
     return () => {
       socket.off('new-order');
       socket.off('order-updated');
@@ -148,7 +148,7 @@ export const KitchenDisplay = () => {
               </span>
             </div>
             <p className="text-slate-500 text-xs font-medium tracking-widest mt-0.5 uppercase">
-               {orders.length} đơn hàng đang chuẩn bị
+              {orders.length} đơn hàng đang chuẩn bị
             </p>
           </div>
         </div>
@@ -180,7 +180,7 @@ export const KitchenDisplay = () => {
                 <ShoppingCart className="w-4 h-4 mr-2" />
                 Sơ đồ bàn
               </Button>
-              
+
               <Button
                 variant="ghost"
                 onClick={() => navigate('/admin')}
@@ -226,7 +226,7 @@ export const KitchenDisplay = () => {
                   exit={{ opacity: 0, scale: 0.95 }}
                   className={cn(
                     "flex flex-col rounded-[2rem] overflow-hidden border transition-all duration-500",
-                    isDark 
+                    isDark
                       ? (isAnyCooking ? "bg-slate-900/40 border-brand/30 shadow-[0_20px_50px_rgba(217,119,6,0.1)]" : "bg-slate-900/40 border-white/5 shadow-2xl")
                       : (isAnyCooking ? "bg-white border-brand/40 shadow-[0_20px_40px_rgba(217,119,6,0.1)]" : "bg-white border-slate-200 shadow-sm")
                   )}
@@ -269,7 +269,7 @@ export const KitchenDisplay = () => {
                         return (
                           <div key={itemId} className={cn(
                             "p-4 rounded-3xl border transition-all duration-300",
-                            isDark 
+                            isDark
                               ? (isCooking ? "bg-slate-800/50 border-brand/20" : isPending ? "bg-amber-500/10 border-amber-500/30" : "bg-black/20 border-white/5 opacity-70")
                               : (isCooking ? "bg-orange-50/50 border-brand/20 shadow-sm" : isPending ? "bg-amber-50 border-amber-200" : "bg-slate-50 border-slate-100")
                           )}>
@@ -292,17 +292,17 @@ export const KitchenDisplay = () => {
                             </div>
 
                             <div className="mt-4 flex gap-2">
-                                  <button
-                                    onClick={() => updateItemStatus(orderId, itemId, 'served')}
-                                    className="flex-1 h-11 bg-emerald-500 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-emerald-600 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20"
-                                  >
-                                    <CheckCircle2 className="w-4 h-4" /> Hoàn tất
-                                  </button>
-                                  {isPending && (
-                                    <div className="flex-1 h-11 bg-amber-500/10 text-amber-600 rounded-xl font-bold text-[8px] uppercase tracking-tighter flex items-center justify-center border border-amber-500/20">
-                                      Chờ duyệt
-                                    </div>
-                                  )}
+                              <button
+                                onClick={() => updateItemStatus(orderId, itemId, 'served')}
+                                className="flex-1 h-11 bg-emerald-500 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-emerald-600 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20"
+                              >
+                                <CheckCircle2 className="w-4 h-4" /> Hoàn tất
+                              </button>
+                              {isPending && (
+                                <div className="flex-1 h-11 bg-amber-500/10 text-amber-600 rounded-xl font-bold text-[8px] uppercase tracking-tighter flex items-center justify-center border border-amber-500/20">
+                                  Chờ duyệt
+                                </div>
+                              )}
                             </div>
                           </div>
                         );

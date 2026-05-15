@@ -1,15 +1,15 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Search, Filter, Edit2, Trash2, Eye, EyeOff, Image as ImageIcon, UtensilsCrossed, ChevronRight, CheckCircle2, Clock, X } from 'lucide-react';
-import axios from '@/src/lib/axiosClient';
+import axios from '@/src/api/axiosClient';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { MenuItem } from '../../../types';
 import { Button } from '../../../components/Button';
 import { AdminMenuModal } from '../modals/AdminMenuModal';
 import { ConfirmModal } from '../../../components/modals/ConfirmModal';
-import { cn } from '../../../lib/cn';
-import { getMenuItemCategoryName, getMenuItemImageUrl, getMenuItemId } from '../../../lib/menuHelpers';
+import { cn } from '../../../api/cn';
+import { getMenuItemCategoryName, getMenuItemImageUrl, getMenuItemId } from '../../../api/menuHelpers';
 
 export const AdminMenuManagement = () => {
   const [menu, setMenu] = useState<MenuItem[]>([]);
@@ -28,7 +28,7 @@ export const AdminMenuManagement = () => {
     isOpen: false,
     title: '',
     message: '',
-    onConfirm: () => {},
+    onConfirm: () => { },
     variant: 'warning'
   });
 
@@ -120,11 +120,11 @@ export const AdminMenuManagement = () => {
     try {
       const currentItemIds = (activeWeeklyMenu.menuItems || []).map((m: any) => m._id || m.id || m);
       const newItemIds = [...new Set([...currentItemIds, ...selectedItemIds])];
-      
+
       await axios.put(`/api/weekly-menu/${activeWeeklyMenu._id || activeWeeklyMenu.id}`, {
         menuItems: newItemIds
       });
-      
+
       toast.success(`Đã xuất bán ${selectedItemIds.length} món cho tuần hiện tại!`);
       setSelectedItemIds([]);
       fetchActiveWeeklyMenu();
@@ -137,15 +137,15 @@ export const AdminMenuManagement = () => {
   const handleUnpublish = async (id: string) => {
     if (!activeWeeklyMenu) return;
     if (!confirm("Bạn có chắc muốn gỡ món này khỏi thực đơn tuần hiện tại?")) return;
-    
+
     try {
       const currentItemIds = (activeWeeklyMenu.menuItems || []).map((m: any) => m._id || m.id || m);
       const newItemIds = currentItemIds.filter((itemId: string) => itemId !== id);
-      
+
       await axios.put(`/api/weekly-menu/${activeWeeklyMenu._id || activeWeeklyMenu.id}`, {
         menuItems: newItemIds
       });
-      
+
       toast.info("Đã gỡ món khỏi thực đơn tuần");
       fetchActiveWeeklyMenu();
     } catch (err) {
@@ -290,12 +290,12 @@ export const AdminMenuManagement = () => {
                 )}
               >
                 {/* Checkbox Overlay */}
-                <div 
+                <div
                   onClick={() => handleToggleSelection(itemId)}
                   className={cn(
                     "absolute top-4 right-4 z-20 w-8 h-8 rounded-xl border-2 flex items-center justify-center cursor-pointer transition-all",
-                    selectedItemIds.includes(itemId) 
-                      ? "bg-brand border-brand text-white" 
+                    selectedItemIds.includes(itemId)
+                      ? "bg-brand border-brand text-white"
                       : "bg-white/20 backdrop-blur-md border-white/40 text-transparent hover:border-white"
                   )}
                 >
@@ -321,14 +321,14 @@ export const AdminMenuManagement = () => {
                           Đang bán tuần
                         </span>
                         <div className="flex opacity-0 group-hover/badge:opacity-100 transition-opacity gap-1">
-                          <button 
+                          <button
                             onClick={(e) => { e.stopPropagation(); handleRenew(itemId); }}
                             className="bg-amber-500 text-white p-1 rounded-md hover:bg-amber-600 shadow-sm"
                             title="Gia hạn 7 ngày"
                           >
                             <Clock className="w-3 h-3" />
                           </button>
-                          <button 
+                          <button
                             onClick={(e) => { e.stopPropagation(); handleUnpublish(itemId); }}
                             className="bg-rose-500 text-white p-1 rounded-md hover:bg-rose-600 shadow-sm"
                             title="Gỡ khỏi tuần"

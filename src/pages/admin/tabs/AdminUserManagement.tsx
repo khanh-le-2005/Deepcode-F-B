@@ -12,10 +12,10 @@ import {
   Eye,
   EyeOff
 } from 'lucide-react';
-import axios from '@/src/lib/axiosClient';
+import axios from '@/src/api/axiosClient';
 import { toast } from 'react-toastify';
 import { Button } from '../../../components/Button';
-import { cn } from '../../../lib/cn';
+import { cn } from '../../../api/cn';
 
 
 // Based on the user API expectations

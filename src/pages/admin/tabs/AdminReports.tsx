@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Download, CreditCard, ShoppingCart, Grid, TrendingUp, Award, ChevronRight, FileText } from 'lucide-react';
-import axios from '@/src/lib/axiosClient';
+import axios from '@/src/api/axiosClient';
 import {
   AreaChart,
   Area,
@@ -12,7 +12,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { Button } from '../../../components/Button';
-import { cn } from '../../../lib/cn';
+import { cn } from '../../../api/cn';
 
 export const AdminReports = () => {
   const [stats, setStats] = useState<any>({});

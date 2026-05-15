@@ -27,10 +27,11 @@ import statsRoutes from "./backend/src/routes/statsRoutes.js";
 import authRoutes from "./backend/src/routes/authRoutes.js";
 import comboRoutes from "./backend/src/routes/ComboRoutes.js";
 import imageRoutes from "./backend/src/routes/imageRoutes.js";
-import bankAccountRoutes from "./backend/src/routes/bankAccountRoutes.js";
+
 import categoryRoutes from "./backend/src/routes/categoryRoutes.js";
 import weeklyMenuRoutes from "./backend/src/routes/weeklyMenuRoutes.js";
 import userRoutes from "./backend/src/routes/userRoutes.js";
+import { startAutoCleanup } from "./backend/src/jobs/autoCleanup.js";
 async function startServer() {
   // Connect to MongoDB
   await connectDB();
@@ -38,35 +39,47 @@ async function startServer() {
   // Seed initial data (Tables + Users) — handled by setup.js
   await seedInitialData();
 
+  // Migrate old virtual tables
+  try {
+    const migrationResult = await Table.updateMany(
+      {
+        $and: [
+          { isVirtual: { $ne: true } },
+          { name: { $regex: /^(mang về|giao hàng|mang đi|tại quầy)/i } }
+        ]
+      },
+      { $set: { isVirtual: true } }
+    );
+    if (migrationResult.modifiedCount > 0) {
+      console.log(`[Migration] Đã cập nhật ${migrationResult.modifiedCount} bàn ảo cũ (isVirtual: true)`);
+    }
+  } catch (err) {
+    console.error(`[Migration Error] Lỗi dọn rác DB:`, err);
+  }
+
   const app = express();
   app.set("trust proxy", 1);
   const httpServer = createServer(app);
   const io = new Server(httpServer, {
     cors: {
       origin: [
-        "http://localhost:8000",
-        "http://localhost:8080",
-
         "http://localhost:3000",
         "http://localhost:3001",
-        "https://pay.momangshow.vn/api",
-        "http://127.0.0.1:5500",
+        "http://150.95.115.212:3001",
       ],
       credentials: true,
     },
   });
 
-  const PORT = 3001;
+  const PORT = process.env.PORT || 3001;
 
   // Professional CORS Configuration
   app.use(
     cors({
       origin: [
-        "http://localhost:8000",
-        "http://localhost:8080",
         "http://localhost:3000",
         "http://localhost:3001",
-        "https://pay.momangshow.vn/api",
+        "http://150.95.115.212:3001",
         "http://127.0.0.1:5500",
       ],
       methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
@@ -93,7 +106,7 @@ async function startServer() {
 
   const limiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-max: 1000,
+    max: 1000,
     message: {
       error: "Too many requests from this IP, please try again later.",
     },
@@ -115,7 +128,7 @@ max: 1000,
   app.use("/api/tables", tableRoutes);
   app.use("/api/orders", orderRoutes);
   app.use("/api/payments", paymentRoutes);
-  app.use("/api/bank-accounts", bankAccountRoutes);
+
   app.use("/api/stats", statsRoutes);
   app.use("/api/users", userRoutes);
   // Global Error Handler
@@ -166,26 +179,17 @@ max: 1000,
   }
 
   io.on("connection", (socket) => {
-    console.log("A user connected: " + socket.id);
-
-    // Kênh phân luồng
-    socket.on("join-room", (room) => {
-      socket.join(room);
-      console.log(`Socket ${socket.id} joined room: ${room}`);
-    });
-
-    socket.on("leave-room", (room) => {
-      socket.leave(room);
-      console.log(`Socket ${socket.id} left room: ${room}`);
-    });
-
+    console.log("A user connected");
     socket.on("disconnect", () => {
-      console.log("User disconnected: " + socket.id);
+      console.log("User disconnected");
     });
   });
 
   httpServer.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
+
+    // 🚀 Khởi động Auto-Cleanup: Tự hủy đơn Kiosk chuyển khoản quá 15 phút
+    startAutoCleanup(io);
   });
 }
 

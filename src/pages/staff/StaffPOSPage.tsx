@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from '@/src/lib/axiosClient';
+import axios from '@/src/api/axiosClient';
 import { toast } from 'react-toastify';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -12,7 +12,7 @@ import {
 import { Button } from '../../components/Button';
 import { useAuth } from '../../AuthContext';
 import { MenuItem, Table } from '../../types';
-import { getMenuItemCategoryName, getMenuItemId, getMenuItemImageUrl } from '../../lib/menuHelpers';
+import { getMenuItemCategoryName, getMenuItemId, getMenuItemImageUrl } from '../../api/menuHelpers';
 
 type StaffCartItem = {
   menuItemId: string;
@@ -197,6 +197,7 @@ export const StaffPOSPage = () => {
     try {
       await axios.post('/api/orders/counter', {
         tableId: selectedTableId,
+        frontendUrl: window.location.origin, // ĐÃ THÊM: Để BE biết origin của app quản lý
         items: cart.map(item => ({
           menuItemId: item.menuItemId,
           name: item.name,
@@ -220,7 +221,7 @@ export const StaffPOSPage = () => {
     // Kiểm tra tất cả món trong đơn đã được phục vụ (served) hoặc bị huỷ (cancelled) chưa
     return activeSession.items.every((i: any) => i.status === 'served' || i.status === 'cancelled');
   }, [activeSession]);
-  
+
   const hasPendingItems = useMemo(() => {
     if (!activeSession || !activeSession.items) return false;
     return activeSession.items.some((i: any) => i.status === 'pending_approval');
@@ -495,7 +496,7 @@ export const StaffPOSPage = () => {
                     </p>
                   </div>
                 )}
-                
+
                 {isOrderDone && (
                   <div className="grid grid-cols-2 gap-3">
                     <button

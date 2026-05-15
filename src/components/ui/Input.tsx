@@ -1,5 +1,5 @@
-import { forwardRef,React } from 'react';
-import { cn } from '../../lib/cn';
+import { forwardRef, React } from 'react';
+import { cn } from '../../api/cn';
 
 export const Input = forwardRef<
   HTMLInputElement,

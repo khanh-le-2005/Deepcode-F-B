@@ -1,5 +1,5 @@
 import { ReactNode } from 'react';
-import { cn } from '../../lib/cn';
+import { cn } from '../../api/cn';
 
 type BadgeVariant = 'default' | 'brand' | 'success' | 'danger' | 'outline';
 

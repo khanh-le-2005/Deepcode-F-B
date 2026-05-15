@@ -1,6 +1,13 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { OrderItem } from '../types';
 
+interface CustomerInfo {
+  name: string;
+  phone: string;
+  address: string;
+  note: string;
+}
+
 interface CartContextType {
   cart: OrderItem[];
   addToCart: (item: OrderItem) => void;
@@ -10,6 +17,14 @@ interface CartContextType {
   clearCart: () => void;
   totalPrice: number;
   totalItems: number;
+  // Persistent Form Data
+  customerInfo: CustomerInfo;
+  setCustomerInfo: React.Dispatch<React.SetStateAction<CustomerInfo>>;
+  orderType: 'takeaway' | 'delivery';
+  setOrderType: (type: 'takeaway' | 'delivery') => void;
+  paymentMethod: 'cash' | 'transfer';
+  setPaymentMethod: (method: 'cash' | 'transfer') => void;
+  clearCustomerInfo: () => void;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -24,9 +39,38 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     }
   });
 
+  const [customerInfo, setCustomerInfo] = useState<CustomerInfo>(() => {
+    try {
+      const saved = localStorage.getItem('qr_dine_customer_info');
+      return saved ? JSON.parse(saved) : { name: '', phone: '', address: '', note: '' };
+    } catch {
+      return { name: '', phone: '', address: '', note: '' };
+    }
+  });
+
+  const [orderType, setOrderType] = useState<'takeaway' | 'delivery'>(() => {
+    return (localStorage.getItem('qr_dine_order_type') as any) || 'takeaway';
+  });
+
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'transfer'>(() => {
+    return (localStorage.getItem('qr_dine_payment_method') as any) || 'transfer';
+  });
+
   useEffect(() => {
     localStorage.setItem('gomoto_cart', JSON.stringify(cart));
   }, [cart]);
+
+  useEffect(() => {
+    localStorage.setItem('qr_dine_customer_info', JSON.stringify(customerInfo));
+  }, [customerInfo]);
+
+  useEffect(() => {
+    localStorage.setItem('qr_dine_order_type', orderType);
+  }, [orderType]);
+
+  useEffect(() => {
+    localStorage.setItem('qr_dine_payment_method', paymentMethod);
+  }, [paymentMethod]);
 
   const getUniqueCartKey = (item: OrderItem) => {
     const optionName = item.selectedOption?.name || 'none';
@@ -81,12 +125,20 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const clearCart = () => setCart([]);
+  
+  const clearCustomerInfo = () => {
+    setCustomerInfo({ name: '', phone: '', address: '', note: '' });
+    localStorage.removeItem('qr_dine_customer_info');
+  };
 
   const totalPrice = cart.reduce((acc, item) => acc + item.totalPrice, 0);
   const totalItems = cart.reduce((acc, item) => acc + item.quantity, 0);
 
   return (
-    <CartContext.Provider value={{ cart, addToCart, removeFromCart, updateQuantity, getUniqueCartKey, clearCart, totalPrice, totalItems }}>
+    <CartContext.Provider value={{ 
+      cart, addToCart, removeFromCart, updateQuantity, getUniqueCartKey, clearCart, totalPrice, totalItems,
+      customerInfo, setCustomerInfo, orderType, setOrderType, paymentMethod, setPaymentMethod, clearCustomerInfo
+    }}>
       {children}
     </CartContext.Provider>
   );

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Bell, ShoppingBag, CreditCard, AlertTriangle, Check } from 'lucide-react';
 import { useSocket } from '../contexts/SocketContext';
-import { cn } from '../lib/cn';
+import { cn } from '../api/cn';
 import { formatDistanceToNow } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { NotificationDetailModal } from './NotificationDetailModal';
@@ -52,7 +52,7 @@ export const NotificationDropdown = ({ isOpen, onClose }: NotificationDropdownPr
         <>
           {/* Overlay for mobile */}
           <div className="fixed inset-0 z-40 lg:hidden" onClick={onClose} />
-          
+
           <motion.div
             initial={{ opacity: 0, y: 10, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -68,7 +68,7 @@ export const NotificationDropdown = ({ isOpen, onClose }: NotificationDropdownPr
               </div>
               <div className="flex items-center gap-2">
                 {unreadCount > 0 && (
-                  <button 
+                  <button
                     onClick={markAllRead}
                     className="p-2 text-gray-400 hover:text-brand bg-gray-50 rounded-xl transition-all"
                     title="Đọc tất cả"
@@ -76,7 +76,7 @@ export const NotificationDropdown = ({ isOpen, onClose }: NotificationDropdownPr
                     <Check className="w-4 h-4" />
                   </button>
                 )}
-                <button 
+                <button
                   onClick={onClose}
                   className="p-2 text-gray-400 hover:text-gray-900 bg-gray-50 rounded-xl transition-all"
                 >
@@ -97,7 +97,7 @@ export const NotificationDropdown = ({ isOpen, onClose }: NotificationDropdownPr
               ) : (
                 <div className="divide-y divide-gray-50">
                   {notifications.map((notif) => (
-                    <div 
+                    <div
                       key={notif.id || notif._id || Math.random().toString()}
                       className={cn(
                         "p-5 transition-all cursor-pointer group flex items-start gap-4",
@@ -141,7 +141,7 @@ export const NotificationDropdown = ({ isOpen, onClose }: NotificationDropdownPr
 
             {notifications.length > 0 && (
               <div className="p-4 bg-gray-50 border-t border-gray-100 text-center">
-                <button 
+                <button
                   onClick={() => {
                     navigate('/admin/notifications');
                     onClose();

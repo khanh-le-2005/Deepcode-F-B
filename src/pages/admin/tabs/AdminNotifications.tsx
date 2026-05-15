@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { useSocket } from '../../../contexts/SocketContext';
-import { 
-  Bell, 
-  Check, 
-  Trash2, 
-  Search, 
-  Filter, 
-  ShoppingBag, 
-  CreditCard, 
+import {
+  Bell,
+  Check,
+  Trash2,
+  Search,
+  Filter,
+  ShoppingBag,
+  CreditCard,
   AlertTriangle,
   ChevronRight,
   MoreVertical,
@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { vi } from 'date-fns/locale';
-import { cn } from '../../../lib/cn';
+import { cn } from '../../../api/cn';
 import { Button } from '../../../components/Button';
 import { NotificationDetailModal } from '../../../components/NotificationDetailModal';
 import { Notification } from '../../../types';
@@ -29,11 +29,11 @@ export const AdminNotifications = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const filteredNotifications = notifications.filter(notif => {
-    const matchesSearch = notif.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                         notif.message.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesFilter = filter === 'all' || 
-                         (filter === 'unread' && !notif.isRead) || 
-                         (filter === 'read' && notif.isRead);
+    const matchesSearch = notif.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      notif.message.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesFilter = filter === 'all' ||
+      (filter === 'unread' && !notif.isRead) ||
+      (filter === 'read' && notif.isRead);
     return matchesSearch && matchesFilter;
   });
 
@@ -62,7 +62,7 @@ export const AdminNotifications = () => {
           <h2 className="text-4xl font-black text-slate-900 tracking-tight font-serif mb-2">Thông báo</h2>
           <p className="text-slate-500 font-medium">Bạn có {unreadCount} thông báo chưa đọc trong hệ thống</p>
         </div>
-        
+
         <div className="flex items-center gap-3">
           {unreadCount > 0 && (
             <Button
@@ -135,8 +135,8 @@ export const AdminNotifications = () => {
                 >
                   <div className={cn(
                     "w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 border transition-all",
-                    notif.isRead 
-                      ? "bg-slate-50 border-slate-100 grayscale opacity-60" 
+                    notif.isRead
+                      ? "bg-slate-50 border-slate-100 grayscale opacity-60"
                       : "bg-white border-brand/10 shadow-lg shadow-brand/5 scale-105"
                   )}>
                     {getIcon(notif.type)}
@@ -155,18 +155,18 @@ export const AdminNotifications = () => {
                           {format(new Date(notif.createdAt), 'HH:mm dd/MM', { locale: vi })}
                         </span>
                         {!notif.isRead && (
-                           <div className="w-2.5 h-2.5 bg-brand rounded-full shadow-lg shadow-brand/40" />
+                          <div className="w-2.5 h-2.5 bg-brand rounded-full shadow-lg shadow-brand/40" />
                         )}
                       </div>
                     </div>
-                    
+
                     <p className={cn(
                       "text-slate-600 font-medium line-clamp-1",
                       !notif.isRead && "text-slate-900"
                     )}>
                       {notif.message}
                     </p>
-                    
+
                     <div className="flex items-center gap-4 mt-3">
                       <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
                         {formatDistanceToNow(new Date(notif.createdAt), { addSuffix: true, locale: vi })}
@@ -190,7 +190,7 @@ export const AdminNotifications = () => {
       </div>
 
       {/* Global Detail Modal */}
-      <NotificationDetailModal 
+      <NotificationDetailModal
         isOpen={isModalOpen}
         notification={selectedNotif}
         onClose={() => setIsModalOpen(false)}

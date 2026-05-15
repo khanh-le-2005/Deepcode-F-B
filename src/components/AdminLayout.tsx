@@ -5,7 +5,7 @@ import { Bell, Search, Calendar, Menu, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useSocket } from '../contexts/SocketContext';
 import { NotificationDropdown } from './NotificationDropdown';
-import { cn } from '../lib/cn';
+import { cn } from '../api/cn';
 
 export const AdminLayout = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
@@ -71,7 +71,7 @@ export const AdminLayout = ({ children }: { children: ReactNode }) => {
             </div>
 
             <div className="relative">
-              <button 
+              <button
                 onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
                 className={cn(
                   "relative p-2 rounded-xl transition-all",
@@ -85,10 +85,10 @@ export const AdminLayout = ({ children }: { children: ReactNode }) => {
                   </span>
                 )}
               </button>
-              
-              <NotificationDropdown 
-                isOpen={isNotificationsOpen} 
-                onClose={() => setIsNotificationsOpen(false)} 
+
+              <NotificationDropdown
+                isOpen={isNotificationsOpen}
+                onClose={() => setIsNotificationsOpen(false)}
               />
             </div>
 

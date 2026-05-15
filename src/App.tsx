@@ -12,14 +12,12 @@ import { MenuPage } from './pages/customer/MenuPage';
 import { MenuItemDetailPage } from './pages/customer/MenuItemDetailPage';
 import { OrderTrackingPage } from './pages/customer/OrderTrackingPage';
 import { SuccessPage } from './pages/customer/SuccessPage';
-import { CheckoutPage } from './pages/customer/CheckoutPage';
 import { CartPage } from './pages/customer/CartPage';
 import { LoginPage } from './pages/auth/LoginPage';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
 import { KitchenDisplay } from './pages/kitchen/KitchenDisplay';
 import { StaffPOSPage } from './pages/staff/StaffPOSPage';
 import OrangeDrinkKiosk from './pages/customer/OrangeDrinkKiosk';
-import { KioskCheckout } from './pages/customer/KioskCheckout';
 
 function App() {
   return (
@@ -75,8 +73,6 @@ function App() {
             <Route path="/menu" element={<MenuPage />} />
             <Route path="/menu/:itemId" element={<MenuItemDetailPage />} />
             <Route path="/cart" element={<CartPage />} />
-            <Route path="/checkout" element={<CheckoutPage />} />
-            <Route path="/kiosk/checkout" element={<KioskCheckout />} />
             <Route path="/tracking/:orderId" element={<OrderTrackingPage />} />
             <Route path="/success" element={<SuccessPage />} />
 

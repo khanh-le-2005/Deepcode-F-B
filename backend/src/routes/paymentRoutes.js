@@ -4,8 +4,10 @@ import {
   getPayments,
   mockPayment,
   generateQR,
-  receiveWebhook,
-  simulateSuccessfulPayment, // Bổ sung import hàm này
+  receivePayosWebhook,
+  verifyPayment,
+  verifyPaymentByOrderId,
+  simulateSuccessfulPayment,
 } from "../controllers/paymentController.js";
 import { authorize } from "../security/SecurityMiddleware.js";
 
@@ -25,6 +27,8 @@ router.post(
 
 // --- API PUBLIC ---
 router.post("/generate-qr/:orderId", generateQR);
-router.post("/webhook", receiveWebhook);
+router.post("/payos-webhook", receivePayosWebhook);
+router.get("/verify/:orderCode", verifyPayment);
+router.get("/verify-by-order/:orderId", verifyPaymentByOrderId);
 
 export default router;

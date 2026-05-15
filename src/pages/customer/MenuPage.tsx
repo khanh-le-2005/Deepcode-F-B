@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -6,16 +6,16 @@ import {
   ShoppingBag, ChevronRight, Facebook, Twitter, Instagram, MapPin, Mail, Phone
 } from 'lucide-react';
 import axiosLib from 'axios';
-import axios from '@/src/lib/axiosClient';
+import axios from '@/src/api/axiosClient';
 import { io } from 'socket.io-client';
 import { MenuItem, OrderItem, Order } from '../../types';
-import { cn } from '../../lib/cn';
+import { cn } from '../../api/cn';
 import { Button } from '../../components/Button';
 import { CustomerHeader } from '../../components/CustomerHeader';
 import { InvalidTable } from '../../components/InvalidTable';
 import { useTableValidation } from '../../hooks/useTableValidation';
 import { useCart } from '../../contexts/CartContext';
-import { getMenuItemCategoryName, getMenuItemId, getMenuItemImageUrl } from '../../lib/menuHelpers';
+import { getMenuItemCategoryName, getMenuItemId, getMenuItemImageUrl } from '../../api/menuHelpers';
 
 import { useSocket } from '../../contexts/SocketContext';
 
@@ -31,9 +31,11 @@ export const MenuPage = () => {
   const [toastItem, setToastItem] = useState<{ name: string, image: string } | null>(null);
   const [selectedOptionsMap, setSelectedOptionsMap] = useState<Record<string, any>>({});
   const navigate = useNavigate();
-  const { status } = useTableValidation(tableId);
+  const { status, table } = useTableValidation(tableId);
 
   const [activeSession, setActiveSession] = useState<Order | null>(null);
+  const [flyingItems, setFlyingItems] = useState<{ id: number, image: string, start: { x: number, y: number } }[]>([]);
+  const cartRef = useRef<HTMLButtonElement>(null);
 
   const extractList = <T,>(payload: any): T[] => {
     if (Array.isArray(payload)) return payload as T[];
@@ -116,7 +118,20 @@ export const MenuPage = () => {
 
   const getItemImageUrl = (item: MenuItem): string => getMenuItemImageUrl(item);
 
-  const handleQuickAdd = async (item: MenuItem) => {
+  const triggerFlyAnimation = (e: React.MouseEvent, image: string) => {
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const id = Date.now();
+    setFlyingItems(prev => [...prev, { id, image, start: { x: startX, y: startY } }]);
+    setTimeout(() => {
+        setFlyingItems(prev => prev.filter(item => item.id !== id));
+    }, 800);
+  };
+
+  const handleQuickAdd = async (e: React.MouseEvent, item: MenuItem) => {
+    e.stopPropagation();
+    triggerFlyAnimation(e, getItemImageUrl(item));
+    
     const itemId = getMenuItemId(item);
     const selectedOption = selectedOptionsMap[itemId];
 
@@ -124,6 +139,7 @@ export const MenuPage = () => {
       try {
         const response = await axios.post('/api/orders', {
           tableId,
+          frontendUrl: window.location.origin, // ĐÃ THÊM
           items: [{
             menuItemId: itemId,
             name: item.name,
@@ -166,24 +182,21 @@ export const MenuPage = () => {
     }
   };
 
-  const toggleCardOption = (menuItemId: string, option: any) => {
-    setSelectedOptionsMap(prev => ({
-      ...prev,
-      [menuItemId]: prev[menuItemId]?.name === option.name ? null : option
-    }));
-  };
-
-  const handleAddToCart = async (item: MenuItem) => {
+  const handleAddToCart = async (e: React.MouseEvent, item: MenuItem) => {
+    e.stopPropagation();
     // Nếu món có options hoặc addons, bắt buộc qua trang detail để chọn
     if (item.options?.length > 0 || item.addons?.length > 0) {
       navigate(tableId ? `/table/${tableId}/menu/${item.id}` : `/menu/${item.id}`);
       return;
     }
 
+    triggerFlyAnimation(e, getItemImageUrl(item));
+
     if (tableId) {
       try {
         const response = await axios.post('/api/orders', {
           tableId,
+          frontendUrl: window.location.origin, // ĐÃ THÊM
           items: [{
             menuItemId: getMenuItemId(item),
             name: item.name,
@@ -219,6 +232,13 @@ export const MenuPage = () => {
       setToastItem({ name: item.name, image: getItemImageUrl(item) });
       setTimeout(() => setToastItem(null), 3000);
     }
+  };
+
+  const toggleCardOption = (menuItemId: string, option: any) => {
+    setSelectedOptionsMap(prev => ({
+      ...prev,
+      [menuItemId]: prev[menuItemId]?.name === option.name ? null : option
+    }));
   };
 
   const handleRemoveTableCartItem = async (itemId: string) => {
@@ -270,6 +290,7 @@ export const MenuPage = () => {
 
       <CustomerHeader
         tableId={tableId}
+        tableName={table?.name}
         totalItems={displayTotalItems}
         onCartClick={() => setIsCartOpen(true)}
         searchTerm={searchTerm}
@@ -278,6 +299,37 @@ export const MenuPage = () => {
         selectedCategory={selectedCategory}
         onCategoryChange={setSelectedCategory}
       />
+
+      {/* FLYING ITEMS ANIMATION CONTAINER */}
+      <div className="fixed inset-0 pointer-events-none z-[999]">
+        <AnimatePresence>
+            {flyingItems.map(item => (
+                <motion.div
+                    key={item.id}
+                    initial={{ 
+                        x: item.start.x - 25, 
+                        y: item.start.y - 25,
+                        scale: 1,
+                        opacity: 1 
+                    }}
+                    animate={{ 
+                        x: window.innerWidth - 80, // Target near floating cart button
+                        y: window.innerHeight - 80,
+                        scale: 0.2,
+                        opacity: 0.5
+                    }}
+                    exit={{ opacity: 0 }}
+                    transition={{ 
+                        duration: 0.8,
+                        ease: [0.42, 0, 0.58, 1] // Ease-in-out
+                    }}
+                    className="fixed w-12 h-12 rounded-full overflow-hidden border-2 border-white shadow-lg bg-white"
+                >
+                    <img src={item.image} className="w-full h-full object-cover" alt="" />
+                </motion.div>
+            ))}
+        </AnimatePresence>
+      </div>
 
       <section className="relative h-[300px] md:h-[400px] bg-[#111] flex flex-col items-center justify-center overflow-hidden">
         <div className="absolute inset-0 z-0">
@@ -311,7 +363,7 @@ export const MenuPage = () => {
                 >
                   <div className="absolute top-2 right-2 sm:top-4 sm:right-4 flex flex-col gap-2 translate-x-10 opacity-0 group-hover:translate-x-0 group-hover:opacity-100 transition-all duration-300">
                     <button className="p-1.5 sm:p-2 bg-white shadow-md rounded-full text-gray-400 hover:text-red-600 hover:bg-red-50"><Heart className="w-3 h-3 sm:w-4 sm:h-4" /></button>
-                    <button className="p-1.5 sm:p-2 bg-white shadow-md rounded-full text-gray-400 hover:text-red-600 hover:bg-red-50" onClick={() => handleAddToCart(item)}><ShoppingBag className="w-3 h-3 sm:w-4 sm:h-4" /></button>
+                    <button className="p-1.5 sm:p-2 bg-white shadow-md rounded-full text-gray-400 hover:text-red-600 hover:bg-red-50" onClick={(e) => handleAddToCart(e, item)}><ShoppingBag className="w-3 h-3 sm:w-4 sm:h-4" /></button>
                   </div>
 
                   <div className="w-full aspect-4/3 rounded-2xl sm:rounded-3xl overflow-hidden mb-3 sm:mb-6 group-hover:shadow-lg transition-all duration-500 cursor-pointer relative" onClick={() => navigate(tableId ? `/table/${tableId}/menu/${item.id}` : `/menu/${item.id}`)}>
@@ -353,7 +405,7 @@ export const MenuPage = () => {
 
                   <div className="w-full mt-auto space-y-2">
                     <button
-                      onClick={(e) => { e.stopPropagation(); handleQuickAdd(item); }}
+                      onClick={(e) => { e.stopPropagation(); handleQuickAdd(e, item); }}
                       className="w-full py-2 sm:py-2.5 rounded-xl font-bold text-[10px] sm:text-xs uppercase tracking-widest transition-all hover:shadow-lg flex items-center justify-center gap-2 bg-red-600 text-white border border-transparent group/btn"
                     >
                       <ShoppingBag className="w-3 h-3 sm:w-4 sm:h-4 group-hover/btn:scale-110 transition-transform" />
@@ -541,7 +593,15 @@ export const MenuPage = () => {
 
       <AnimatePresence>
         {displayTotalItems > 0 && (
-          <motion.button initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }} onClick={() => setIsCartOpen(true)} className="fixed bottom-8 right-8 z-[150] w-16 h-16 bg-black text-white rounded-full shadow-2xl border-4 border-white flex items-center justify-center group">
+          <motion.button 
+            ref={cartRef}
+            initial={{ scale: 0 }} 
+            animate={{ scale: 1 }} 
+            whileTap={{ scale: 1.2 }}
+            exit={{ scale: 0 }} 
+            onClick={() => setIsCartOpen(true)} 
+            className="fixed bottom-8 right-8 z-[150] w-16 h-16 bg-black text-white rounded-full shadow-2xl border-4 border-white flex items-center justify-center group"
+          >
             <ShoppingBag className="w-7 h-7 group-hover:rotate-12 transition-transform" />
             <div className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center border-2 border-white">{displayTotalItems}</div>
             <div className="absolute inset-0 rounded-full bg-red-600 animate-ping opacity-20 -z-10" />
@@ -562,3 +622,5 @@ export const MenuPage = () => {
     </div>
   );
 };
+
+export default MenuPage;

@@ -1,12 +1,24 @@
 import express from "express";
+import rateLimit from "express-rate-limit";
 import * as orderController from "../controllers/orderController.js";
 import { authorize } from "../security/SecurityMiddleware.js";
 
 const router = express.Router();
 
+// Middleware chống Kiosk DDoS/Spam
+const kioskOrderLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000, // 10 phút
+  max: 5, // Mỗi IP tối đa 5 đơn
+  message: {
+    success: false,
+    error: { message: "Bạn đã đặt quá nhiều đơn. Vui lòng thử lại sau 10 phút." }
+  },
+  validate: { xForwardedForHeader: false }
+});
+
 // --- LUỒNG KHÁCH (Public - Không cần Token) ---
 router.post("/calculate-price", orderController.calculatePrice);             // API tính giá cho Frontend (Chuẩn 100% Backend)
-router.post("/kiosk", orderController.createKioskOrder);                     // Kiosk: Đặt Mang về / Giao hàng (Public - Tiền mặt)
+router.post("/kiosk", kioskOrderLimiter, orderController.createKioskOrder);  // Kiosk: Đặt Mang về / Giao hàng (Public - Tiền mặt)
 
 router.get("/table/:tableId/active-session", orderController.getActiveSession); // Khách quét QR kiểm tra bàn
 router.get("/:id/status", orderController.getOrderStatus);                      // Khách kiểm tra trạng thái bill
@@ -26,9 +38,11 @@ router.post("/counter", authorize(["staff", "admin"]), orderController.createCou
 
 router.put("/:sessionId/approve-all", authorize(["staff", "admin", "chef"]), orderController.approveAllItems);
 router.put("/:sessionId/item/:itemId/status", authorize(["staff", "admin", "chef"]), orderController.updateItemStatus);
+router.put("/:sessionId/item/:itemId/admin-quantity", authorize(["staff", "admin"]), orderController.adminUpdateItemQuantity);
 
 // FIX #1: PUT/DELETE toàn bộ order giờ yêu cầu token, ngăn khách xóa bill người khác
 router.put("/:id", authorize(["staff", "admin"]), orderController.updateOrder);
+router.post("/:id/complete", authorize(["staff", "admin"]), orderController.completeOrder);
 router.delete("/:id", authorize(["admin"]), orderController.deleteOrder);
 
 export default router;

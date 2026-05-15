@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Grid, Trash2, Edit2, QrCode, X, Printer, ChevronRight, Utensils, DollarSign } from 'lucide-react';
-import axios from '@/src/lib/axiosClient';
+import axios from '@/src/api/axiosClient';
 import { toast } from 'react-toastify';
 import { io } from 'socket.io-client';
 import { QRCodeSVG } from 'qrcode.react';
@@ -11,7 +11,7 @@ import { Table } from '../../../types';
 import { Button } from '../../../components/Button';
 import { AdminTableModal } from '../modals/AdminTableModal';
 import { ConfirmModal } from '../../../components/modals/ConfirmModal';
-import { cn } from '../../../lib/cn';
+import { cn } from '../../../api/cn';
 
 const socket = io();
 const getPublicAppUrl = () => {
@@ -34,7 +34,7 @@ export const AdminTableManagement = () => {
     isOpen: false,
     title: '',
     message: '',
-    onConfirm: () => {},
+    onConfirm: () => { },
     variant: 'warning'
   });
 
@@ -51,6 +51,12 @@ export const AdminTableManagement = () => {
       .then(res => setTables(res.data))
       .catch(err => console.error("Failed to fetch tables:", err));
   };
+
+  // Filter out delivery and takeaway "tables" from the management view
+  const filteredTables = tables.filter(t => 
+    !t.name.toLowerCase().includes('giao hàng') && 
+    !t.name.toLowerCase().includes('mang về')
+  );
 
   const handleSave = async (data: any) => {
     try {
@@ -148,9 +154,9 @@ export const AdminTableManagement = () => {
       {/* Stats Summary - Mini */}
       <div className="flex flex-wrap gap-4">
         {[
-          { label: 'Tổng số bàn', count: tables.length, color: 'text-slate-900', bg: 'bg-white' },
-          { label: 'Đang phục vụ', count: tables.filter(t => t.status === 'occupied').length, color: 'text-brand', bg: 'bg-brand/5' },
-          { label: 'Bàn trống', count: tables.filter(t => t.status === 'empty').length, color: 'text-emerald-500', bg: 'bg-emerald-50' }
+          { label: 'Tổng số bàn', count: filteredTables.length, color: 'text-slate-900', bg: 'bg-white' },
+          { label: 'Đang phục vụ', count: filteredTables.filter(t => t.status === 'occupied').length, color: 'text-brand', bg: 'bg-brand/5' },
+          { label: 'Bàn trống', count: filteredTables.filter(t => t.status === 'empty').length, color: 'text-emerald-500', bg: 'bg-emerald-50' }
         ].map((stat, i) => (
           <div key={i} className={cn("px-6 py-4 rounded-2xl border border-gray-100 shadow-card flex items-center gap-4", stat.bg)}>
             <div className={cn("text-2xl font-black font-serif leading-none", stat.color)}>{stat.count}</div>
@@ -162,7 +168,7 @@ export const AdminTableManagement = () => {
       {/* Tables Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
         <AnimatePresence mode="popLayout">
-          {tables.map((table, i) => (
+          {filteredTables.map((table, i) => (
             <motion.div
               layout
               initial={{ opacity: 0, scale: 0.95 }}
@@ -242,7 +248,7 @@ export const AdminTableManagement = () => {
       </div>
 
       {/* Empty State */}
-      {tables.length === 0 && (
+      {filteredTables.length === 0 && (
         <div className="premium-card py-32 flex flex-col items-center justify-center text-center">
           <div className="w-24 h-24 bg-gray-50 rounded-[3rem] flex items-center justify-center mb-6">
             <Grid className="w-10 h-10 text-gray-200" />
@@ -293,8 +299,8 @@ export const AdminTableManagement = () => {
               </div>
 
               <div className="bg-white p-10 rounded-[3rem] shadow-card border border-gray-100 mx-auto mb-10 group relative transition-transform hover:scale-105 duration-500 flex items-center justify-center">
-                <QRCodeSVG 
-                  value={`${getPublicAppUrl()}/table/${selectedQR.slug || selectedQR.id}`} 
+                <QRCodeSVG
+                  value={`${getPublicAppUrl()}/table/${selectedQR.slug || selectedQR.id}`}
                   size={240}
                   level="H"
                   includeMargin={false}

@@ -20,7 +20,7 @@ const PUBLIC_PATHS = [
   '/api/orders',         // Khách mở bàn, thêm món vào giỏ, checkout (chỉ các sub-route public)
   '/api/tables',         // Khách kiểm tra trạng thái bàn khi quét QR (chỉ GET)
   '/api/payments/generate-qr',   // Khách tạo QR thanh toán
-  '/api/payments/webhook',       // Bot Python báo kết quả về
+  '/api/payments/payos-webhook', // PayOS gọi webhook xác nhận thanh toán (PUBLIC - không cần token)
   // NOTE: /api/payments/mock NOT public - yêu cầu token Staff/Admin (FIX #5)
   '/api/bank-accounts/default',  // Khách lấy thông tin ngân hàng để hiển thị QR
 

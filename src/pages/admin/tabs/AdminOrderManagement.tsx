@@ -1,13 +1,12 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShoppingCart, Search, Filter, Clock, CheckCircle2, XCircle, MoreVertical, CreditCard, Receipt, ChevronRight } from 'lucide-react';
-import axios from '@/src/lib/axiosClient';
+import { ShoppingCart, Search, Filter, Clock, CheckCircle2, XCircle, MoreVertical, CreditCard, Receipt, ChevronRight, ChevronLeft } from 'lucide-react';
+import axios from '@/src/api/axiosClient';
 import { toast } from 'react-toastify';
 import { io } from 'socket.io-client';
 import { Order } from '../../../types';
-import { Button } from '../../../components/Button';
 import { ConfirmModal } from '../../../components/modals/ConfirmModal';
-import { cn } from '../../../lib/cn';
+import { cn } from '../../../api/cn';
 
 const socket = io();
 
@@ -16,6 +15,13 @@ export const AdminOrderManagement = () => {
   const [tableNameMap, setTableNameMap] = useState<Record<string, string>>({});
   const [filter, setFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // --- THÊM STATE QUẢN LÝ PHÂN TRANG ---
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalOrders, setTotalOrders] = useState(0);
+  const ITEMS_PER_PAGE = 10; // Cấu hình số đơn hiển thị trên 1 trang
+
   const [confirmConfig, setConfirmConfig] = useState<{
     isOpen: boolean;
     title: string;
@@ -23,33 +29,89 @@ export const AdminOrderManagement = () => {
     onConfirm: () => void;
     variant: 'danger' | 'warning' | 'info';
   }>({
-    isOpen: false,
-    title: '',
-    message: '',
-    onConfirm: () => {},
-    variant: 'warning'
+    isOpen: false, title: '', message: '', onConfirm: () => { }, variant: 'warning'
   });
 
   useEffect(() => {
-    fetchOrders();
     fetchTables();
-    socket.on('new-order', (newOrder) => {
-      setOrders(prev => [newOrder, ...prev]);
+    
+    // Khởi tạo Socket lắng nghe đơn mới
+    socket.on('new-order', () => {
+      // Khi có đơn mới, tốt nhất là fetch lại dữ liệu trang 1 để đồng bộ
+      if (currentPage === 1 && filter === 'all') fetchOrders();
     });
+    
     socket.on('order-updated', (updatedOrder) => {
       const updated_id = updatedOrder._id || updatedOrder.id;
       setOrders(prev => prev.map(o => ((o as any)._id || o.id) === updated_id ? updatedOrder : o));
     });
+    
     return () => {
       socket.off('new-order');
       socket.off('order-updated');
     };
-  }, []);
+  }, []); // Cảnh báo: Chỉ chạy 1 lần lúc mount
 
-  const fetchOrders = () => {
-    axios.get('/api/orders')
-      .then(res => setOrders(res.data.reverse()))
-      .catch(err => console.error("Failed to fetch orders:", err));
+  // Gọi API mỗi khi thay đổi Filter, Search, hoặc Chuyển trang
+  useEffect(() => {
+    // Reset về trang 1 khi đổi bộ lọc tìm kiếm
+    setCurrentPage(1);
+    fetchOrders(1);
+  }, [filter, searchTerm]);
+
+  // Gọi API khi chuyển trang
+  useEffect(() => {
+    fetchOrders(currentPage);
+  }, [currentPage]);
+
+  // --- HÀM FETCH ORDERS (Đã hỗ trợ phân trang) ---
+  const fetchOrders = async (page: number = currentPage) => {
+    try {
+      // Gửi Query params lên Backend (Nếu Backend của bạn có hỗ trợ phân trang)
+      // Nếu Backend không hỗ trợ, ta sẽ nhận toàn bộ data và xử lý cắt mảng ở Frontend
+      const res = await axios.get('/api/orders', {
+        params: {
+          page: page,
+          limit: ITEMS_PER_PAGE,
+          status: filter !== 'all' ? filter : undefined,
+          search: searchTerm || undefined
+        }
+      });
+
+      // Kiểm tra xem Backend có trả về cấu trúc Pagination hay không
+      // Cấu trúc mong đợi: { data: [...], totalPages: 5, totalItems: 50 }
+      if (res.data && res.data.data) {
+        setOrders(res.data.data);
+        setTotalPages(res.data.totalPages || 1);
+        setTotalOrders(res.data.totalItems || res.data.data.length);
+      } else {
+        // FALLBACK: Backend không có phân trang, trả về array nguyên gốc
+        const allOrders = Array.isArray(res.data) ? res.data.reverse() : [];
+        
+        // 1. Lọc tay (Frontend)
+        const filtered = allOrders.filter(o => {
+          const normalizedStatus = normalizeStatus(o.status);
+          const matchesFilter = filter === 'all' || normalizedStatus === filter;
+          const tableName = tableNameMap[o.tableId] || '';
+          const matchesSearch = o.tableId.includes(searchTerm)
+            || (o.id || (o as any)._id || '').includes(searchTerm)
+            || tableName.toLowerCase().includes(searchTerm.toLowerCase());
+          return matchesFilter && matchesSearch;
+        });
+
+        // 2. Tính toán tổng số trang (Frontend)
+        const total = filtered.length;
+        setTotalOrders(total);
+        setTotalPages(Math.ceil(total / ITEMS_PER_PAGE));
+
+        // 3. Cắt mảng hiển thị (Frontend Slice)
+        const startIndex = (page - 1) * ITEMS_PER_PAGE;
+        const slicedOrders = filtered.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+        setOrders(slicedOrders);
+      }
+    } catch (err) {
+      console.error("Failed to fetch orders:", err);
+    }
   };
 
   const fetchTables = () => {
@@ -77,10 +139,7 @@ export const AdminOrderManagement = () => {
             await axios.put(`/api/orders/${id}`, { status });
             fetchOrders();
             toast.success(`Đã hủy đơn hàng!`);
-          } catch (err) {
-            console.error('Failed to cancel order:', err);
-            toast.error('Lỗi khi hủy đơn hàng!');
-          }
+          } catch (err) { toast.error('Lỗi khi hủy đơn hàng!'); }
         }
       });
       return;
@@ -90,10 +149,7 @@ export const AdminOrderManagement = () => {
       await axios.put(`/api/orders/${id}`, { status });
       fetchOrders();
       toast.success(`Đã cập nhật trạng thái đơn hàng: ${getStatusLabel(status)}`);
-    } catch (err) {
-      console.error('Failed to update order status:', err);
-      toast.error('Lỗi khi cập nhật trạng thái đơn hàng!');
-    }
+    } catch (err) { toast.error('Lỗi khi cập nhật trạng thái đơn hàng!'); }
   };
 
   const approveAll = async (id: string) => {
@@ -101,10 +157,7 @@ export const AdminOrderManagement = () => {
       await axios.put(`/api/orders/${id}/approve-all`);
       fetchOrders();
       toast.success('Đã duyệt toàn bộ món chờ duyệt!');
-    } catch (err) {
-      console.error('Failed to approve all items:', err);
-      toast.error('Không thể duyệt tất cả món.');
-    }
+    } catch (err) { toast.error('Không thể duyệt tất cả món.'); }
   };
 
   const updateItemStatus = async (orderId: string, itemId: string, status: string) => {
@@ -112,10 +165,7 @@ export const AdminOrderManagement = () => {
       await axios.put(`/api/orders/${orderId}/item/${itemId}/status`, { status });
       fetchOrders();
       toast.success('Đã chuyển món vào bếp!');
-    } catch (err) {
-      console.error('Failed to update item:', err);
-      toast.error('Không thể cập nhật món!');
-    }
+    } catch (err) { toast.error('Không thể cập nhật món!'); }
   };
 
   const normalizeStatus = (status: string) => {
@@ -126,7 +176,7 @@ export const AdminOrderManagement = () => {
   const handlePayment = async (order: Order) => {
     const orderId = (order as any)._id || order.id;
     const orderTotal = Number(order.total || 0);
-    
+
     setConfirmConfig({
       isOpen: true,
       title: 'Xác nhận hoàn tất',
@@ -134,27 +184,13 @@ export const AdminOrderManagement = () => {
       variant: 'info',
       onConfirm: async () => {
         try {
-          // API v3.0: Use dedicated complete endpoint which handles status + table reset
           await axios.post(`/api/orders/${orderId}/complete`);
           fetchOrders();
           toast.success('Đơn hàng đã hoàn tất, bàn đã sẵn sàng!');
-        } catch (err) {
-          console.error('Completion failed:', err);
-          toast.error('Lỗi khi chốt đơn hàng!');
-        }
+        } catch (err) { toast.error('Lỗi khi chốt đơn hàng!'); }
       }
     });
   };
-
-  const filteredOrders = orders.filter(o => {
-    const normalizedStatus = normalizeStatus(o.status);
-    const matchesFilter = filter === 'all' || normalizedStatus === filter;
-    const tableName = tableNameMap[o.tableId] || '';
-    const matchesSearch = o.tableId.includes(searchTerm)
-      || (o.id || (o as any)._id || '').includes(searchTerm)
-      || tableName.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesFilter && matchesSearch;
-  });
 
   const getStatusColor = (status: string) => {
     switch (normalizeStatus(status)) {
@@ -171,6 +207,14 @@ export const AdminOrderManagement = () => {
       case 'completed': return 'Đã thanh toán';
       case 'cancelled': return 'Đã huỷ';
       default: return status;
+    }
+  };
+
+  // Nút chuyển trang (Previous / Next)
+  const handlePageChange = (newPage: number) => {
+    if (newPage > 0 && newPage <= totalPages) {
+      setCurrentPage(newPage);
+      // Có thể thêm window.scrollTo(0,0) nếu muốn tự động cuộn lên trên cùng khi sang trang
     }
   };
 
@@ -218,7 +262,7 @@ export const AdminOrderManagement = () => {
       {/* Orders Grid */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
         <AnimatePresence mode="popLayout">
-          {filteredOrders.map((order, i) => {
+          {orders.map((order, i) => {
             const orderId = (order as any)._id || order.id || '';
             return (
               <motion.div
@@ -274,7 +318,6 @@ export const AdminOrderManagement = () => {
                               <div className="w-1.5 h-1.5 bg-brand rounded-full opacity-40 group-hover:opacity-100 group-hover:scale-125 transition-all" />
                               <p className="font-bold text-gray-800 text-sm">{item.name}</p>
                             </div>
-                            {/* Options & Addons display for Kitchen */}
                             {(item.selectedOption || (item.selectedAddons && item.selectedAddons.length > 0)) && (
                               <div className="ml-5 flex flex-wrap gap-2">
                                 {item.selectedOption && (
@@ -293,7 +336,7 @@ export const AdminOrderManagement = () => {
                           <div className="flex items-center gap-4">
                             <span className="text-[10px] font-black text-gray-400 uppercase">x{item.quantity}</span>
                             <span className="text-xs font-bold text-gray-900">
-                              {Number(item.totalPrice ?? item.basePrice ?? item.price ?? 0).toLocaleString()}đ
+                              {Number(item.totalPrice ?? item.basePrice ?? item.basePrice ?? 0).toLocaleString()}đ
                             </span>
                             {item.status === 'pending_approval' && (
                               <button
@@ -355,13 +398,58 @@ export const AdminOrderManagement = () => {
         </AnimatePresence>
       </div>
 
-      {filteredOrders.length === 0 && (
+      {orders.length === 0 && (
         <div className="premium-card py-32 flex flex-col items-center justify-center text-center">
           <div className="w-24 h-24 bg-gray-50 rounded-[3rem] flex items-center justify-center mb-6">
             <Receipt className="w-10 h-10 text-gray-200" />
           </div>
           <h3 className="text-2xl font-black text-gray-900 font-serif mb-2">Không tìm thấy đơn hàng</h3>
           <p className="text-gray-400 font-medium">Hãy thử thay đổi bộ lọc hoặc từ khóa tìm kiếm</p>
+        </div>
+      )}
+
+      {/* --- PHẦN PHÂN TRANG (PAGINATION CONTROLS) --- */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between bg-white px-6 py-4 rounded-2xl border border-gray-100 shadow-sm mt-8">
+          <p className="text-sm font-bold text-gray-500">
+            Hiển thị trang <span className="text-gray-900">{currentPage}</span> / {totalPages} (Tổng: {totalOrders} đơn)
+          </p>
+          
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => handlePageChange(currentPage - 1)}
+              disabled={currentPage === 1}
+              className="p-3 bg-gray-50 text-gray-600 rounded-xl hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+            
+            {/* Hiển thị danh sách số trang */}
+            <div className="flex gap-1 mx-2">
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                <button
+                  key={page}
+                  onClick={() => handlePageChange(page)}
+                  className={cn(
+                    "w-10 h-10 rounded-xl font-black text-sm transition-all",
+                    currentPage === page 
+                      ? "bg-brand text-white shadow-md" 
+                      : "bg-transparent text-gray-500 hover:bg-gray-100"
+                  )}
+                >
+                  {page}
+                </button>
+              ))}
+            </div>
+
+            <button 
+              onClick={() => handlePageChange(currentPage + 1)}
+              disabled={currentPage === totalPages}
+              className="p-3 bg-gray-50 text-gray-600 rounded-xl hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+            >
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          </div>
         </div>
       )}
 

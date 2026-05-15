@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Package, Search, Plus, Edit2, Trash2, X, CheckCircle2 } from 'lucide-react';
-import axios from '@/src/lib/axiosClient';
+import axios from '@/src/api/axiosClient';
 import { toast } from 'react-toastify';
 import { Combo, MenuItem } from '../../../types';
 import { Button } from '../../../components/Button';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { getMenuItemCategoryName } from '../../../lib/menuHelpers';
+import { getMenuItemCategoryName } from '../../../api/menuHelpers';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));

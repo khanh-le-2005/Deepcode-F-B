@@ -2,10 +2,11 @@ import { useState, useRef, useEffect } from "react";
 import { Search, ShoppingBag, ChevronLeft, X, Menu } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { cn } from "../lib/cn";
+import { cn } from "../api/cn";
 
 interface CustomerHeaderProps {
   tableId?: string;
+  tableName?: string; // ĐÃ THÊM
   totalItems?: number;
   onCartClick?: () => void;
   showBackButton?: boolean;
@@ -18,6 +19,7 @@ interface CustomerHeaderProps {
 
 export const CustomerHeader = ({
   tableId,
+  tableName, // ĐÃ THÊM
   totalItems = 0,
   onCartClick,
   showBackButton = false,
@@ -80,7 +82,7 @@ export const CustomerHeader = ({
               ) : (
                 <div className="flex items-center gap-4 xl:gap-8">
                   {/* Mobile Menu Trigger */}
-                  <button 
+                  <button
                     onClick={() => setIsMobileMenuOpen(true)}
                     className="md:hidden p-1 hover:text-red-600 transition-colors"
                   >
@@ -96,10 +98,10 @@ export const CustomerHeader = ({
                   </h1>
                   <nav className="hidden md:flex gap-6 text-sm font-bold uppercase tracking-widest items-center">
                     <p className="text-white">Thực đơn</p>
-                    
+
                     {categories.length > 0 && (
                       <div className="relative" ref={dropdownRef}>
-                        <button 
+                        <button
                           onClick={() => setIsCategoryOpen(!isCategoryOpen)}
                           className={cn(
                             "flex items-center gap-1.5 transition-colors hover:text-red-600",
@@ -163,7 +165,7 @@ export const CustomerHeader = ({
 
                 {tableId && (
                   <button className="bg-red-600 hover:bg-red-700 text-white px-3 sm:px-6 py-1.5 sm:py-2 rounded font-bold text-[10px] sm:text-sm transition-all uppercase whitespace-nowrap">
-                    Bàn: {tableId}
+                    Bàn: {tableName || tableId}
                   </button>
                 )}
               </div>
@@ -222,7 +224,7 @@ export const CustomerHeader = ({
                   <X className="w-6 h-6" />
                 </button>
               </div>
-              
+
               <div className="flex-1 overflow-y-auto p-6">
                 <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 mb-6">Chọn Danh Mục</p>
                 <div className="space-y-2">
@@ -235,8 +237,8 @@ export const CustomerHeader = ({
                       }}
                       className={cn(
                         "w-full text-left px-5 py-4 rounded-2xl text-sm font-bold transition-all flex items-center justify-between",
-                        selectedCategory === cat 
-                          ? "bg-red-600 text-white shadow-lg shadow-red-600/20" 
+                        selectedCategory === cat
+                          ? "bg-red-600 text-white shadow-lg shadow-red-600/20"
                           : "text-gray-400 hover:bg-white/5 hover:text-white"
                       )}
                     >

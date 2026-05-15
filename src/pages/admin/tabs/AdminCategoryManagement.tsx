@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { Button } from '../../../components/Button';
-import { cn } from '../../../lib/cn';
+import { cn } from '../../../api/cn';
 import { Category } from '../../../types';
 
 const STORAGE_KEY = 'qr-dine-admin-categories';

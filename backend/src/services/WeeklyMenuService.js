@@ -1,4 +1,6 @@
 import { WeeklyMenu } from '../models/WeeklyMenu.js';
+import { MenuItem } from '../models/MenuItem.js';
+import { Combo } from '../models/Combo.js';
 import { NotFoundError, BadRequestError } from '../utils/AppError.js';
 
 class WeeklyMenuService {
@@ -59,6 +61,10 @@ class WeeklyMenuService {
       throw new BadRequestError('Đã có lịch bán trùng thời gian với tuần này: ' + overlappingMenu.title);
     }
 
+    if (data.menuItems && Array.isArray(data.menuItems)) {
+      await this._validateMenuItems(data.menuItems);
+    }
+
     const menu = new WeeklyMenu(data);
     await menu.save();
     
@@ -67,6 +73,10 @@ class WeeklyMenuService {
   }
 
   async updateWeeklyMenu(id, data, io) {
+    if (data.menuItems && Array.isArray(data.menuItems)) {
+      await this._validateMenuItems(data.menuItems);
+    }
+    
     const menu = await WeeklyMenu.findByIdAndUpdate(id, data, { new: true });
     if (!menu) throw new NotFoundError('Danh sách tuần không tồn tại');
     
@@ -80,6 +90,16 @@ class WeeklyMenuService {
     
     if (io) io.emit("weekly-menu-updated");
     return menu;
+  }
+
+  // Helper validation: Kiểm tra món ăn/combo có tồn tại thực sự không
+  async _validateMenuItems(itemIds) {
+    for (const id of itemIds) {
+      const exists = await MenuItem.exists({ _id: id }) || await Combo.exists({ _id: id });
+      if (!exists) {
+        throw new BadRequestError(`Món ăn với ID ${id} không tồn tại trong hệ thống. Vui lòng kiểm tra lại.`);
+      }
+    }
   }
 }
 

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { ShoppingCart, CreditCard, Grid, Clock, TrendingUp, Users, Utensils, ChevronRight } from 'lucide-react';
-import axios from '@/src/lib/axiosClient';
+import axios from '@/src/api/axiosClient';
 import { io } from 'socket.io-client';
 import {
   XAxis,
@@ -13,7 +13,7 @@ import {
   Area
 } from 'recharts';
 import { useSocket } from '../../../contexts/SocketContext';
-import { cn } from '../../../lib/cn';
+import { cn } from '../../../api/cn';
 
 export const AdminOverview = () => {
   const { socket } = useSocket();

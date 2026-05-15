@@ -1,17 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  X, Upload, Image as ImageIcon, Plus, Trash2, 
+import {
+  X, Upload, Image as ImageIcon, Plus, Trash2,
   ChevronLeft, Save, AlertCircle, CheckCircle2, Search,
   Loader2, Sparkles, Wand2
 } from 'lucide-react';
-import axios from '@/src/lib/axiosClient';
+import axios from '@/src/api/axiosClient';
 import { toast } from 'react-toastify';
 import { MenuItem, MenuItemOption, MenuItemAddon, Category } from '../../../types';
 import { Button } from '../../../components/Button';
-import { getCategoryId, getMenuItemId } from '../../../lib/menuHelpers';
-import { cn } from '../../../lib/cn';
+import { getCategoryId, getMenuItemId } from '../../../api/menuHelpers';
+import { cn } from '../../../api/cn';
 
 interface FormState {
   name: string;
@@ -44,7 +44,7 @@ export const AdminMenuEditor = () => {
   const [galleryImageIds, setGalleryImageIds] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(isEditMode);
-  
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // --- Image Suggestion Logic ---
@@ -134,12 +134,12 @@ export const AdminMenuEditor = () => {
   const selectSuggestedImage = (img: any) => {
     const imgId = img._id || img.id;
     if (galleryImageIds.includes(imgId)) return;
-    
+
     if (galleryImageIds.length + selectedFiles.length >= 5) {
       toast.warning('Tối đa 5 ảnh cho mỗi món.');
       return;
     }
-    
+
     setGalleryImageIds(prev => [...prev, imgId]);
     setFormData(prev => ({
       ...prev,
@@ -240,7 +240,7 @@ export const AdminMenuEditor = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="flex items-center gap-4">
-          <button 
+          <button
             onClick={() => navigate('/admin/menu')}
             className="p-3 bg-white border border-gray-100 rounded-2xl text-gray-400 hover:text-brand hover:border-brand shadow-card transition-all"
           >
@@ -258,9 +258,9 @@ export const AdminMenuEditor = () => {
           <Button variant="outline" size="lg" onClick={() => navigate('/admin/menu')} className="rounded-2xl px-8 h-14 font-black text-xs uppercase tracking-widest">
             Hủy bỏ
           </Button>
-          <Button 
-            variant="secondary" 
-            size="lg" 
+          <Button
+            variant="secondary"
+            size="lg"
             disabled={isSaving}
             onClick={handleSave}
             className="bg-brand text-white hover:bg-brand-dark px-10 h-14 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-brand/20 transition-all active:scale-95"
@@ -280,7 +280,7 @@ export const AdminMenuEditor = () => {
               <span className="w-8 h-8 bg-brand/10 text-brand rounded-lg flex items-center justify-center text-sm italic">01</span>
               Thông tin cơ bản
             </h3>
-            
+
             <div className="space-y-6">
               <div className="space-y-2 relative">
                 <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Tên món ăn <span className="text-danger">*</span></label>
@@ -310,11 +310,11 @@ export const AdminMenuEditor = () => {
                           )}
                           {isSearching ? 'Đang tìm ảnh phù hợp...' : `Gợi ý ảnh cho "${formData.name}"`}
                         </p>
-                        <button 
+                        <button
                           onClick={() => {
                             setSuggestions([]);
                             setIsSearching(false);
-                          }} 
+                          }}
                           className="text-gray-400 hover:text-danger"
                         >
                           <X className="w-4 h-4" />
@@ -403,7 +403,7 @@ export const AdminMenuEditor = () => {
                 <h3 className="text-lg font-black text-gray-900 flex items-center gap-2">
                   <CheckCircle2 className="w-5 h-5 text-amber-500" /> Tuỳ chọn (Size/Vị)
                 </h3>
-                <button 
+                <button
                   onClick={() => setFormData(prev => ({ ...prev, options: [...prev.options, { name: '', priceExtra: 0 }] }))}
                   className="p-2 bg-amber-50 text-amber-600 rounded-xl hover:bg-amber-100 transition-colors"
                 >
@@ -434,7 +434,7 @@ export const AdminMenuEditor = () => {
                       }}
                       className="w-24 bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/20 font-black text-brand"
                     />
-                    <button 
+                    <button
                       onClick={() => setFormData(prev => ({ ...prev, options: prev.options.filter((_, idx) => idx !== i) }))}
                       className="p-3 text-gray-300 hover:text-danger hover:bg-danger/5 rounded-xl transition-all"
                     >
@@ -450,7 +450,7 @@ export const AdminMenuEditor = () => {
                 <h3 className="text-lg font-black text-gray-900 flex items-center gap-2">
                   <Sparkles className="w-5 h-5 text-brand" /> Topping / Addon
                 </h3>
-                <button 
+                <button
                   onClick={() => setFormData(prev => ({ ...prev, addons: [...prev.addons, { name: '', priceExtra: 0 }] }))}
                   className="p-2 bg-brand/10 text-brand rounded-xl hover:bg-brand/20 transition-colors"
                 >
@@ -481,7 +481,7 @@ export const AdminMenuEditor = () => {
                       }}
                       className="w-24 bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand/20 font-black text-brand"
                     />
-                    <button 
+                    <button
                       onClick={() => setFormData(prev => ({ ...prev, addons: prev.addons.filter((_, idx) => idx !== i) }))}
                       className="p-3 text-gray-300 hover:text-danger hover:bg-danger/5 rounded-xl transition-all"
                     >
@@ -501,7 +501,7 @@ export const AdminMenuEditor = () => {
             <h3 className="text-lg font-black text-gray-900 flex items-center gap-3">
               <ImageIcon className="w-5 h-5 text-gray-400" /> Hình ảnh ({formData.previewImages.length}/5)
             </h3>
-            
+
             <div className="grid grid-cols-2 gap-4">
               <AnimatePresence>
                 {formData.previewImages.map((src, idx) => (
@@ -537,13 +537,13 @@ export const AdminMenuEditor = () => {
                 >
                   <Upload className="w-8 h-8 opacity-20" />
                   <span className="text-[10px] font-black uppercase tracking-widest">Tải ảnh lên</span>
-                  <input 
-                    type="file" 
-                    ref={fileInputRef} 
-                    onChange={handleFileChange} 
-                    accept="image/*" 
-                    multiple 
-                    className="hidden" 
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                    accept="image/*"
+                    multiple
+                    className="hidden"
                   />
                 </motion.div>
               )}
@@ -561,8 +561,8 @@ export const AdminMenuEditor = () => {
                     onClick={() => setFormData({ ...formData, status: 'available' })}
                     className={cn(
                       "py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all",
-                      formData.status === 'available' 
-                        ? "bg-emerald-50 text-emerald-600 border-emerald-500 shadow-sm" 
+                      formData.status === 'available'
+                        ? "bg-emerald-50 text-emerald-600 border-emerald-500 shadow-sm"
                         : "bg-white text-gray-400 border-gray-100 hover:border-gray-300"
                     )}
                   >
@@ -572,8 +572,8 @@ export const AdminMenuEditor = () => {
                     onClick={() => setFormData({ ...formData, status: 'unavailable' })}
                     className={cn(
                       "py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all",
-                      formData.status === 'unavailable' 
-                        ? "bg-rose-50 text-rose-600 border-rose-500 shadow-sm" 
+                      formData.status === 'unavailable'
+                        ? "bg-rose-50 text-rose-600 border-rose-500 shadow-sm"
                         : "bg-white text-gray-400 border-gray-100 hover:border-gray-300"
                     )}
                   >

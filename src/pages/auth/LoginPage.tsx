@@ -158,19 +158,17 @@ export const LoginPage = () => {
               </button>
             </form>
 
-            {/* Trial Account Box (Small & Clean) */}
+            {/* Trial Account Box (Small & Clean)
             <div className="mt-12 p-4 bg-black/10 rounded-3xl border border-white/5 inline-block mx-auto w-full">
               <p className="text-[10px] font-bold text-teal-400 uppercase tracking-widest mb-2">Tài khoản dùng thử</p>
               <div className="grid grid-cols-2 gap-2">
-                <p className="text-[11px] text-teal-100/60">Admin: admin@gmail.com / 123456</p>
-                <p className="text-[11px] text-teal-100/60">Staff: staff@gmail.com / 123456</p>
               </div>
-            </div>
+            </div> */}
           </motion.div>
 
           <div className="absolute bottom-8 right-8 text-[10px] text-teal-100/30 text-right">
             Bạn gặp sự cố? Liên hệ bộ phận IT<br />
-            <span className="text-teal-100/50">support@dineflow.com</span>
+            <span className="text-teal-100/50">support@deepcode.com</span>
           </div>
         </div>
       </main>

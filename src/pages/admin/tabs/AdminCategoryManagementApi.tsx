@@ -16,10 +16,10 @@ import {
   Upload,
   WandSparkles,
 } from 'lucide-react';
-import axios from '@/src/lib/axiosClient';
+import axios from '@/src/api/axiosClient';
 import { toast } from 'react-toastify';
 import { Button } from '../../../components/Button';
-import { cn } from '../../../lib/cn';
+import { cn } from '../../../api/cn';
 import { Category } from '../../../types';
 
 type CategoryFormState = {

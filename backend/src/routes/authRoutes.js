@@ -1,9 +1,10 @@
 import express from 'express';
-import { login } from '../controllers/authController.js';
+import { login, refreshToken } from '../controllers/authController.js';
 
 const router = express.Router();
 
 router.post('/login', login);
+router.post('/refresh-token', refreshToken);
 
 // Lấy thông tin tài khoản hiện tại (Dùng để check token ở Frontend)
 router.get('/me', (req, res) => {

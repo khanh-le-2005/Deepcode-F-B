@@ -1,6 +1,5 @@
 import PaymentService from "../services/PaymentService.js";
 import OrderService from "../services/OrderService.js";
-import BankAccountService from "../services/BankAccountService.js";
 import { catchAsync } from "../utils/catchAsync.js";
 import { BadRequestError, NotFoundError } from "../utils/AppError.js";
 
@@ -29,18 +28,14 @@ export const mockPayment = catchAsync(async (req, res) => {
   }
 
   const amount = order.total || 0;
-  const defaultBank = await BankAccountService.getDefaultAccount();
-  const bankAccountId = defaultBank ? defaultBank._id : null;
-  const methodName = defaultBank
-    ? `QR ${defaultBank.bankName} (Giả lập)`
-    : "QR VNPAY/MOMO (Giả lập Thành Công)";
+  const methodName = "QR PayOS (Giả lập)";
 
   const payment = await PaymentService.processPayment(
     {
       orderId,
       amount,
       method: methodName,
-      bankAccountId: bankAccountId,
+      bankAccountId: null,
     },
     req.user,
   );
@@ -58,28 +53,34 @@ export const generateQR = catchAsync(async (req, res) => {
   res.json(qrData);
 });
 
-export const receiveWebhook = catchAsync(async (req, res) => {
-  const xSecret = req.headers["x-internal-secret"];
-  const expectedSecret =
-    process.env.WEBHOOK_SECRET_KEY || "HLG_INTERNAL_SECRET_KEY_VERY_SECURE_2025";
-
-  if (xSecret !== expectedSecret) {
-    // Controller returns 403 dynamically. We can throw customized AppError with 403 or just return
-    return res.status(403).json({ success: false, error: { message: "Forbidden" } });
+export const receivePayosWebhook = catchAsync(async (req, res) => {
+  try {
+    await PaymentService.handleWebhook(req.body, req.io);
+    res.status(200).json({ success: true });
+  } catch (error) {
+    console.error("Lỗi xử lý Webhook PayOS:", error);
+    res.status(400).json({ success: false, message: "Webhook Signature Invalid" });
   }
+});
 
-  await PaymentService.handleWebhook(req.body, req.io);
-  res.status(200).json({ message: "Webhook processed successfully" });
+export const verifyPayment = catchAsync(async (req, res) => {
+  const { orderCode } = req.params;
+  const result = await PaymentService.verifyPaymentStatus(orderCode, req.io);
+  res.json(result);
+});
+
+export const verifyPaymentByOrderId = catchAsync(async (req, res) => {
+  const { orderId } = req.params;
+  const result = await PaymentService.verifyPaymentByOrderId(orderId, req.io);
+  res.json(result);
 });
 
 export const simulateSuccessfulPayment = catchAsync(async (req, res) => {
   const { orderId } = req.params;
 
-  const mockPayload = {
-    booking_id: orderId,
-  };
-
-  await PaymentService.handleWebhook(mockPayload, req.io);
+  // Fake webhook payload is no longer compatible via PaymentService.handleWebhook due to signature check.
+  // Giao dịch mock nên được xử lý qua \`/mock\` hoặc Admin.
+  throw new BadRequestError("Chức năng này không còn dùng được vì Payload PayOS cần có Signatue. Dùng /mock thay thế.");
 
   res.status(200).json({
     success: true,

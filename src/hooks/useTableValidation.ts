@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import axios from '@/src/lib/axiosClient';
+import axios from '@/src/api/axiosClient';
 import { Table, Order } from '../types';
 
 export type TableValidationStatus = 'loading' | 'valid' | 'invalid';

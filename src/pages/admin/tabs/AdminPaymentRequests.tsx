@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { HandCoins, Clock, CheckCircle2, Search, Table2, Banknote, Timer } from 'lucide-react';
-import axios from '@/src/lib/axiosClient';
+import axios from '@/src/api/axiosClient';
 import { toast } from 'react-toastify';
 import { io } from 'socket.io-client';
 import { Order } from '../../../types';
-import { cn } from '../../../lib/cn';
+import { cn } from '../../../api/cn';
 import { Button } from '../../../components/Button';
 
 const socket = io();
@@ -25,7 +25,7 @@ export const AdminPaymentRequests = () => {
                 position: "top-center",
                 autoClose: 10000
             });
-            
+
             // Thêm vào danh sách "Live" để hiển thị tạm thời
             setLiveRequests(prev => {
                 // Tránh trùng lặp bàn
@@ -63,7 +63,7 @@ export const AdminPaymentRequests = () => {
         try {
             await axios.post(`/api/orders/${orderId}/complete`);
             toast.success('Đã xác nhận thanh toán & giải phóng bàn!');
-            
+
             // Xóa khỏi danh sách live nếu có
             if (tableId) {
                 setLiveRequests(prev => prev.filter(r => r.tableId !== tableId));
@@ -79,8 +79,8 @@ export const AdminPaymentRequests = () => {
         ...orders.filter(o => !liveRequests.find(lr => lr.orderId === (o as any)._id))
     ];
 
-    const filteredRequests = allRequests.filter(o => 
-        (o.tableId || '').includes(searchTerm) || 
+    const filteredRequests = allRequests.filter(o =>
+        (o.tableId || '').includes(searchTerm) ||
         (o.tableName || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
 

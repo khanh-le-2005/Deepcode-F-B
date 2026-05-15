@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Search, CalendarDays, Edit2, Trash2, X, CheckCircle2, CalendarRange, UtensilsCrossed } from 'lucide-react';
-import axios from '@/src/lib/axiosClient';
+import axios from '@/src/api/axiosClient';
 import { toast } from 'react-toastify';
 import { Button } from '../../../components/Button';
 import { MenuItem } from '../../../types';
-import { cn } from '../../../lib/cn';
-import { getMenuItemCategoryName } from '../../../lib/menuHelpers';
+import { cn } from '../../../api/cn';
+import { getMenuItemCategoryName } from '../../../api/menuHelpers';
 
 type WeeklyMenuFormState = {
   title: string;

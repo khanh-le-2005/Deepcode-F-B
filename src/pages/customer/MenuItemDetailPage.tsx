@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import axios from '@/src/lib/axiosClient';
+import axios from '@/src/api/axiosClient';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ShoppingBag, Heart, Star, X, Minus, Plus, Trash2 } from 'lucide-react';
 import { MenuItem } from '../../types';
@@ -8,7 +8,8 @@ import { CustomerHeader } from '../../components/CustomerHeader';
 import { InvalidTable } from '../../components/InvalidTable';
 import { useTableValidation } from '../../hooks/useTableValidation';
 import { useCart } from '../../contexts/CartContext';
-import { getMenuItemCategoryName, getMenuItemId, getMenuItemImageUrl } from '../../lib/menuHelpers';
+import { getMenuItemCategoryName, getMenuItemId, getMenuItemImageUrl } from '../../api/menuHelpers';
+import { toast } from 'react-toastify';
 
 export const MenuItemDetailPage = () => {
   const { tableId, itemId } = useParams();
@@ -16,7 +17,7 @@ export const MenuItemDetailPage = () => {
   const [item, setItem] = useState<MenuItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
-  const { status } = useTableValidation(tableId);
+  const { status, table } = useTableValidation(tableId);
   const { cart, addToCart, removeFromCart, updateQuantity, totalItems, totalPrice } = useCart();
   const [selectedOption, setSelectedOption] = useState<any>(null);
   const [selectedAddons, setSelectedAddons] = useState<any[]>([]);
@@ -85,6 +86,7 @@ export const MenuItemDetailPage = () => {
       try {
         await axios.post('/api/orders', {
           tableId,
+          frontendUrl: window.location.origin, // ĐÃ THÊM
           items: itemsToAdd
         });
         toast.success(`Đã thêm ${quantity} ${item.name} vào giỏ bàn ${tableId}!`);
@@ -149,6 +151,7 @@ export const MenuItemDetailPage = () => {
     <div className="bg-[#fcf9f4] min-h-screen text-[#1a1a1a]" style={{ fontFamily: "'Be Vietnam Pro', sans-serif" }}>
       <CustomerHeader
         tableId={tableId}
+        tableName={table?.name}
         showBackButton={true}
         totalItems={displayTotalItems}
         onCartClick={() => setIsCartOpen(true)}
@@ -206,8 +209,8 @@ export const MenuItemDetailPage = () => {
                         key={opt.name}
                         onClick={() => setSelectedOption(selectedOption?.name === opt.name ? null : opt)}
                         className={`px-5 py-3 rounded-2xl font-bold border-2 transition-all ${selectedOption?.name === opt.name
-                            ? 'border-red-600 bg-red-600 text-white shadow-lg shadow-red-200'
-                            : 'border-gray-100 bg-white text-gray-600 hover:border-gray-200'
+                          ? 'border-red-600 bg-red-600 text-white shadow-lg shadow-red-200'
+                          : 'border-gray-100 bg-white text-gray-600 hover:border-gray-200'
                           }`}
                       >
                         {opt.name} {opt.priceExtra > 0 && `(+${opt.priceExtra.toLocaleString()}đ)`}
@@ -229,8 +232,8 @@ export const MenuItemDetailPage = () => {
                           key={addon.name}
                           onClick={() => handleToggleAddon(addon)}
                           className={`px-5 py-3 rounded-2xl font-bold border-2 transition-all ${isSelected
-                              ? 'border-gray-900 bg-gray-900 text-white shadow-lg'
-                              : 'border-gray-100 bg-white text-gray-600 hover:border-gray-200'
+                            ? 'border-gray-900 bg-gray-900 text-white shadow-lg'
+                            : 'border-gray-100 bg-white text-gray-600 hover:border-gray-200'
                             }`}
                         >
                           {addon.name} {addon.priceExtra > 0 && `(+${addon.priceExtra.toLocaleString()}đ)`}

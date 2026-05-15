@@ -29,6 +29,8 @@ const orderItemSchema = new mongoose.Schema({
   actionBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   actionByName: { type: String },
   actionAt: { type: Date },
+  
+  isPaid: { type: Boolean, default: false },
 });
 
 const orderSchema = new mongoose.Schema(
@@ -69,18 +71,25 @@ const orderSchema = new mongoose.Schema(
 
     // 5. THÔNG TIN KHÁCH HÀNG (dành cho Takeaway & Delivery)
     customerInfo: {
-      name:            { type: String },
-      phone:           { type: String },
+      name: { type: String },
+      phone: { type: String },
       deliveryAddress: { type: String }, // Text tự do: "Lớp 10A", "Phòng 203 Tòa B"...
-      note:            { type: String }  // Ghi chú thêm cho bếp/shipper
+      note: { type: String }  // Ghi chú thêm cho bếp/shipper
     },
 
     // 6. IP CỦA KHÁCH (để phần lịch sử/chống lạm dụng)
     clientIp: { type: String },
 
+    // 6.1 URL Gốc của Frontend (để Redirect linh hoạt)
+    frontendUrl: { type: String },
+
     completedAt: { type: Date },
     completedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     completedByName: { type: String },
+
+    // 7. PAYOS INTEGRATION - Bắt buộc phải có để thanh toán
+    orderCode: { type: Number, unique: true, sparse: true },
+    frontendUrl: { type: String }, // Lưu địa chỉ frontend để PayOS quay về đúng chỗ
   },
   globalSchemaOptions,
 );
@@ -88,5 +97,15 @@ const orderSchema = new mongoose.Schema(
 orderSchema.index({ tableId: 1 });
 orderSchema.index({ status: 1 });
 orderSchema.index({ createdAt: -1 });
+
+// Tự động tạo orderCode (kiểu Number int < 2^53) cho PayOS
+orderSchema.pre('save', async function () {
+  if (!this.orderCode) {
+    // Thuật toán: Random 2 chữ số + 8 chữ số cuối cùa Date.now = số duy nhất và đọc được
+    const timePart = String(Date.now()).slice(-6);
+    const randomPart = Math.floor(100 + Math.random() * 900);
+    this.orderCode = Number(`${timePart}${randomPart}`);
+  }
+});
 
 export const Order = mongoose.model("Order", orderSchema);

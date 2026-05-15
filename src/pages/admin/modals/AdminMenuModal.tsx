@@ -2,10 +2,10 @@ import { useState, useEffect, useRef } from 'react';
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Upload, Image as ImageIcon, Plus, Trash2 } from 'lucide-react';
-import axios from '@/src/lib/axiosClient';
+import axios from '@/src/api/axiosClient';
 import { MenuItem, MenuItemOption, MenuItemAddon, Category } from '../../../types';
 import { Button } from '../../../components/Button';
-import { getCategoryId, getMenuItemImageUrl } from '../../../lib/menuHelpers';
+import { getCategoryId, getMenuItemImageUrl } from '../../../api/menuHelpers';
 
 interface FormState {
   name: string;
@@ -107,7 +107,7 @@ export const AdminMenuModal = ({
   const selectSuggestedImage = (img: any) => {
     const imgId = img._id || img.id;
     if (galleryImageIds.includes(imgId)) return;
-    
+
     setGalleryImageIds(prev => [...prev, imgId]);
     setFormData(prev => ({
       ...prev,
@@ -238,7 +238,7 @@ export const AdminMenuModal = ({
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-amber-500/20"
             />
-            
+
             {/* Image Suggestions Grid */}
             <AnimatePresence>
               {suggestions.length > 0 && (

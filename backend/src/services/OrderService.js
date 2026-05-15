@@ -2,6 +2,8 @@ import { Order } from "../models/Order.js";
 import { Table } from "../models/Table.js";
 import { Payment } from "../models/Payment.js";
 import mongoose from "mongoose";
+import { MenuItem } from "../models/MenuItem.js";
+import { Combo } from "../models/Combo.js";
 import crypto from "crypto";
 import { NotFoundError, BadRequestError } from "../utils/AppError.js";
 import WeeklyMenuService from "./WeeklyMenuService.js";
@@ -28,7 +30,7 @@ class OrderService {
   }
 
   async getOrders() {
-    return Order.find().sort({ createdAt: -1 });
+    return Order.find({ status: "active" }).sort({ updatedAt: -1 });
   }
 
   async getOrderById(id) {
@@ -63,24 +65,34 @@ class OrderService {
     const activeMenu = await WeeklyMenuService.getActiveWeeklyMenu();
     // Nếu chưa có lịch tuần → cho phép đặt tất cả món (chế độ không giới hạn)
     const allowedIds = activeMenu
-      ? activeMenu.menuItems.map((m) => String(m._id || m))
+      ? activeMenu.menuItems.map(m => String(m._id || m))
       : null;
 
     // Calculate total for incoming items
     let newItemsTotal = 0;
-    const newItems = data.items.map((item) => {
-      const basePrice = item.basePrice || item.price || 0;
+    const newItems = await Promise.all(data.items.map(async (item) => {
       const menuItemId = item.id || item.menuItemId || item._id;
       const menuItemIdStr = String(menuItemId);
 
-      // Chỉ kiểm tra nếu có lịch tuần active
-      if (allowedIds && !allowedIds.includes(menuItemIdStr)) {
-        throw new BadRequestError(
-          `Món '${item.name || menuItemIdStr}' chưa được xuất bán trong tuần này!`,
-        );
+      // Lấy thông tin thật từ DB để tránh lỗi thiếu name/price và chống hack
+      let dbItem = await MenuItem.findById(menuItemIdStr);
+      let isCombo = false;
+      
+      if (!dbItem) {
+        dbItem = await Combo.findById(menuItemIdStr);
+        if (dbItem) isCombo = true;
       }
 
-      let itemPrice = Number(basePrice);
+      if (!dbItem) {
+        throw new NotFoundError(`Món ăn với ID ${menuItemIdStr} không tồn tại`);
+      }
+
+      // Chỉ kiểm tra nếu có lịch tuần active
+      if (allowedIds && !allowedIds.includes(menuItemIdStr)) {
+        throw new BadRequestError(`Món '${dbItem.name}' chưa được xuất bán trong tuần này!`);
+      }
+
+      let itemPrice = Number(dbItem.price);
       if (item.selectedOption && item.selectedOption.priceExtra)
         itemPrice += Number(item.selectedOption.priceExtra);
       if (item.selectedAddons && item.selectedAddons.length > 0) {
@@ -88,36 +100,45 @@ class OrderService {
           if (addon.priceExtra) itemPrice += Number(addon.priceExtra);
         });
       }
-      const totalPrice = itemPrice * Number(item.quantity || 1);
+      
+      const quantity = Number(item.quantity || 1);
+      const totalPrice = itemPrice * quantity;
       newItemsTotal += totalPrice;
 
       return {
         ...item,
-        menuItemId: String(menuItemId),
-        basePrice: Number(basePrice),
+        name: dbItem.name, // Quan trọng: Luôn lấy name từ DB
+        menuItemId: menuItemIdStr,
+        isCombo,
+        basePrice: Number(dbItem.price),
         totalPrice,
-        status: "in_cart", // Mới: Thêm vào Giỏ Hàng Chung của Bàn
+        status: "in_cart",
+        isPaid: false,
       };
-    });
+    }));
 
-    // FIX #3: Kiểm tra cả paymentStatus để tránh nhồi món vào bill đã thanh toán
+    // CHỈ kiểm tra status: "active", không quan tâm paymentStatus 
+    // để tránh việc khách đã trả 1 đợt rồi gọi món mới lại bị tách thành 2 bill (2 card)
     let session = await Order.findOne({
       tableId: String(table._id),
-      status: "active",
-      paymentStatus: "unpaid",
+      status: "active"
     });
 
+    let isNewSession = false;
     if (session) {
       // Nhồi món mới vào phiên cũ
       session = await Order.findByIdAndUpdate(
         session._id,
-        { $push: { items: { $each: newItems } } },
-        { new: true },
+        { 
+          $push: { items: { $each: newItems } },
+          $set: { paymentStatus: "unpaid" } // Có món mới -> bill lại thành chưa thanh toán hết
+        },
+        { returnDocument: 'after' },
       );
-      // Update total
       session.total += newItemsTotal;
       await session.save();
     } else {
+      isNewSession = true;
       // Tạo phiên mới
       const sessionToken = crypto.randomBytes(16).toString("hex");
       let newOrder = new Order({
@@ -127,18 +148,24 @@ class OrderService {
         items: newItems,
         total: newItemsTotal,
         status: "active",
+        paymentMethod: data.paymentMethod || "cash",
+        frontendUrl: data.frontendUrl, // Lưu URL origin của đơn hàng
       });
       session = await newOrder.save();
       await Table.findByIdAndUpdate(
         table._id,
         { status: "occupied" },
-        { new: true },
+        { returnDocument: 'after' },
       );
     }
 
     if (io) {
-      io.to('role_kitchen').emit("new-order", session);
-      io.to('role_staff').emit("tables-updated", await Table.find());
+      if (isNewSession) {
+        io.emit("new-order", session);
+      } else {
+        io.emit("order-updated", session);
+      }
+      io.emit("tables-updated", await Table.find());
     }
     return session;
   }
@@ -158,7 +185,7 @@ class OrderService {
       await Table.findByIdAndUpdate(
         table._id,
         { status: "occupied" },
-        { new: true },
+        { returnDocument: 'after' },
       );
     } else {
       // 2. Khách vãng lai mang đi (Không có tableId), tự sinh ra 1 bàn ảo
@@ -166,7 +193,7 @@ class OrderService {
         data.tableName ||
         "Mang đi - " + new Date().getHours() + "h" + new Date().getMinutes();
       const slug = crypto.randomBytes(4).toString("hex");
-      const table = new Table({ name: tableName, status: "occupied", slug });
+      const table = new Table({ name: tableName, status: "occupied", slug, isVirtual: true });
       await table.save();
       tableIdStr = String(table._id);
     }
@@ -174,23 +201,28 @@ class OrderService {
     const activeMenu = await WeeklyMenuService.getActiveWeeklyMenu();
     // Nếu chưa có lịch tuần → cho phép đặt tất cả món (chế độ không giới hạn)
     const allowedIds = activeMenu
-      ? activeMenu.menuItems.map((m) => String(m._id || m))
+      ? activeMenu.menuItems.map(m => String(m._id || m))
       : null;
 
     let newItemsTotal = 0;
-    const newItems = data.items.map((item) => {
-      const basePrice = item.basePrice || item.price || 0;
+    const newItems = await Promise.all(data.items.map(async (item) => {
       const menuItemId = item.id || item.menuItemId || item._id;
       const menuItemIdStr = String(menuItemId);
 
-      // Chỉ kiểm tra nếu có lịch tuần active
+      let dbItem = await MenuItem.findById(menuItemIdStr);
+      let isCombo = false;
+      if (!dbItem) {
+        dbItem = await Combo.findById(menuItemIdStr);
+        if (dbItem) isCombo = true;
+      }
+      if (!dbItem) throw new NotFoundError(`Món ăn ID ${menuItemIdStr} không tồn tại`);
+
+      // Kiểm tra lịch tuần
       if (allowedIds && !allowedIds.includes(menuItemIdStr)) {
-        throw new BadRequestError(
-          `Món '${item.name || menuItemIdStr}' chưa được xuất bán trong tuần này!`,
-        );
+        throw new BadRequestError(`Món '${dbItem.name}' chưa được xuất bán tuần này!`);
       }
 
-      let itemPrice = Number(basePrice);
+      let itemPrice = Number(dbItem.price);
       if (item.selectedOption && item.selectedOption.priceExtra)
         itemPrice += Number(item.selectedOption.priceExtra);
       if (item.selectedAddons && item.selectedAddons.length > 0) {
@@ -198,33 +230,41 @@ class OrderService {
           if (addon.priceExtra) itemPrice += Number(addon.priceExtra);
         });
       }
-      const totalPrice = itemPrice * Number(item.quantity || 1);
+      
+      const quantity = Number(item.quantity || 1);
+      const totalPrice = itemPrice * quantity;
       newItemsTotal += totalPrice;
 
       return {
         ...item,
-        menuItemId: String(menuItemId),
-        basePrice: Number(basePrice),
+        name: dbItem.name,
+        menuItemId: menuItemIdStr,
+        isCombo,
+        basePrice: Number(dbItem.price),
         totalPrice,
-        status: "pending_approval", // Gửi thẳng xuống bếp
+        status: "pending_approval",
+        isPaid: false,
       };
-    });
+    }));
 
     let session = await Order.findOne({
       tableId: tableIdStr,
       status: "active",
     });
 
+    let isNewSession = false;
     if (session) {
       // Nhồi món mới nếu bàn này đã có session
       session = await Order.findByIdAndUpdate(
         session._id,
         { $push: { items: { $each: newItems } } },
-        { new: true },
+        { returnDocument: 'after' },
       );
       session.total += newItemsTotal;
+      if (session.paymentStatus === "paid") session.paymentStatus = "unpaid";
       await session.save();
     } else {
+      isNewSession = true;
       // Bàn mới toanh
       const sessionToken = crypto.randomBytes(16).toString("hex");
       let newOrder = new Order({
@@ -233,14 +273,19 @@ class OrderService {
         items: newItems,
         total: newItemsTotal,
         status: "active",
+        paymentMethod: data.paymentMethod || "cash",
+        frontendUrl: data.frontendUrl, // Lưu URL origin của đơn hàng quầy
       });
       session = await newOrder.save();
     }
 
     if (io) {
-      io.to('role_kitchen').emit("new-order", session);
-      io.to('role_staff').to(`table_${session.tableId}`).emit("order-updated", session);
-      io.to('role_staff').emit("tables-updated", await Table.find());
+      if (isNewSession) {
+        io.emit("new-order", session);
+      } else {
+        io.emit("order-updated", session);
+      }
+      io.emit("tables-updated", await Table.find());
     }
     return session;
   }
@@ -251,10 +296,10 @@ class OrderService {
   // =============================================
   async createKioskOrder(data, clientIp, io) {
     const {
-      orderType = "dine_in",
-      paymentMethod = "cash", // "cash" | "transfer"
-      customerInfo = {},
-      items,
+      orderType    = "dine_in",
+      paymentMethod = "cash",          // "cash" | "transfer"
+      customerInfo  = {},
+      items
     } = data;
 
     // ── VALIDATE BẮT BUỘC ──────────────────────────────────────────
@@ -268,23 +313,14 @@ class OrderService {
     }
 
     if (orderType === "delivery") {
-      if (!customerInfo.phone?.trim())
-        throw new BadRequestError(
-          "Đơn Giao hàng bắt buộc phải có Số điện thoại",
-        );
-      if (!customerInfo.deliveryAddress?.trim())
-        throw new BadRequestError(
-          "Đơn Giao hàng bắt buộc phải có Địa chỉ giao hàng",
-        );
+      if (!customerInfo.phone?.trim())           throw new BadRequestError("Đơn Giao hàng bắt buộc phải có Số điện thoại");
+      if (!customerInfo.deliveryAddress?.trim()) throw new BadRequestError("Đơn Giao hàng bắt buộc phải có Địa chỉ giao hàng");
     }
     if (orderType === "takeaway") {
-      if (!customerInfo.phone?.trim())
-        throw new BadRequestError("Đơn Mang về bắt buộc phải có Số điện thoại");
+      if (!customerInfo.phone?.trim()) throw new BadRequestError("Đơn Mang về bắt buộc phải có Số điện thoại");
     }
     if (!["cash", "transfer"].includes(paymentMethod)) {
-      throw new BadRequestError(
-        "Phương thức thanh toán không hợp lệ (cash | transfer)",
-      );
+      throw new BadRequestError("Phương thức thanh toán không hợp lệ (cash | transfer)");
     }
 
     // ── SINH BÀN ẢO ────────────────────────────────────────────────
@@ -294,106 +330,88 @@ class OrderService {
     } else if (orderType === "takeaway") {
       tableName = `Mang về - ${customerInfo.phone}`;
     } else {
-      tableName =
-        data.tableName ||
-        `Tại quầy - ${new Date().getHours()}h${new Date().getMinutes()}`;
+      tableName = data.tableName || `Tại quầy - ${new Date().getHours()}h${new Date().getMinutes()}`;
     }
 
     const slug = crypto.randomBytes(4).toString("hex");
-    const table = new Table({ name: tableName, status: "occupied", slug });
+    const table = new Table({ name: tableName, status: "occupied", slug, isVirtual: true });
     await table.save();
     const tableIdStr = String(table._id);
 
     // ── KIỂM TRA THỰC ĐƠN TUẦN ────────────────────────────────────
     const activeMenu = await WeeklyMenuService.getActiveWeeklyMenu();
     const allowedIds = activeMenu
-      ? activeMenu.menuItems.map((m) => String(m._id || m))
+      ? activeMenu.menuItems.map(m => String(m._id || m))
       : null;
 
     // ── TÍNH GIÁ TỪNG MÓN ─────────────────────────────────────────
     // Transfer (trả trước) → Items ở trạng thái awaiting_payment, BẾP CHƯA THẤY
     // Cash (trả sau)       → Items ở trạng thái pending_approval,  BẾP THẤY NGAY
-    const itemStatus =
-      paymentMethod === "transfer" ? "awaiting_payment" : "pending_approval";
+    const itemStatus = paymentMethod === "transfer" ? "awaiting_payment" : "pending_approval";
 
     let total = 0;
-    const newItems = items.map((item) => {
-      const basePrice = item.basePrice || item.price || 0;
-      const menuItemId = item.id || item.menuItemId || item._id;
+    const newItems = await Promise.all(items.map(async (item) => {
+      const menuItemId  = item.id || item.menuItemId || item._id;
       const menuItemIdStr = String(menuItemId);
 
+      let dbItem = await MenuItem.findById(menuItemIdStr);
+      let isCombo = false;
+      if (!dbItem) {
+        dbItem = await Combo.findById(menuItemIdStr);
+        if (dbItem) isCombo = true;
+      }
+      if (!dbItem) throw new NotFoundError(`Món ăn ID ${menuItemIdStr} không tồn tại`);
+
       if (allowedIds && !allowedIds.includes(menuItemIdStr)) {
-        throw new BadRequestError(
-          `Món '${item.name || menuItemIdStr}' chưa được xuất bán trong tuần này!`,
-        );
+        throw new BadRequestError(`Món '${dbItem.name}' chưa được xuất bán trong tuần này!`);
       }
 
-      let itemPrice = Number(basePrice);
-      if (item.selectedOption?.priceExtra)
-        itemPrice += Number(item.selectedOption.priceExtra);
-      if (item.selectedAddons?.length > 0) {
-        item.selectedAddons.forEach((a) => {
-          if (a.priceExtra) itemPrice += Number(a.priceExtra);
-        });
+      let itemPrice = Number(dbItem.price);
+      if (item.selectedOption?.priceExtra)  itemPrice += Number(item.selectedOption.priceExtra);
+      if (item.selectedAddons?.length > 0)  {
+        item.selectedAddons.forEach(a => { if (a.priceExtra) itemPrice += Number(a.priceExtra); });
       }
-      const totalPrice = itemPrice * Number(item.quantity || 1);
+      const quantity = Number(item.quantity || 1);
+      const totalPrice = itemPrice * quantity;
       total += totalPrice;
 
       return {
         ...item,
+        name: dbItem.name,
         menuItemId: menuItemIdStr,
-        basePrice: Number(basePrice),
+        isCombo,
+        basePrice:  Number(dbItem.price),
         totalPrice,
-        status: itemStatus,
+        status:     itemStatus,
+        isPaid:     false,
       };
-    });
+    }));
 
     // ── TẠO ORDER ─────────────────────────────────────────────────
     const sessionToken = crypto.randomBytes(16).toString("hex");
     const session = await new Order({
-      tableId: tableIdStr,
+      tableId:       tableIdStr,
       tableName,
       sessionToken,
-      items: newItems,
+      items:         newItems,
       total,
-      status: "active",
+      status:        "active",
       paymentStatus: "unpaid",
-      paymentMethod, // "cash" hoặc "transfer"
+      paymentMethod,            // "cash" hoặc "transfer"
+      frontendUrl: data.frontendUrl, // Lưu URL origin của đơn hàng Kiosk
       orderType,
       customerInfo,
-      clientIp: clientIp || null, // Lưu IP người đặt
+      clientIp: clientIp || null,  // Lưu IP người đặt
     }).save();
 
     // ── BẮN SOCKET ────────────────────────────────────────────────
+    // Chỉ báo Bếp nếu là tiền mặt (transfer thì chờ webhook xác nhận)
     if (io) {
-      io.to('role_staff').to(`table_${session.tableId}`).emit("order-updated", session);
-      io.to('role_staff').emit("tables-updated", await Table.find());
-
-      const orderLabel = orderType === "delivery" ? "Giao hàng" : "Mang về";
-      const customerName = customerInfo.name || "Khách hàng";
-
       if (paymentMethod === "cash") {
-        // 1. ĐƠN TIỀN MẶT: Báo nhân viên duyệt NGAY LẬP TỨC
-        io.to('role_staff').emit("notification:staff", {
-          type: "warning",
-          title: `🛎️ Có đơn ${orderLabel} mới (Tiền mặt)`,
-          message: `Khách [${customerName}] vừa đặt đơn mới. Vui lòng kiểm tra và duyệt xuống bếp!`,
-          orderId: session._id,
-          sound: "bell_ring"
-        });
-
-        // (Tuỳ chọn) Báo luôn cho bếp chuẩn bị tinh thần
-        io.to('role_kitchen').emit("new-order", session);
-      } else {
-        // 2. ĐƠN CHUYỂN KHOẢN: Báo nhân viên có người đang quét mã
-        io.to('role_staff').emit("notification:staff", {
-          type: "info",
-          title: `⏱️ Đơn ${orderLabel} đang chờ thanh toán`,
-          message: `Khách [${customerName}] đang tiến hành quét mã QR chuyển khoản.`,
-          orderId: session._id,
-          sound: "info"
-        });
+        io.emit("new-order", session);    // Chuông bếp
       }
+      io.emit("order-updated", session);
+      io.emit("tables-updated", await Table.find());
     }
 
     return session;
@@ -403,20 +421,20 @@ class OrderService {
     const session = await Order.findOneAndUpdate(
       { _id: sessionId, "items.status": "in_cart" },
       { $set: { "items.$[elem].status": "pending_approval" } },
-      { arrayFilters: [{ "elem.status": "in_cart" }], new: true },
+      { arrayFilters: [{ "elem.status": "in_cart" }], returnDocument: 'after' },
     );
     if (!session) throw new NotFoundError("Session not found or Cart is empty");
 
     if (io) {
-      io.to('role_staff').to(`table_${session.tableId}`).emit("order-updated", session);
-
-      // Bắn thông báo cho Thu Ngân
-      io.to('role_staff').emit("notification:staff", {
+      io.emit("order-updated", session); // Cập nhật state
+      
+      // Bắn thông báo (Notification) cho Thu Ngân / Quản lý
+      io.emit("notification:staff", {
         type: "info",
-        title: "🛎️ Đơn gọi món mới",
-        message: `Bàn [${session.tableName}] vừa chốt giỏ hàng gửi yêu cầu đặt món. Cần xác nhận!`,
+        title: "Đơn gọi món mới",
+        message: `Bàn [${session.tableName}] vừa gửi yêu cầu đặt món. Cần xác nhận!`,
         orderId: session._id,
-        sound: "info",
+        sound: "bell_ring.mp3" // Gợi ý để FE phát âm thanh
       });
     }
     return session;
@@ -438,10 +456,10 @@ class OrderService {
 
     session.total -= item.totalPrice;
     session.items.splice(itemIndex, 1);
-
+    
     await session.save();
-
-    if (io) io.to('role_staff').to(`table_${session.tableId}`).emit("order-updated", session);
+    
+    if (io) io.emit("order-updated", session);
     return session;
   }
 
@@ -453,16 +471,14 @@ class OrderService {
     if (!item) throw new NotFoundError("Item not found");
 
     if (item.status !== "in_cart" && item.status !== "pending_approval") {
-      throw new BadRequestError(
-        "Không thể thay đổi số lượng món đang làm hoặc đã làm xong",
-      );
+      throw new BadRequestError("Không thể thay đổi số lượng món đang làm hoặc đã làm xong");
     }
 
     const pricePerUnit = item.totalPrice / (item.quantity || 1);
     const newQuantity = (item.quantity || 1) + Number(delta);
 
     if (newQuantity <= 0) {
-      // Remove item entirely
+      // Remove item entirely 
       session.total -= item.totalPrice;
       session.items.pull(itemId);
     } else {
@@ -474,7 +490,49 @@ class OrderService {
     }
 
     await session.save();
-    if (io) io.to('role_staff').to(`table_${session.tableId}`).emit("order-updated", session);
+    if (io) io.emit("order-updated", session);
+    return session;
+  }
+
+  async adminUpdateItemQuantity(sessionId, itemId, delta, io, user = null) {
+    const session = await Order.findById(sessionId);
+    if (!session) throw new NotFoundError("Session not found");
+
+    const item = session.items.id(itemId);
+    if (!item) throw new NotFoundError("Item not found");
+
+    // Admin can change quantity regardless of status, but if they reduce it, we handle price subtraction
+    const pricePerUnit = item.totalPrice / (item.quantity || 1);
+    const newQuantity = (item.quantity || 1) + Number(delta);
+
+    if (newQuantity <= 0) {
+      // Mark as cancelled and subtract full price if it wasn't cancelled already
+      if (item.status !== 'cancelled') {
+        session.total -= item.totalPrice;
+      }
+      item.status = 'cancelled';
+      item.quantity = 0;
+      item.totalPrice = 0;
+    } else {
+      const oldTotalPrice = item.totalPrice;
+      item.quantity = newQuantity;
+      const newTotalPrice = pricePerUnit * newQuantity;
+      
+      // Update session total only if status is NOT cancelled
+      if (item.status !== 'cancelled') {
+        session.total = session.total - oldTotalPrice + newTotalPrice;
+      }
+      item.totalPrice = newTotalPrice;
+    }
+
+    if (user) {
+      item.actionBy = user.id;
+      item.actionByName = user.name;
+      item.actionAt = new Date();
+    }
+
+    await session.save();
+    if (io) io.emit("order-updated", session);
     return session;
   }
 
@@ -491,79 +549,70 @@ class OrderService {
       if (item.selectedOption && item.selectedOption.priceExtra) {
         itemPrice += Number(item.selectedOption.priceExtra);
       }
-
+      
       if (item.selectedAddons && item.selectedAddons.length > 0) {
         item.selectedAddons.forEach((addon) => {
           if (addon.priceExtra) itemPrice += Number(addon.priceExtra);
         });
       }
-
+      
       const totalPrice = itemPrice * Number(item.quantity || 1);
       totalCartPrice += totalPrice;
 
       return {
         ...item,
         unitPrice: itemPrice,
-        totalPrice,
+        totalPrice
       };
     });
 
     return { calculatedItems, totalCartPrice };
   }
 
-  async updateItemStatus(sessionId, itemId, status, io, user = null) {
-    const updateFields = { "items.$.status": status };
-    if (user) {
-      updateFields["items.$.actionBy"] = user.id;
-      updateFields["items.$.actionByName"] = user.name;
-      updateFields["items.$.actionAt"] = new Date();
-    }
 
-    const session = await Order.findOneAndUpdate(
-      { _id: sessionId, "items._id": itemId },
-      { $set: updateFields },
-      { new: true },
-    );
+  async updateItemStatus(sessionId, itemId, status, io, user = null) {
+    const session = await Order.findOne({ _id: sessionId, "items._id": itemId });
     if (!session) throw new NotFoundError("Session or Item not found");
 
-    if (io) {
-      io.to('role_staff').to(`table_${session.tableId}`).emit("order-updated", session);
+    const item = session.items.id(itemId);
+    const oldStatus = item.status;
 
+    // IF CHANGING TO CANCELLED: Subtract from total if it was active
+    if (status === 'cancelled' && oldStatus !== 'cancelled') {
+      session.total -= item.totalPrice;
+    } 
+    // IF CHANGING FROM CANCELLED: Add back to total
+    else if (status !== 'cancelled' && oldStatus === 'cancelled') {
+      session.total += item.totalPrice;
+    }
+
+    item.status = status;
+    if (user) {
+      item.actionBy = user.id;
+      item.actionByName = user.name;
+      item.actionAt = new Date();
+    }
+    
+    await session.save();
+
+    if (io) {
+      io.emit("order-updated", session);
+
+      // Nếu trạng thái đổi thành "cooking", báo cho Bếp
       if (status === "cooking") {
         const item = session.items.id(itemId);
-        io.to('role_kitchen').emit("notification:kitchen", {
+        io.emit("notification:kitchen", {
           type: "warning",
-          title: "🔥 Bếp chú ý: Món bổ sung",
-          message: `Món [${item.name}] của Bàn [${session.tableName}] vừa được duyệt.`,
-          orderId: session._id,
-          sound: "warning",
-        });
-
-        io.to(`table_${session.tableId}`).emit("customer:item_status_changed", {
-          itemId: item._id,
-          newStatus: "cooking",
-          message: "Đầu bếp đang chuẩn bị món ăn của bạn!"
-        });
-      }
-
-      if (status === "served" || status === "ready_to_serve") {
-        const item = session.items.id(itemId);
-        io.to('role_staff').emit("notification:staff", {
-          type: "success",
-          title: "🍲 Món đã sẵn sàng",
-          message: `Món [${item.name}] của Bàn [${session.tableName}] đã làm xong. Vui lòng mang cho khách!`,
-          sound: "food_ready"
-        });
-        io.to(`table_${session.tableId}`).emit("customer:item_status_changed", {
-          itemId: item._id,
-          newStatus: status,
-          message: "Món ăn của bạn đã hoàn thành!"
+          title: "Bếp chú ý: Món được duyệt bổ sung",
+          message: `Món [${item.name}] của Bàn [${session.tableName}] vừa được duyệt xuống bếp.`,
+          orderId: session._id
         });
       }
     }
     return session;
   }
-  async approveAllItems(sessionId, io, user = null) {
+
+async approveAllItems(sessionId, io, user = null) {
     const session = await Order.findById(sessionId);
     if (!session) throw new NotFoundError("Session not found");
 
@@ -586,15 +635,15 @@ class OrderService {
     if (updated) {
       await session.save();
       if (io) {
-        io.to('role_staff').to(`table_${session.tableId}`).emit("order-updated", session);
-
-        // Bắn thông báo cho Bếp
-        io.to('role_kitchen').emit("notification:kitchen", {
-          type: "warning",
-          title: "🔥 Bếp chú ý: Có bill mới",
-          message: `Bàn [${session.tableName}] vừa được duyệt ${approvedCount} món xuống bếp. Vui lòng chuẩn bị!`,
+        io.emit("order-updated", session);
+        
+        // Bắn thông báo (Notification) cho Nhà Bếp
+        io.emit("notification:kitchen", {
+          type: "warning", // Màu vàng/cam cho bếp dễ chú ý
+          title: "Bếp chú ý: Có bill mới",
+          message: `Bàn [${session.tableName}] vừa được duyệt ${approvedCount} món xuống bếp.`,
           orderId: session._id,
-          sound: "warning",
+          sound: "kitchen_ticket.mp3"
         });
       }
     }
@@ -609,7 +658,7 @@ class OrderService {
       data.completedAt = new Date();
     }
 
-    const session = await Order.findByIdAndUpdate(id, data, { new: true });
+    const session = await Order.findByIdAndUpdate(id, data, { returnDocument: 'after' });
     if (!session) throw new NotFoundError("Session not found");
 
     if (session.status === "completed" || session.status === "cancelled") {
@@ -618,12 +667,12 @@ class OrderService {
         await Table.findByIdAndUpdate(
           table._id,
           { status: "empty" },
-          { new: true },
+          { returnDocument: 'after' },
         );
-      if (io) io.to('role_staff').emit("tables-updated", await Table.find());
+      if (io) io.emit("tables-updated", await Table.find());
     }
 
-    if (io) io.to('role_staff').to(`table_${session.tableId}`).emit("order-updated", session);
+    if (io) io.emit("order-updated", session);
     return session;
   }
 
@@ -636,9 +685,9 @@ class OrderService {
       await Table.findByIdAndUpdate(
         table._id,
         { status: "empty" },
-        { new: true },
+        { returnDocument: 'after' },
       );
-    if (io) io.to('role_staff').emit("tables-updated", await Table.find());
+    if (io) io.emit("tables-updated", await Table.find());
 
     return true;
   }
@@ -654,6 +703,10 @@ class OrderService {
     if (!order) throw new NotFoundError("Order not found");
 
     order.status = "completed"; // Đóng vòng đời phục vụ
+    order.paymentStatus = "paid";
+    order.items.forEach(item => {
+      item.isPaid = true;
+    });
     order.completedAt = new Date();
     await order.save();
 
@@ -661,8 +714,8 @@ class OrderService {
     await Table.findByIdAndUpdate(order.tableId, { status: "empty" });
 
     if (io) {
-      io.to('role_staff').emit("tables-updated", await Table.find());
-      io.to('role_staff').to(`table_${order.tableId}`).emit("order-updated", order);
+      io.emit("tables-updated", await Table.find());
+      io.emit("order-updated", order);
     }
     return order;
   }

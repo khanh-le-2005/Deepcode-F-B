@@ -57,7 +57,7 @@ async function cancelExpiredKioskOrders(io) {
 
       // 2b. Cập nhật trạng thái Order trong MongoDB
       order.status = "cancelled";
-      order.paymentStatus = "cancelled";
+      order.paymentStatus = "unpaid";
       order.completedAt = new Date();
       order.completedByName = "Hệ thống tự động (Auto-Cancel 15p)";
       await order.save();

@@ -181,16 +181,16 @@ export const AdminOrderHistory = () => {
       {/* --- HEADER --- */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
         <div>
-          <h2 className="text-4xl font-black text-gray-900 tracking-tight font-serif">Lịch sử {activeTab === 'orders' ? 'Đơn hàng' : 'Giao dịch'}</h2>
+          <h2 className="text-4xl font-black text-gray-900 tracking-tight">Lịch sử {activeTab === 'orders' ? 'Đơn hàng' : 'Giao dịch'}</h2>
           <p className="text-gray-500 font-medium mt-1">Xem lại các {activeTab === 'orders' ? 'đơn đã hoàn thành hoặc đã huỷ' : 'khoản thanh toán đã thu'}</p>
         </div>
-        <div className="flex flex-col gap-4 items-end">
+        <div className="flex flex-col gap-4 items-end ">
           <div className="flex items-center gap-2 bg-gray-100/50 p-1 rounded-2xl w-fit border border-gray-100">
             <button
               onClick={() => setActiveTab('orders')}
               className={cn(
-                "px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all",
-                activeTab === 'orders' ? "bg-white text-slate-900 shadow border border-gray-200" : "text-gray-500 hover:text-slate-700"
+                "px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer hover:bg-amber-500",
+                activeTab === 'orders' ? "bg-white text-slate-900 shadow border border-gray-200" : "text-gray-500 hover:text-slate-700 "
               )}
             >
               Đơn Hàng
@@ -198,7 +198,7 @@ export const AdminOrderHistory = () => {
             <button
               onClick={() => setActiveTab('payments')}
               className={cn(
-                "px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all",
+                "px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer hover:bg-amber-500",
                 activeTab === 'payments' ? "bg-white text-slate-900 shadow border border-gray-200" : "text-gray-500 hover:text-slate-700"
               )}
             >
@@ -373,7 +373,7 @@ export const AdminOrderHistory = () => {
                           <div className="w-20 h-20 bg-gray-50 rounded-[2.5rem] flex items-center justify-center mb-6">
                             <CheckCircle2 className="w-10 h-10 text-gray-200" />
                           </div>
-                          <h3 className="text-2xl font-black text-gray-900 font-serif mb-2">Không có đơn nào</h3>
+                          <h3 className="text-2xl font-black text-gray-900 mb-2">Không có đơn nào</h3>
                           <p className="text-gray-400 font-medium">Thử đổi khoảng ngày hoặc từ khóa tìm kiếm</p>
                         </div>
                       </td>
@@ -451,7 +451,7 @@ export const AdminOrderHistory = () => {
                           <div className="w-20 h-20 bg-gray-50 rounded-[2.5rem] flex items-center justify-center mb-6">
                             <ReceiptText className="w-10 h-10 text-gray-200" />
                           </div>
-                          <h3 className="text-2xl font-black text-gray-900 font-serif mb-2">Không có giao dịch</h3>
+                          <h3 className="text-2xl font-black text-gray-900  mb-2">Không có giao dịch</h3>
                           <p className="text-gray-400 font-medium">Bạn chưa có lịch sử thanh toán nào gần đây</p>
                         </div>
                       </td>

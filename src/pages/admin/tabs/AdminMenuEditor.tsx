@@ -255,7 +255,7 @@ export const AdminMenuEditor = () => {
         </div>
 
         <div className="flex items-center gap-3">
-          <Button variant="outline" size="lg" onClick={() => navigate('/admin/menu')} className="rounded-2xl px-8 h-14 font-black text-xs uppercase tracking-widest">
+          <Button variant="outline" size="lg" onClick={() => navigate('/admin/menu')} className="rounded-2xl px-8 h-14 font-black text-xs uppercase tracking-widest hover:bg-red-500 hover:text-white cursor-pointer">
             Hủy bỏ
           </Button>
           <Button
@@ -263,7 +263,7 @@ export const AdminMenuEditor = () => {
             size="lg"
             disabled={isSaving}
             onClick={handleSave}
-            className="bg-brand text-white hover:bg-brand-dark px-10 h-14 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-brand/20 transition-all active:scale-95"
+            className="bg-brand text-white hover:bg-brand-dark px-10 h-14 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-brand/20 transition-all active:scale-95 cursor-pointer"
           >
             {isSaving ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Save className="w-5 h-5 mr-2" />}
             {isEditMode ? 'Lưu thay đổi' : 'Tạo món ngay'}
@@ -359,7 +359,7 @@ export const AdminMenuEditor = () => {
                   <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Giá bán (VNĐ) <span className="text-danger">*</span></label>
                   <div className="relative">
                     <input
-                      type="number"
+                      type="input"
                       placeholder="0"
                       value={formData.price}
                       onChange={(e) => setFormData({ ...formData, price: Number(e.target.value) })}
@@ -405,7 +405,7 @@ export const AdminMenuEditor = () => {
                 </h3>
                 <button
                   onClick={() => setFormData(prev => ({ ...prev, options: [...prev.options, { name: '', priceExtra: 0 }] }))}
-                  className="p-2 bg-amber-50 text-amber-600 rounded-xl hover:bg-amber-100 transition-colors"
+                  className="p-2 bg-amber-50 text-amber-600 rounded-xl hover:bg-amber-100 transition-colors cursor-pointer"
                 >
                   <Plus className="w-5 h-5" />
                 </button>
@@ -452,7 +452,7 @@ export const AdminMenuEditor = () => {
                 </h3>
                 <button
                   onClick={() => setFormData(prev => ({ ...prev, addons: [...prev.addons, { name: '', priceExtra: 0 }] }))}
-                  className="p-2 bg-brand/10 text-brand rounded-xl hover:bg-brand/20 transition-colors"
+                  className="p-2 bg-brand/10 text-brand rounded-xl hover:bg-brand/20 transition-colors cursor-pointer"
                 >
                   <Plus className="w-5 h-5" />
                 </button>

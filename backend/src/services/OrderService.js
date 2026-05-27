@@ -131,7 +131,10 @@ class OrderService {
         session._id,
         { 
           $push: { items: { $each: newItems } },
-          $set: { paymentStatus: "unpaid" } // Có món mới -> bill lại thành chưa thanh toán hết
+          $set: { 
+            paymentStatus: "unpaid",
+            ...(data.note && { note: data.note }) // Luôn cập nhật ghi chú mới nếu có
+          } // Có món mới -> bill lại thành chưa thanh toán hết
         },
         { returnDocument: 'after' },
       );
@@ -150,6 +153,7 @@ class OrderService {
         status: "active",
         paymentMethod: data.paymentMethod || "cash",
         frontendUrl: data.frontendUrl, // Lưu URL origin của đơn hàng
+        note: data.note, // Mới thêm: ghi chú của đơn
       });
       session = await newOrder.save();
       await Table.findByIdAndUpdate(
@@ -257,7 +261,12 @@ class OrderService {
       // Nhồi món mới nếu bàn này đã có session
       session = await Order.findByIdAndUpdate(
         session._id,
-        { $push: { items: { $each: newItems } } },
+        { 
+          $push: { items: { $each: newItems } },
+          $set: {
+            ...(data.note && { note: data.note }) // Cập nhật ghi chú mới nếu nhân viên gõ thêm
+          }
+        },
         { returnDocument: 'after' },
       );
       session.total += newItemsTotal;
@@ -275,6 +284,7 @@ class OrderService {
         status: "active",
         paymentMethod: data.paymentMethod || "cash",
         frontendUrl: data.frontendUrl, // Lưu URL origin của đơn hàng quầy
+        note: data.note, // Mới thêm: ghi chú của đơn quầy
       });
       session = await newOrder.save();
     }
@@ -401,6 +411,7 @@ class OrderService {
       frontendUrl: data.frontendUrl, // Lưu URL origin của đơn hàng Kiosk
       orderType,
       customerInfo,
+      note: data.note, // Mới thêm: ghi chú chung của đơn Kiosk
       clientIp: clientIp || null,  // Lưu IP người đặt
     }).save();
 

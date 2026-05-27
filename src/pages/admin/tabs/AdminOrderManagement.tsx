@@ -223,7 +223,7 @@ export const AdminOrderManagement = () => {
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
         <div>
-          <h2 className="text-4xl font-black text-gray-900 tracking-tight font-serif">Đơn Hàng</h2>
+          <h2 className="text-4xl font-black text-gray-900 tracking-tight">Đơn Hàng</h2>
           <p className="text-gray-500 font-medium mt-1">Theo dõi và xử lý các đơn hàng theo thời gian thực</p>
         </div>
 
@@ -248,7 +248,7 @@ export const AdminOrderManagement = () => {
             key={s}
             onClick={() => setFilter(s)}
             className={cn(
-              "px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-widest transition-all border shrink-0",
+              "px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-widest transition-all border shrink-0 cursor-pointer",
               filter === s
                 ? "bg-slate-900 text-white border-slate-900 shadow-xl shadow-slate-900/10"
                 : "bg-white text-gray-500 border-gray-100 hover:border-brand/40 hover:text-brand shadow-card"
@@ -282,10 +282,10 @@ export const AdminOrderManagement = () => {
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-5">
                       <div className="w-16 h-16 bg-slate-900 rounded-[2rem] flex items-center justify-center text-white shadow-xl shadow-slate-900/10 border-4 border-white">
-                        <span className="text-xl font-serif font-black">{tableNameMap[order.tableId] || order.tableId}</span>
+                        <span className="text-xl font-black">{tableNameMap[order.tableId] || order.tableId}</span>
                       </div>
                       <div>
-                        <h4 className="text-xl font-bold font-serif text-gray-900">Bàn {tableNameMap[order.tableId] || order.tableId}</h4>
+                        <h4 className="text-xl font-bold text-gray-900">Bàn {tableNameMap[order.tableId] || order.tableId}</h4>
                         <div className="flex items-center gap-2 mt-1">
                           <span className={cn(
                             "inline-flex items-center justify-center px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-[0.15em] border whitespace-nowrap",
@@ -357,7 +357,7 @@ export const AdminOrderManagement = () => {
                     {order.items.some(item => item.status === 'pending_approval') && (
                       <button
                         onClick={() => approveAll(orderId)}
-                        className="px-5 bg-white border border-gray-100 text-gray-600 rounded-2xl hover:bg-gray-50 transition-all flex items-center justify-center h-[52px] font-black text-[10px] uppercase tracking-widest"
+                        className="px-5 bg-white border border-gray-100 text-gray-600 rounded-2xl hover:bg-gray-50 transition-all flex items-center justify-center h-[52px] font-black text-[10px] uppercase tracking-widest cursor-pointer"
                       >
                         Duyệt tất cả
                       </button>
@@ -366,7 +366,7 @@ export const AdminOrderManagement = () => {
                     {order.status === 'active' && (
                       <button
                         onClick={() => handlePayment(order)}
-                        className="flex-1 bg-brand text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all shadow-lg shadow-brand/20 flex items-center justify-center gap-2"
+                        className="flex-1 bg-brand text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all shadow-lg shadow-brand/20 flex items-center justify-center gap-2 cursor-pointer"
                       >
                         <CreditCard className="w-4 h-4" />
                         Thu tiền & Đóng bàn
@@ -403,7 +403,7 @@ export const AdminOrderManagement = () => {
           <div className="w-24 h-24 bg-gray-50 rounded-[3rem] flex items-center justify-center mb-6">
             <Receipt className="w-10 h-10 text-gray-200" />
           </div>
-          <h3 className="text-2xl font-black text-gray-900 font-serif mb-2">Không tìm thấy đơn hàng</h3>
+          <h3 className="text-2xl font-black text-gray-900 mb-2">Không tìm thấy đơn hàng</h3>
           <p className="text-gray-400 font-medium">Hãy thử thay đổi bộ lọc hoặc từ khóa tìm kiếm</p>
         </div>
       )}

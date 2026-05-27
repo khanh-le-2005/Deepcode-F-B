@@ -18,16 +18,16 @@ const Footer: React.FC = () => {
                             Tiên phong trong việc ứng dụng AI để phân tích, rà soát và tối ưu hóa mã nguồn. Giúp đội ngũ lập trình viên làm việc thông minh và hiệu quả hơn.
                         </p>
                         <div className="flex space-x-4 pt-2">
-                            <a href="#" className="text-gray-400 hover:text-white transition-colors">
+                            {/* <a href="#" className="text-gray-400 hover:text-white transition-colors">
                                 <Github size={20} />
-                            </a>
+                            </a> */}
                             <a href="#" className="text-gray-400 hover:text-blue-400 transition-colors">
                                 <Twitter size={20} />
                             </a>
                             <a href="#" className="text-gray-400 hover:text-blue-600 transition-colors">
                                 <Linkedin size={20} />
                             </a>
-                            <a href="#" className="text-gray-400 hover:text-blue-500 transition-colors">
+                            <a href="https://www.facebook.com/laptrinhcnangcao?locale=vi_VN" className="text-gray-400 hover:text-blue-500 transition-colors">
                                 <Facebook size={20} />
                             </a>
                         </div>

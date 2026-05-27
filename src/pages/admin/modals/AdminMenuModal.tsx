@@ -396,8 +396,8 @@ export const AdminMenuModal = ({
         </div>
 
         <div className="p-8 bg-gray-50 border-t border-gray-100 flex gap-4">
-          <Button variant="outline" className="flex-1 py-4" onClick={onClose}>Huỷ</Button>
-          <Button variant="secondary" className="flex-1 py-4 shadow-lg shadow-amber-500/20" onClick={handleSave}>
+          <Button variant="outline" className="flex-1 py-4 cursor-pointer hover:bg-red-600 hover:text-white " onClick={onClose}>Huỷ</Button>
+          <Button variant="secondary" className="flex-1 py-4 shadow-lg shadow-amber-500/20 cursor-pointer hover:bg-yellow-600 hover:text-white " onClick={handleSave}>
             Lưu lại
           </Button>
         </div>

@@ -89,7 +89,7 @@ export const AdminPaymentRequests = () => {
             {/* Header */}
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
                 <div>
-                    <h2 className="text-4xl font-black text-gray-900 tracking-tight font-serif flex items-center gap-4">
+                    <h2 className="text-4xl font-black text-gray-900 tracking-tight flex items-center gap-4">
                         <HandCoins className="w-10 h-10 text-brand" />
                         Yêu Cầu Thanh Toán
                     </h2>
@@ -173,7 +173,7 @@ export const AdminPaymentRequests = () => {
                     <div className="w-24 h-24 bg-slate-50 rounded-[3rem] flex items-center justify-center mb-6">
                         <HandCoins className="w-10 h-10 text-slate-300" />
                     </div>
-                    <h3 className="text-2xl font-black text-gray-900 font-serif mb-2">Không có yêu cầu nào</h3>
+                    <h3 className="text-2xl font-black text-gray-900 mb-2">Không có yêu cầu nào</h3>
                     <p className="text-gray-400 font-medium">Hiện tại không có bàn nào yêu cầu tính tiền mặt</p>
                 </div>
             )}

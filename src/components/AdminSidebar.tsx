@@ -19,7 +19,8 @@ import {
   ChevronRight,
   X,
   HandCoins,
-  Bell
+  Bell,
+  Image as ImageIcon
 } from 'lucide-react';
 import { useAuth } from '../AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -42,6 +43,7 @@ export const AdminSidebar = ({ isOpen, onClose }: AdminSidebarProps) => {
     { icon: UtensilsCrossed, label: 'Quản lý menu', path: '/admin/menu' },
     { icon: CalendarDays, label: 'Thực đơn tuần', path: '/admin/weekly-menu' },
     { icon: Package, label: 'Combo', path: '/admin/combo' },
+    { icon: ImageIcon, label: 'Quản lý banner', path: '/admin/banners' },
     { icon: History, label: 'Lịch sử đơn', path: '/admin/order-history' },
     { icon: ShoppingCart, label: 'Đơn hàng', path: '/admin/orders' },
     { icon: CreditCard, label: 'Thanh toán', path: '/admin/payments' },

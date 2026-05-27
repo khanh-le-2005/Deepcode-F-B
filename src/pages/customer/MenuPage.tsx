@@ -6,7 +6,6 @@ import {
   ShoppingBag, ChevronRight, Facebook, Twitter, Instagram, MapPin, Mail, Phone
 } from 'lucide-react';
 import axiosLib from 'axios';
-import axios from '@/src/api/axiosClient';
 import { io } from 'socket.io-client';
 import { MenuItem, OrderItem, Order } from '../../types';
 import { cn } from '../../api/cn';
@@ -18,11 +17,24 @@ import { useCart } from '../../contexts/CartContext';
 import { getMenuItemCategoryName, getMenuItemId, getMenuItemImageUrl } from '../../api/menuHelpers';
 
 import { useSocket } from '../../contexts/SocketContext';
+import { toast } from 'react-toastify';
+import axiosClient from '@/src/api/axiosClient';
+
+import { Swiper, SwiperSlide } from 'swiper/react';
+import { Autoplay, Pagination, EffectFade } from 'swiper/modules';
+
+import 'swiper/css';
+import 'swiper/css/pagination';
+import 'swiper/css/effect-fade';
 
 export const MenuPage = () => {
   const { socket } = useSocket();
   const { tableId } = useParams();
   const [menu, setMenu] = useState<MenuItem[]>([]);
+  const [combos, setCombos] = useState<any[]>([]);
+  const [selectedComboForDetail, setSelectedComboForDetail] = useState<any | null>(null);
+  const [detailQuantity, setDetailQuantity] = useState(1);
+  const [itemNote, setItemNote] = useState('');
   const { cart, addToCart, removeFromCart, updateQuantity, getUniqueCartKey, totalPrice, totalItems, clearCart } = useCart();
   const [selectedCategory, setSelectedCategory] = useState('Tất cả');
   const [searchTerm, setSearchTerm] = useState('');
@@ -49,9 +61,9 @@ export const MenuPage = () => {
   const fetchActiveSession = async () => {
     if (!tableId) return;
     try {
-      const res = await axios.get(`/api/orders/table/${tableId}/active-session`);
+      const res = await axiosClient.get(`/api/orders/table/${tableId}/active-session`);
       // Nếu đơn đã thanh toán hoặc hoàn tất thì coi như không còn session đặt món active
-      const isStillActive = res.data && res.data.status !== 'paid' && res.data.status !== 'completed' && res.data.paymentStatus !== 'paid';
+      const isStillActive = res.data && res.data.status === 'active' && res.data.paymentStatus !== 'paid';
       setActiveSession(isStillActive ? res.data : null);
     } catch (error: any) {
       if (error.response?.status === 404) {
@@ -61,25 +73,50 @@ export const MenuPage = () => {
   };
 
   useEffect(() => {
+    if (selectedComboForDetail) {
+      setDetailQuantity(1);
+      setItemNote('');
+    }
+  }, [selectedComboForDetail]);
+
+  useEffect(() => {
     if (status !== 'valid') return;
-    axios.get('/api/weekly-menu/active')
-      .then(res => {
-        if (!res.data) {
+    Promise.all([
+      axiosClient.get('/api/weekly-menu/active'),
+      axiosClient.get('/api/combos')
+    ])
+      .then(([menuRes, combosRes]) => {
+        if (menuRes.data) {
+          const fetchedMenu = extractList<MenuItem>(menuRes.data.menuItems || menuRes.data);
+          setMenu(fetchedMenu);
+
+          // Tự động chọn size đầu tiên cho tất cả món
+          const defaultOptions: Record<string, any> = {};
+          fetchedMenu.forEach((item: MenuItem) => {
+            if (item.options && item.options.length > 0) {
+              defaultOptions[getMenuItemId(item)] = item.options[0];
+            }
+          });
+          setSelectedOptionsMap(defaultOptions);
+        } else {
           setMenu([]);
-          return;
         }
-        setMenu(extractList<MenuItem>(res.data.menuItems || res.data));
+
+        if (combosRes.data) {
+          setCombos((combosRes.data || []).filter((c: any) => c.status !== 'unavailable'));
+        }
       })
       .catch(err => {
-        console.error("Failed to fetch menu:", err);
+        console.error("Failed to fetch data:", err);
         setMenu([]);
+        setCombos([]);
       });
     fetchActiveSession();
 
     const handleOrderUpdate = (updatedOrder: Order) => {
       const slugify = (str?: string) => str ? String(str).toLowerCase().trim().replace(/[\s\W-]+/g, '-') : '';
       if (tableId && (updatedOrder.tableId === tableId || updatedOrder.tableId === slugify(tableId))) {
-        const isStillActive = updatedOrder.status === 'active' && updatedOrder.status !== 'paid' && updatedOrder.status !== 'completed' && updatedOrder.paymentStatus !== 'paid';
+        const isStillActive = updatedOrder.status === 'active' && updatedOrder.paymentStatus !== 'paid';
         setActiveSession(isStillActive ? updatedOrder : null);
       }
     };
@@ -100,6 +137,11 @@ export const MenuPage = () => {
     return () => window.removeEventListener('resize', updateViewport);
   }, []);
 
+  const filteredCombos = React.useMemo(() => {
+    if (selectedCategory !== 'Combo ưu đãi' && selectedCategory !== 'Tất cả') return [];
+    return combos.filter(combo => combo.name.toLowerCase().includes(searchTerm.toLowerCase()));
+  }, [combos, selectedCategory, searchTerm]);
+
   if (status === 'loading') {
     return <div className="min-h-screen flex items-center justify-center bg-[#fcf9f4]"><div className="w-10 h-10 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div></div>;
   }
@@ -109,8 +151,13 @@ export const MenuPage = () => {
   }
 
   const visibleMenu = menu;
-  const categories = ['Tất cả', ...new Set(visibleMenu.map(item => getMenuItemCategoryName(item)))];
+  const categories = [
+    'Tất cả',
+    ...(combos.length > 0 ? ['Combo ưu đãi'] : []),
+    ...new Set(visibleMenu.map(item => getMenuItemCategoryName(item)))
+  ];
   const filteredMenu = visibleMenu.filter(item => {
+    if (selectedCategory === 'Combo ưu đãi') return false;
     const matchesCategory = selectedCategory === 'Tất cả' || getMenuItemCategoryName(item) === selectedCategory;
     const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesCategory && matchesSearch;
@@ -124,20 +171,26 @@ export const MenuPage = () => {
     const id = Date.now();
     setFlyingItems(prev => [...prev, { id, image, start: { x: startX, y: startY } }]);
     setTimeout(() => {
-        setFlyingItems(prev => prev.filter(item => item.id !== id));
+      setFlyingItems(prev => prev.filter(item => item.id !== id));
     }, 800);
   };
 
   const handleQuickAdd = async (e: React.MouseEvent, item: MenuItem) => {
     e.stopPropagation();
-    triggerFlyAnimation(e, getItemImageUrl(item));
-    
+
     const itemId = getMenuItemId(item);
     const selectedOption = selectedOptionsMap[itemId];
 
+    if (item.options && item.options.length > 0 && !selectedOption) {
+      toast.warning("Vui lòng chọn Size cho món ăn!");
+      return;
+    }
+
+    triggerFlyAnimation(e, getItemImageUrl(item));
+
     if (tableId) {
       try {
-        const response = await axios.post('/api/orders', {
+        const response = await axiosClient.post('/api/orders', {
           tableId,
           frontendUrl: window.location.origin, // ĐÃ THÊM
           items: [{
@@ -194,7 +247,7 @@ export const MenuPage = () => {
 
     if (tableId) {
       try {
-        const response = await axios.post('/api/orders', {
+        const response = await axiosClient.post('/api/orders', {
           tableId,
           frontendUrl: window.location.origin, // ĐÃ THÊM
           items: [{
@@ -234,6 +287,60 @@ export const MenuPage = () => {
     }
   };
 
+  const handleAddComboToCart = async (e: React.MouseEvent, combo: any, quantity: number = 1, note: string = '') => {
+    e.stopPropagation();
+    const comboImageUrl = combo.image
+      ? `${axiosClient.defaults.baseURL}/api/images/${combo.image}`
+      : (combo.menuItemIds?.[0]?.images?.length > 0 ? `${axiosClient.defaults.baseURL}/api/images/${combo.menuItemIds[0].images[0]}` : 'https://placehold.co/400');
+
+    triggerFlyAnimation(e, comboImageUrl);
+
+    if (tableId) {
+      try {
+        const response = await axiosClient.post('/api/orders', {
+          tableId,
+          frontendUrl: window.location.origin,
+          items: [{
+            menuItemId: combo._id || combo.id,
+            name: combo.name,
+            basePrice: combo.price,
+            quantity: quantity,
+            isCombo: true,
+            image: comboImageUrl,
+            category: 'Combo ưu đãi',
+            note: note
+          }]
+        });
+        if (response.data) {
+          setActiveSession(response.data);
+        } else {
+          await fetchActiveSession();
+        }
+        setToastItem({ name: combo.name, image: comboImageUrl });
+        setTimeout(() => setToastItem(null), 3000);
+      } catch (err) {
+        console.error("Failed to add combo to shared cart", err);
+        const apiMessage = axiosLib.isAxiosError(err) ? err.response?.data?.error?.message || err.response?.data?.message : null;
+        alert(apiMessage || "Lỗi khi thêm combo vào giỏ bàn. Vui lòng thử lại!");
+      }
+    } else {
+      addToCart({
+        menuItemId: combo._id || combo.id,
+        name: combo.name,
+        basePrice: combo.price,
+        quantity: quantity,
+        totalPrice: combo.price * quantity,
+        status: 'in_cart',
+        image: comboImageUrl,
+        category: 'Combo ưu đãi',
+        isCombo: true,
+        note: note
+      } as any);
+      setToastItem({ name: combo.name, image: comboImageUrl });
+      setTimeout(() => setToastItem(null), 3000);
+    }
+  };
+
   const toggleCardOption = (menuItemId: string, option: any) => {
     setSelectedOptionsMap(prev => ({
       ...prev,
@@ -244,7 +351,7 @@ export const MenuPage = () => {
   const handleRemoveTableCartItem = async (itemId: string) => {
     if (!tableId || !activeSession) return;
     try {
-      await axios.delete(`/api/orders/${activeSession.id || activeSession._id}/item/${itemId}`);
+      await axiosClient.delete(`/api/orders/${activeSession.id || activeSession._id}/item/${itemId}`);
       await fetchActiveSession();
     } catch (err) {
       console.error("Failed to remove item from table cart:", err);
@@ -255,7 +362,7 @@ export const MenuPage = () => {
   const handleUpdateTableCartItemQuantity = async (itemId: string, delta: number) => {
     if (!tableId || !activeSession) return;
     try {
-      await axios.patch(`/api/orders/${activeSession.id || activeSession._id}/item/${itemId}/quantity`, {
+      await axiosClient.patch(`/api/orders/${activeSession.id || activeSession._id}/item/${itemId}/quantity`, {
         delta,
       });
       await fetchActiveSession();
@@ -303,58 +410,141 @@ export const MenuPage = () => {
       {/* FLYING ITEMS ANIMATION CONTAINER */}
       <div className="fixed inset-0 pointer-events-none z-[999]">
         <AnimatePresence>
-            {flyingItems.map(item => (
-                <motion.div
-                    key={item.id}
-                    initial={{ 
-                        x: item.start.x - 25, 
-                        y: item.start.y - 25,
-                        scale: 1,
-                        opacity: 1 
-                    }}
-                    animate={{ 
-                        x: window.innerWidth - 80, // Target near floating cart button
-                        y: window.innerHeight - 80,
-                        scale: 0.2,
-                        opacity: 0.5
-                    }}
-                    exit={{ opacity: 0 }}
-                    transition={{ 
-                        duration: 0.8,
-                        ease: [0.42, 0, 0.58, 1] // Ease-in-out
-                    }}
-                    className="fixed w-12 h-12 rounded-full overflow-hidden border-2 border-white shadow-lg bg-white"
-                >
-                    <img src={item.image} className="w-full h-full object-cover" alt="" />
-                </motion.div>
-            ))}
+          {flyingItems.map(item => (
+            <motion.div
+              key={item.id}
+              initial={{
+                x: item.start.x - 25,
+                y: item.start.y - 25,
+                scale: 1,
+                opacity: 1
+              }}
+              animate={{
+                x: window.innerWidth - 80, // Target near floating cart button
+                y: window.innerHeight - 80,
+                scale: 0.2,
+                opacity: 0.5
+              }}
+              exit={{ opacity: 0 }}
+              transition={{
+                duration: 0.8,
+                ease: [0.42, 0, 0.58, 1] // Ease-in-out
+              }}
+              className="fixed w-12 h-12 rounded-full overflow-hidden border-2 border-white shadow-lg bg-white"
+            >
+              <img src={item.image} className="w-full h-full object-cover" alt="" />
+            </motion.div>
+          ))}
         </AnimatePresence>
       </div>
 
-      <section className="relative h-[300px] md:h-[400px] bg-[#111] flex flex-col items-center justify-center overflow-hidden">
-        <div className="absolute inset-0 z-0">
-          <img src="https://images.unsplash.com/photo-1594212699903-ec8a3eca50f5?q=80&w=2071&auto=format&fit=crop" className="w-full h-full object-cover opacity-50" alt="Background" />
-          <div className="absolute inset-0 via-transparent to-black/70" />
-        </div>
-        <div className="relative z-20 text-center px-4">
-          <h2 className="text-5xl md:text-7xl font-black text-white mb-4 tracking-tight uppercase italic" style={{ fontFamily: "'Playfair Display', serif" }}>Sản Phẩm</h2>
-          <div className="flex items-center justify-center gap-3 text-sm md:text-base font-bold uppercase tracking-[0.2em]">
-            {/* <span className="text-gray-200 hover:text-red-600 transition-colors cursor-pointer" onClick={() => navigate('/')}>Trang chủ</span> */}
-            <span className="text-red-600 text-xl font-black">»</span>
-            <span className="text-red-600">Thực đơn {tableId ? `(Bàn ${tableId})` : '(Giao hàng)'}</span>
-          </div>
-        </div>
+      <section className="relative h-[300px] md:h-[400px] overflow-hidden">
+        <Swiper
+          modules={[Autoplay, Pagination, EffectFade]}
+          slidesPerView={1}
+          loop
+          effect="fade"
+          autoplay={{
+            delay: 4000,
+            disableOnInteraction: false,
+          }}
+          pagination={{ clickable: true }}
+          className="h-full"
+        >
+          {[
+            "https://images.unsplash.com/photo-1594212699903-ec8a3eca50f5?q=80&w=2071&auto=format&fit=crop",
+            "https://images.unsplash.com/photo-1504674900247-0877df9cc836?q=80&w=2070&auto=format&fit=crop",
+            "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?q=80&w=2074&auto=format&fit=crop",
+          ].map((image, index) => (
+            <SwiperSlide key={index}>
+              <div className="relative h-[300px] md:h-[400px]">
+                {/* Background */}
+                <div className="absolute inset-0">
+                  <img
+                    src={image}
+                    className="w-full h-full object-cover"
+                    alt="Banner"
+                  />
+
+                  {/* Overlay */}
+                  {/* <div className="absolute inset-0 bg-black/55" /> */}
+
+                  {/* Gradient */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/30" />
+                </div>
+
+                {/* Content */}
+                <div className="relative z-20 h-full flex flex-col items-center justify-center text-center px-4">
+                  <h2 className="text-5xl md:text-7xl font-black text-white mb-4 tracking-tight uppercase drop-shadow-lg">
+                    Sản Phẩm
+                  </h2>
+
+                  <div className="flex items-center justify-center gap-3 text-sm md:text-base font-bold uppercase tracking-[0.2em]">
+                    <span className="text-red-600 text-xl font-black">»</span>
+
+                    <span className="text-red-500">
+                      Thực đơn {tableId ? `(Bàn ${tableId})` : '(Giao hàng)'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </SwiperSlide>
+          ))}
+        </Swiper>
       </section>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-16">
         <div className="w-full">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8 sm:mb-10 text-xs sm:text-sm font-bold text-gray-500 uppercase tracking-widest">
-            <p>Hiển thị 1–{filteredMenu.length} trong tổng số {visibleMenu.length} món</p>
+            <p>Hiển thị 1–{filteredMenu.length + filteredCombos.length} trong tổng số {visibleMenu.length + combos.length} món</p>
           </div>
 
-          {menu.length > 0 ? (
+          {menu.length > 0 || combos.length > 0 ? (
             <div className="grid grid-cols-2 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-6 lg:gap-8">
-              {filteredMenu.map((item) => (
+              {/* Render Combos */}
+              {(selectedCategory === 'Tất cả' || selectedCategory === 'Combo ưu đãi') && filteredCombos.map((combo) => (
+                <motion.div
+                  key={`combo-${combo._id}`}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  className="bg-white group rounded-4xl overflow-hidden border border-gray-100 hover:shadow-2xl transition-all duration-500 text-center flex flex-col items-center p-3 sm:p-6 relative animate-in fade-in duration-300"
+                >
+                  <div className="absolute top-2 right-2 sm:top-4 sm:right-4 flex flex-col gap-2 translate-x-10 opacity-0 group-hover:translate-x-0 group-hover:opacity-100 transition-all duration-300">
+                    <button className="p-1.5 sm:p-2 bg-white shadow-md rounded-full text-gray-400 hover:text-red-600 hover:bg-red-50" onClick={(e) => handleAddComboToCart(e, combo)}><ShoppingBag className="w-3 h-3 sm:w-4 sm:h-4" /></button>
+                  </div>
+
+                  <div className="w-full aspect-4/3 rounded-sm sm:rounded-3xl overflow-hidden mb-3 sm:mb-6 group-hover:shadow-lg transition-all duration-500 cursor-pointer relative" onClick={() => setSelectedComboForDetail(combo)}>
+                    <img src={combo.image ? `${axiosClient.defaults.baseURL}/api/images/${combo.image}` : (combo.menuItemIds?.[0]?.images?.length > 0 ? `${axiosClient.defaults.baseURL}/api/images/${combo.menuItemIds[0].images[0]}` : 'https://placehold.co/400')} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt={combo.name} />
+                  </div>
+
+                  <h3 className="text-base sm:text-lg font-bold text-gray-900 group-hover:text-red-600 transition-colors mb-0.5 sm:mb-1 cursor-pointer line-clamp-1" onClick={() => setSelectedComboForDetail(combo)}>
+                    {combo.name}
+                  </h3>
+
+                  <p className="text-gray-500 text-[10px] sm:text-xs mb-3 sm:mb-4 line-clamp-2">
+                    {combo.description || (combo.menuItemIds?.map((m: any) => m.name).join(' + ') || '')}
+                  </p>
+
+                  <div className="flex flex-col items-center gap-2 mb-3 sm:mb-4 mt-auto">
+                    <div className="text-sm sm:text-base font-black text-red-650">
+                      {combo.price.toLocaleString()}đ
+                    </div>
+                  </div>
+
+                  <div className="w-full mt-auto space-y-2">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleAddComboToCart(e, combo); }}
+                      className="w-full py-2 sm:py-2.5 rounded-xl font-bold text-[10px] sm:text-xs uppercase tracking-widest transition-all hover:shadow-lg flex items-center justify-center gap-2 bg-red-600 text-white border border-transparent group/btn"
+                    >
+                      <ShoppingBag className="w-3 h-3 sm:w-4 sm:h-4 group-hover/btn:scale-110 transition-transform" />
+                      Đặt combo
+                    </button>
+                  </div>
+                </motion.div>
+              ))}
+
+              {/* Render Món thường */}
+              {selectedCategory !== 'Combo ưu đãi' && filteredMenu.map((item) => (
                 <motion.div
                   key={item.id}
                   initial={{ opacity: 0, y: 20 }}
@@ -366,37 +556,53 @@ export const MenuPage = () => {
                     <button className="p-1.5 sm:p-2 bg-white shadow-md rounded-full text-gray-400 hover:text-red-600 hover:bg-red-50" onClick={(e) => handleAddToCart(e, item)}><ShoppingBag className="w-3 h-3 sm:w-4 sm:h-4" /></button>
                   </div>
 
-                  <div className="w-full aspect-4/3 rounded-2xl sm:rounded-3xl overflow-hidden mb-3 sm:mb-6 group-hover:shadow-lg transition-all duration-500 cursor-pointer relative" onClick={() => navigate(tableId ? `/table/${tableId}/menu/${item.id}` : `/menu/${item.id}`)}>
+                  <div className="w-full aspect-4/3 rounded-sm sm:rounded-3xl overflow-hidden mb-3 sm:mb-6 group-hover:shadow-lg transition-all duration-500 cursor-pointer relative" onClick={() => navigate(tableId ? `/table/${tableId}/menu/${item.id}` : `/menu/${item.id}`)}>
                     <img src={getItemImageUrl(item)} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt={item.name} />
                   </div>
 
-                  <h3 className="text-base sm:text-lg font-bold text-gray-900 group-hover:text-red-600 transition-colors mb-0.5 sm:mb-1 italic cursor-pointer line-clamp-1" style={{ fontFamily: "'Playfair Display', serif" }} onClick={() => navigate(tableId ? `/table/${tableId}/menu/${item.id}` : `/menu/${item.id}`)}>
+                  <h3 className="text-base sm:text-lg font-bold text-gray-900 group-hover:text-red-600 transition-colors mb-0.5 sm:mb-1 cursor-pointer line-clamp-1" onClick={() => navigate(tableId ? `/table/${tableId}/menu/${item.id}` : `/menu/${item.id}`)}>
                     {item.name} {selectedOptionsMap[getMenuItemId(item)]?.name}
                   </h3>
 
                   <div className="flex flex-col items-center gap-2 mb-3 sm:mb-4">
-                    <div className="text-sm sm:text-base font-black text-red-600 italic" style={{ fontFamily: "'Playfair Display', serif" }}>
+                    <div className="text-sm sm:text-base font-black text-red-600">
                       {(item.price + Number(selectedOptionsMap[getMenuItemId(item)]?.priceExtra || 0)).toLocaleString()}đ
                     </div>
 
                     {/* Size Selection Pill Buttons */}
                     {item.options && item.options.length > 0 && (
-                      <div className="flex gap-1.5 mt-1">
+                      <div className="flex flex-wrap justify-center gap-1.5 mt-1 w-full">
                         {item.options.map((opt: any) => {
                           const isSelected = selectedOptionsMap[getMenuItemId(item)]?.name === opt.name;
                           return (
-                            <button
-                              key={opt.name}
-                              onClick={(e) => { e.stopPropagation(); toggleCardOption(getMenuItemId(item), opt); }}
-                              className={cn(
-                                "px-2.5 py-1 rounded-full text-[12px] font-black uppercase tracking-tighter border transition-all",
-                                isSelected
-                                  ? "bg-red-600 text-white border-red-600 shadow-sm"
-                                  : "bg-gray-50 text-gray-400 border-gray-100 hover:border-gray-300"
-                              )}
-                            >
-                              {opt.name} {opt.priceExtra > 0 && `(+${opt.priceExtra.toLocaleString()}đ)`}
-                            </button>
+                            <React.Fragment key={opt.name}>
+                              {/* --- GIAO DIỆN MOBILE --- */}
+                              <button
+                                onClick={(e) => { e.stopPropagation(); toggleCardOption(getMenuItemId(item), opt); }}
+                                className={cn(
+                                  "sm:hidden px-2.5 py-1.5 rounded-xl border-2 transition-all flex flex-col items-center justify-center min-w-[3.5rem]",
+                                  isSelected
+                                    ? "bg-red-50 border-red-500 text-red-600 shadow-sm"
+                                    : "bg-white border-gray-100 text-gray-500 hover:border-red-200"
+                                )}
+                              >
+                                <span className="text-[11px] font-black uppercase leading-none">{opt.name.replace(/size\s*/i, '')}</span>
+                                {opt.priceExtra > 0 && <span className="text-[9px] font-bold mt-1 leading-none opacity-80">+{(opt.priceExtra / 1000)}k</span>}
+                              </button>
+
+                              {/* --- GIAO DIỆN MÁY TÍNH (Như cũ) --- */}
+                              <button
+                                onClick={(e) => { e.stopPropagation(); toggleCardOption(getMenuItemId(item), opt); }}
+                                className={cn(
+                                  "hidden sm:flex px-2.5 py-1 rounded-full text-[12px] font-black uppercase tracking-tighter border transition-all whitespace-nowrap",
+                                  isSelected
+                                    ? "bg-red-600 text-white border-red-600 shadow-sm"
+                                    : "bg-gray-50 text-gray-400 border-gray-100 hover:border-gray-300 hover:text-red-500"
+                                )}
+                              >
+                                {opt.name} {opt.priceExtra > 0 && `(+${opt.priceExtra.toLocaleString()}đ)`}
+                              </button>
+                            </React.Fragment>
                           );
                         })}
                       </div>
@@ -417,7 +623,7 @@ export const MenuPage = () => {
             </div>
           ) : (
             <div className="bg-white rounded-[2rem] border border-dashed border-gray-200 p-10 sm:p-16 text-center">
-              <h3 className="text-2xl font-black italic mb-2" style={{ fontFamily: "'Playfair Display', serif" }}>Chưa có món ăn được xuất bản</h3>
+              <h3 className="text-2xl font-black mb-2">Chưa có món ăn được xuất bản</h3>
             </div>
           )}
         </div>
@@ -442,7 +648,7 @@ export const MenuPage = () => {
               initial={isMobile ? { y: "100%", opacity: 0.98 } : { x: "100%" }}
               animate={isMobile ? { y: 0, opacity: 1 } : { x: 0, opacity: 1 }}
               exit={isMobile ? { y: "100%", opacity: 0.98 } : { x: "100%" }}
-              transition={cartDrawerTransition}
+              transition={{ type: "tween", ease: "circOut", duration: 0.35 }}
               style={{ willChange: 'transform' }}
               className={cn(
                 "fixed right-0 bottom-0 w-full sm:max-w-md bg-white z-[201] flex flex-col",
@@ -541,7 +747,7 @@ export const MenuPage = () => {
 
               <div className={cn(
                 "space-y-4 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] border-t border-gray-100",
-                isMobile ? "p-5 bg-white/95 backdrop-blur-md" : "p-8 bg-gray-50"
+                isMobile ? "p-5 bg-white" : "p-8 bg-gray-50"
               )}>
                 <div className="flex justify-between items-center px-1">
                   <span className="text-gray-400 font-bold uppercase text-[10px] tracking-widest italic">Tổng cộng</span>
@@ -566,7 +772,7 @@ export const MenuPage = () => {
                       if (tableId) {
                         try {
                           if (!hasTableCartItems || !activeSession) return;
-                          await axios.post(`/api/orders/${activeSession.id || activeSession._id}/checkout`);
+                          await axiosClient.post(`/api/orders/${activeSession.id || activeSession._id}/checkout`);
                           setIsCartOpen(false);
                           navigate(`/table/${tableId}/tracking`);
                         } catch (error) {
@@ -593,13 +799,13 @@ export const MenuPage = () => {
 
       <AnimatePresence>
         {displayTotalItems > 0 && (
-          <motion.button 
+          <motion.button
             ref={cartRef}
-            initial={{ scale: 0 }} 
-            animate={{ scale: 1 }} 
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
             whileTap={{ scale: 1.2 }}
-            exit={{ scale: 0 }} 
-            onClick={() => setIsCartOpen(true)} 
+            exit={{ scale: 0 }}
+            onClick={() => setIsCartOpen(true)}
             className="fixed bottom-8 right-8 z-[150] w-16 h-16 bg-black text-white rounded-full shadow-2xl border-4 border-white flex items-center justify-center group"
           >
             <ShoppingBag className="w-7 h-7 group-hover:rotate-12 transition-transform" />
@@ -616,6 +822,159 @@ export const MenuPage = () => {
               <img src={toastItem.image} alt={toastItem.name} className="w-full h-full object-cover" />
             </div>
             <span className="text-sm font-medium">Đã thêm <strong className="text-green-400">{toastItem.name}</strong> vào giỏ</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* MODAL CHI TIẾT COMBO */}
+      <AnimatePresence>
+        {selectedComboForDetail && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] flex items-end md:items-center justify-center p-0 md:p-6"
+          >
+            <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" onClick={() => setSelectedComboForDetail(null)}></div>
+
+            <motion.div
+              initial={{ y: "100%", opacity: 0.5 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: "100%", opacity: 0 }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="relative w-full max-w-2xl bg-white rounded-t-[2rem] md:rounded-[2rem] overflow-hidden shadow-2xl flex flex-col max-h-[90vh] md:max-h-[85vh] z-10 mt-20"
+            >
+              <button
+                onClick={() => setSelectedComboForDetail(null)}
+                className="absolute top-4 right-4 z-50 p-2 bg-black/40 hover:bg-black/60 text-white rounded-full flex items-center justify-center transition-all active:scale-90"
+              >
+                <X size={18} strokeWidth={2.5} />
+              </button>
+
+              {/* HÌNH ẢNH COMBO */}
+              <div className="w-full aspect-[16/10] relative bg-gray-100 overflow-hidden">
+                <img
+                  src={selectedComboForDetail.image ? `${axiosClient.defaults.baseURL}/api/images/${selectedComboForDetail.image}` : (selectedComboForDetail.menuItemIds?.[0]?.images?.length > 0 ? `${axiosClient.defaults.baseURL}/api/images/${selectedComboForDetail.menuItemIds[0].images[0]}` : 'https://placehold.co/800x800')}
+                  className="absolute inset-0 w-full h-full object-cover filter blur-2xl scale-110 opacity-30 select-none pointer-events-none"
+                  alt=""
+                />
+                <img
+                  src={selectedComboForDetail.image ? `${axiosClient.defaults.baseURL}/api/images/${selectedComboForDetail.image}` : (selectedComboForDetail.menuItemIds?.[0]?.images?.length > 0 ? `${axiosClient.defaults.baseURL}/api/images/${selectedComboForDetail.menuItemIds[0].images[0]}` : 'https://placehold.co/800x800')}
+                  className="absolute inset-0 w-full h-full object-contain relative z-10"
+                  alt={selectedComboForDetail.name}
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent z-20" />
+              </div>
+
+              {/* NỘI DUNG CHI TIẾT */}
+              <div className="flex-1 flex flex-col bg-white relative z-20 -mt-6 rounded-t-[2rem] min-h-0">
+                <div className="w-12 h-1 bg-gray-300 rounded-full mx-auto mt-3 mb-1" />
+
+                <div className="flex-1 overflow-y-auto px-6 pt-4 pb-6 custom-scrollbar">
+                  <span className="bg-red-100 text-red-600 text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-md inline-block mb-2">
+                    Combo ưu đãi cực hời
+                  </span>
+
+                  <h3 className="text-xl font-bold text-gray-900 mb-2 leading-tight">
+                    {selectedComboForDetail.name}
+                  </h3>
+
+                  <p className="text-gray-500 text-xs md:text-sm mb-6 leading-relaxed">
+                    {selectedComboForDetail.description || 'Gói combo tiết kiệm tiện lợi được chuẩn bị đặc biệt từ các nguyên liệu tươi mới trong ngày.'}
+                  </p>
+
+                  {/* DANH SÁCH MÓN */}
+                  <div className="mb-6">
+                    <div className="flex items-center justify-between mb-3 bg-gray-50 px-4 py-2 rounded-xl border border-gray-100">
+                      <h4 className="font-bold text-[11px] text-gray-800 uppercase tracking-wider">Các món trong combo</h4>
+                      <span className="text-[10px] font-black text-red-500">{selectedComboForDetail.menuItemIds?.length || 0} MÓN ĂN</span>
+                    </div>
+
+                    <div className="flex flex-col gap-2">
+                      {selectedComboForDetail.menuItemIds?.map((m: any, idx: number) => (
+                        <div key={m._id || idx} className="flex items-center gap-3 bg-red-50/50 p-2.5 rounded-xl border border-red-100/50">
+                          <img
+                            src={m.images?.length > 0 ? `${axiosClient.defaults.baseURL}/api/images/${m.images[0]}` : 'https://placehold.co/100'}
+                            className="w-10 h-10 rounded-lg object-cover border border-red-200"
+                            alt={m.name}
+                          />
+                          <div className="flex-1">
+                            <h5 className="font-bold text-xs text-gray-850">{m.name}</h5>
+                            <p className="text-[10px] text-gray-400 line-clamp-1">{m.description}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* GHI CHÚ COMBO */}
+                  <div className="mb-4">
+                    <div className="flex items-center justify-between mb-3 bg-gray-50 px-4 py-2 rounded-xl border border-gray-100">
+                      <h4 className="font-bold text-[11px] text-gray-800 uppercase tracking-wider">Ghi chú thêm</h4>
+                      <span className="text-[9px] font-black text-gray-400">KHÔNG BẮT BUỘC</span>
+                    </div>
+                    <textarea
+                      value={itemNote}
+                      onChange={(e) => setItemNote(e.target.value)}
+                      placeholder="Ghi chú (Ví dụ: ít đá, nhiều đường...)"
+                      className="w-full bg-white border border-gray-200 rounded-xl p-3 text-xs focus:outline-none focus:ring-2 focus:ring-red-500 transition-all"
+                      rows={2}
+                    />
+                  </div>
+                </div>
+
+                {/* THANH TOÁN DÍNH ĐÁY COMBO */}
+                {(() => {
+                  const displayPrice = selectedComboForDetail.price * detailQuantity;
+
+                  return (
+                    <div className="shrink-0 p-4 bg-white border-t border-gray-100 shadow-[0_-10px_20px_rgba(0,0,0,0.03)] z-30">
+                      <div className="flex flex-col gap-3">
+                        <div className="flex items-center justify-between bg-gray-50 p-2 rounded-xl border border-gray-100">
+                          <div className="flex items-center gap-3">
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1">Số lượng</span>
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => setDetailQuantity(Math.max(1, detailQuantity - 1))}
+                                className="w-8 h-8 rounded-lg bg-white border border-gray-200 flex items-center justify-center text-gray-600 hover:bg-red-500 hover:text-white hover:border-red-500 transition-all active:scale-90"
+                              >
+                                <Minus size={14} />
+                              </button>
+                              <div className="w-8 text-center font-bold text-sm text-gray-800">
+                                {detailQuantity}
+                              </div>
+                              <button
+                                onClick={() => setDetailQuantity(detailQuantity + 1)}
+                                className="w-8 h-8 rounded-lg bg-white border border-gray-200 flex items-center justify-center text-gray-600 hover:bg-red-500 hover:text-white hover:border-red-500 transition-all active:scale-90"
+                              >
+                                <Plus size={14} />
+                              </button>
+                            </div>
+                          </div>
+                          <div className="flex flex-col items-end mr-1">
+                            <span className="text-[8px] font-bold text-gray-400 uppercase tracking-wider">Tạm tính</span>
+                            <span className="text-base font-black text-red-650">
+                              {displayPrice.toLocaleString()}đ
+                            </span>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={(e) => {
+                            handleAddComboToCart(e, selectedComboForDetail, detailQuantity, itemNote);
+                            setSelectedComboForDetail(null);
+                          }}
+                          className="w-full py-3 bg-red-600 text-white font-bold rounded-xl shadow-lg hover:bg-red-700 transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-wider active:scale-95"
+                        >
+                          <ShoppingBag size={14} />
+                          Thêm {detailQuantity} Combo Vào Giỏ
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>

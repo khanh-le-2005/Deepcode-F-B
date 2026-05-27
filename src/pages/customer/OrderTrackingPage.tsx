@@ -183,7 +183,6 @@ export const OrderTrackingPage = () => {
       setIsGeneratingQr(true);
       setPaymentError('');
       const response = await axios.post(`/api/payments/generate-qr/${order.id || order._id}`);
-      
       if (response.data?.checkoutUrl) {
         toast.info("Đang chuyển hướng đến cổng thanh toán...");
         window.location.href = response.data.checkoutUrl;

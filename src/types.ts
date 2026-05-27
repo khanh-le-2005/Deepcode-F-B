@@ -62,6 +62,23 @@ export interface Combo {
   price: number;
   menuItemIds: string[];
   status?: 'available' | 'unavailable';
+  image?: string;
+  images?: string[];
+}
+
+export interface Banner {
+  id: string;
+  _id?: string;
+  title: string;
+  subtitle?: string;
+  image: string;
+  link?: string;
+  displayOrder: number;
+  status: 'active' | 'inactive';
+  startDate?: string;
+  endDate?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 // ─────────────────────────────────────────────────
@@ -97,6 +114,7 @@ export interface OrderItem {
     name: string;
     priceExtra: number;
   }[];
+  note?: string;                   // Ghi chú của khách hàng
   /** Vòng đời: in_cart → pending_approval → cooking → served → cancelled */
   status: 'in_cart' | 'pending_approval' | 'cooking' | 'served' | 'cancelled';
   actionByName?: string;           // Nhân viên nào duyệt

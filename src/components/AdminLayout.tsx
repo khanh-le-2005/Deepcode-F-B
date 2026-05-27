@@ -74,7 +74,7 @@ export const AdminLayout = ({ children }: { children: ReactNode }) => {
               <button
                 onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
                 className={cn(
-                  "relative p-2 rounded-xl transition-all",
+                  "relative p-2 rounded-xl transition-all cursor-pointer",
                   isNotificationsOpen ? "bg-brand/10 text-brand" : "text-gray-400 hover:text-brand bg-gray-50"
                 )}
               >

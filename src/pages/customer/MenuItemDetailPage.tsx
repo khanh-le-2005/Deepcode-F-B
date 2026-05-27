@@ -21,6 +21,7 @@ export const MenuItemDetailPage = () => {
   const { cart, addToCart, removeFromCart, updateQuantity, totalItems, totalPrice } = useCart();
   const [selectedOption, setSelectedOption] = useState<any>(null);
   const [selectedAddons, setSelectedAddons] = useState<any[]>([]);
+  const [note, setNote] = useState('');
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [activeSession, setActiveSession] = useState<any>(null);
 
@@ -41,7 +42,14 @@ export const MenuItemDetailPage = () => {
     axios.get('/api/menu').then(res => {
       const foundItem = res.data.find((i: MenuItem) => getMenuItemId(i) === itemId);
       setItem(foundItem || null);
-      // Removed auto-selection of first option
+      
+      // Tự động chọn size đầu tiên
+      if (foundItem && foundItem.options && foundItem.options.length > 0) {
+        setSelectedOption(foundItem.options[0]);
+      } else {
+        setSelectedOption(null);
+      }
+      
       setLoading(false);
     }).catch(() => {
       setLoading(false);
@@ -70,6 +78,11 @@ export const MenuItemDetailPage = () => {
   const handleAddToCart = async () => {
     if (!item) return;
 
+    if (item.options && item.options.length > 0 && !selectedOption) {
+      toast.warning("Vui lòng chọn Size cho món ăn!");
+      return;
+    }
+
     const itemsToAdd = [{
       menuItemId: getMenuItemId(item),
       name: item.name,
@@ -79,6 +92,7 @@ export const MenuItemDetailPage = () => {
       selectedAddons: selectedAddons || [],
       image: getMenuItemImageUrl(item),
       category: getMenuItemCategoryName(item),
+      note: note.trim() || undefined,
     }];
 
     if (tableId) {
@@ -101,7 +115,7 @@ export const MenuItemDetailPage = () => {
       // Local Cart cho Delivery
       const unitPrice = Number(item.price) +
         Number(selectedOption?.priceExtra || 0) +
-        selectedAddons.reduce((sum, addon) => sum + Number(addon.priceExtra || 0), 0);
+        selectedAddons.reduce((sum, addon) => sum + Number((addon as any).price || addon.priceExtra || 0), 0);
 
       addToCart({
         ...itemsToAdd[0],
@@ -183,7 +197,7 @@ export const MenuItemDetailPage = () => {
                 <span className="flex text-yellow-500"><Star className="w-4 h-4 fill-current" /><Star className="w-4 h-4 fill-current" /><Star className="w-4 h-4 fill-current" /><Star className="w-4 h-4 fill-current" /><Star className="w-4 h-4 fill-current" /></span>
               </div>
 
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-black text-gray-900 mb-6 italic" style={{ fontFamily: "'Playfair Display', serif" }}>
+              <h1 className="text-4xl md:text-5xl lg:text-6xl font-black text-gray-900 mb-6 uppercase tracking-tight">
                 {item.name}
               </h1>
 
@@ -191,18 +205,18 @@ export const MenuItemDetailPage = () => {
                 {item.description || "Hương vị tuyệt hảo được chế biến từ những nguyên liệu tươi ngon nhất, mang đến trải nghiệm ẩm thực khó quên dành cho bạn."}
               </p>
 
-              <div className="text-4xl md:text-5xl font-black text-red-600 mb-8" style={{ fontFamily: "'Playfair Display', serif" }}>
+              <div className="text-4xl md:text-5xl font-black text-red-600 mb-8 tracking-tighter">
                 {(
                   Number(item.price || 0) +
                   Number(selectedOption?.priceExtra || 0) +
-                  selectedAddons.reduce((sum, a) => sum + Number(a.priceExtra || 0), 0)
+                  selectedAddons.reduce((sum, a) => sum + Number((a as any).price || a.priceExtra || 0), 0)
                 ).toLocaleString()}đ
               </div>
 
               {/* Options Selection */}
               {item.options && item.options.length > 0 && (
                 <div className="mb-8 text-left">
-                  <h3 className="text-sm font-black uppercase tracking-widest text-gray-400 mb-4">Lựa chọn (Chọn 1)</h3>
+                  <h3 className="text-sm font-black uppercase tracking-widest text-gray-400 mb-4">Chọn size của bạn</h3>
                   <div className="flex flex-wrap gap-3 justify-center lg:justify-start">
                     {item.options.map((opt) => (
                       <button
@@ -227,22 +241,36 @@ export const MenuItemDetailPage = () => {
                   <div className="flex flex-wrap gap-3 justify-center lg:justify-start">
                     {item.addons.map((addon) => {
                       const isSelected = selectedAddons.find(a => a.name === addon.name);
+                      const addonPrice = (addon as any).price || addon.priceExtra || 0;
                       return (
                         <button
                           key={addon.name}
                           onClick={() => handleToggleAddon(addon)}
                           className={`px-5 py-3 rounded-2xl font-bold border-2 transition-all ${isSelected
-                            ? 'border-gray-900 bg-gray-900 text-white shadow-lg'
+                            ? 'border-red-600 bg-red-50 text-red-600 shadow-lg shadow-red-100'
                             : 'border-gray-100 bg-white text-gray-600 hover:border-gray-200'
                             }`}
                         >
-                          {addon.name} {addon.priceExtra > 0 && `(+${addon.priceExtra.toLocaleString()}đ)`}
+                          <span className="flex items-center gap-2">
+                            {addon.name} {addonPrice > 0 && <span className="text-sm font-semibold opacity-80">(+{(addonPrice).toLocaleString()}đ)</span>}
+                          </span>
                         </button>
                       );
                     })}
                   </div>
                 </div>
               )}
+
+              {/* Note Selection */}
+              <div className="mb-10 text-left w-full">
+                <h3 className="text-sm font-black uppercase tracking-widest text-gray-400 mb-4">Ghi chú (Tùy chọn)</h3>
+                <textarea
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder="Ví dụ: Ít đá, ít đường, không hành..."
+                  className="w-full bg-white border-2 border-gray-100 rounded-2xl p-4 text-gray-700 font-medium focus:outline-none focus:border-red-500 focus:ring-4 focus:ring-red-100 transition-all resize-none h-24 placeholder-gray-300"
+                />
+              </div>
 
               <div className="flex flex-col sm:flex-row gap-6 items-center">
                 <div className="flex items-center border-2 border-gray-200 rounded-full h-14 bg-white hover:border-red-200 transition-colors">

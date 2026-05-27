@@ -31,6 +31,7 @@ import imageRoutes from "./backend/src/routes/imageRoutes.js";
 import categoryRoutes from "./backend/src/routes/categoryRoutes.js";
 import weeklyMenuRoutes from "./backend/src/routes/weeklyMenuRoutes.js";
 import userRoutes from "./backend/src/routes/userRoutes.js";
+import bannerRoutes from "./backend/src/routes/bannerRoutes.js";
 import { startAutoCleanup } from "./backend/src/jobs/autoCleanup.js";
 async function startServer() {
   // Connect to MongoDB
@@ -131,6 +132,7 @@ async function startServer() {
 
   app.use("/api/stats", statsRoutes);
   app.use("/api/users", userRoutes);
+  app.use("/api/banners", bannerRoutes);
   // Global Error Handler
   app.use((err, req, res, next) => {
     console.error(err.stack);

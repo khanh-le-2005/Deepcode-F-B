@@ -135,7 +135,7 @@ export const AdminTableManagement = () => {
       {/* Header Area */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
         <div>
-          <h2 className="text-4xl font-black text-gray-900 tracking-tight font-serif">Quản Lý Bàn</h2>
+          <h2 className="text-4xl font-black text-gray-900 tracking-tight">Quản Lý Bàn</h2>
           <p className="text-gray-500 font-medium mt-1">Quản lý sơ đồ bàn và mã QR đặt món thông minh</p>
         </div>
         <Button
@@ -145,7 +145,7 @@ export const AdminTableManagement = () => {
             setEditingTable(null);
             setIsModalOpen(true);
           }}
-          className="bg-brand text-white hover:bg-brand-dark px-8 h-14 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-brand/20 border-none transition-all hover:-translate-y-1"
+          className="bg-brand text-white hover:bg-brand-dark px-8 h-14 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-brand/20 border-none transition-all hover:-translate-y-1 cursor-pointer"
         >
           <Plus className="w-5 h-5 mr-1" /> Thêm bàn mới
         </Button>
@@ -197,14 +197,14 @@ export const AdminTableManagement = () => {
                       setEditingTable(table);
                       setIsModalOpen(true);
                     }}
-                    className="p-3 bg-white border border-gray-100 text-gray-600 rounded-xl hover:text-brand hover:border-brand/40 shadow-sm transition-all"
+                    className="p-3 bg-white border border-gray-100 text-gray-600 rounded-xl hover:text-brand hover:border-brand/40 shadow-sm transition-all cursor-pointer"
                   >
                     <Edit2 className="w-4 h-4" />
                   </button>
                   <button
                     type="button"
                     onClick={() => handleDelete(table.id)}
-                    className="p-3 bg-white border border-gray-100 text-rose-500 rounded-xl hover:bg-rose-50 transition-all shadow-sm"
+                    className="p-3 bg-white border border-gray-100 text-rose-500 rounded-xl hover:bg-rose-50 transition-all shadow-sm cursor-pointer hover:border-rose-400"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -231,7 +231,7 @@ export const AdminTableManagement = () => {
 
                 <button
                   onClick={() => setSelectedQR(table)}
-                  className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2.5 hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/10 active:scale-95"
+                  className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2.5 hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/10 active:scale-95 cursor-pointer"
                 >
                   <QrCode className="w-4 h-4" /> Xem mã QR
                 </button>

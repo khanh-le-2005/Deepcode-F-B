@@ -16,6 +16,7 @@ import { AdminBankAccounts } from './tabs/AdminBankAccounts';
 import { AdminUserManagement } from './tabs/AdminUserManagement';
 import { AdminPaymentRequests } from './tabs/AdminPaymentRequests';
 import { AdminNotifications } from './tabs/AdminNotifications';
+import { AdminBannerManagement } from './tabs/AdminBannerManagement';
 
 export const AdminDashboard = () => {
   return (
@@ -29,6 +30,7 @@ export const AdminDashboard = () => {
         <Route path="menu/create" element={<AdminMenuEditor />} />
         <Route path="menu/edit/:id" element={<AdminMenuEditor />} />
         <Route path="combo" element={<AdminComboManagement />} />
+        <Route path="banners" element={<AdminBannerManagement />} />
         <Route path="weekly-menu" element={<AdminWeeklyMenuManagement />} />
         <Route path="order-history" element={<AdminOrderHistory />} />
         <Route path="orders" element={<AdminOrderManagement />} />

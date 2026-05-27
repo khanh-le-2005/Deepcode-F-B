@@ -89,8 +89,8 @@ export const AdminTableModal = ({
           </div>
 
           <div className="p-8 bg-gray-50 border-t border-gray-100 flex gap-4">
-            <Button type="button" variant="outline" className="flex-1 py-4" onClick={onClose}>Huỷ</Button>
-            <Button type="submit" variant="secondary" className="flex-1 py-4 font-black uppercase tracking-widest">Lưu lại</Button>
+            <Button type="button" variant="outline" className="flex-1 py-4 cursor-pointer hover:bg-red-500 hover:text-white" onClick={onClose}>Huỷ</Button>
+            <Button type="submit" variant="secondary" className="flex-1 py-4 font-black uppercase tracking-widest cursor-pointer hover:bg-amber-500 hover:text-white">Lưu lại</Button>
           </div>
         </form>
       </motion.div>

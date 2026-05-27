@@ -16,7 +16,13 @@ class ComboService {
     if (!data.name || typeof data.name !== 'string') {
       throw new BadRequestError('Combo name is required');
     }
-    if (!data.price || typeof data.price !== 'number') {
+    
+    // Cast price to number if it is a string representing a number
+    if (data.price !== undefined && data.price !== null) {
+      data.price = Number(data.price);
+    }
+
+    if (data.price === undefined || data.price === null || isNaN(data.price)) {
       throw new BadRequestError('Combo price is required and must be a number');
     }
     const combo = new Combo(data);

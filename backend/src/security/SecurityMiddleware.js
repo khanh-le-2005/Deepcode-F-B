@@ -15,6 +15,7 @@ const PUBLIC_PATHS = [
   '/api/categories',              // Khách lấy danh mục lọc món
   '/api/weekly-menu/active',      // Khách lấy thực đơn tuần hiện tại
   '/api/combos',                  // Khách xem combo
+  '/api/banners',                 // Khách xem banner quảng cáo
 
   // --- LUỒNG KHÁCH (QR Scan -> Gọi món -> Thanh Toán) ---
   '/api/orders',         // Khách mở bàn, thêm món vào giỏ, checkout (chỉ các sub-route public)

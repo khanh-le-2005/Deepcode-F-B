@@ -75,7 +75,7 @@ export const AdminOverview = () => {
       {/* Welcome Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-4xl font-black text-gray-900 tracking-tight font-serif">Bảng Điều Khiển</h2>
+          <h2 className="text-4xl font-black text-gray-900 tracking-tight">Bảng Điều Khiển</h2>
           <p className="text-gray-500 font-medium mt-1">Theo dõi hoạt động kinh doanh nhà hàng của bạn</p>
         </div>
         {/* <div className="flex items-center gap-3">

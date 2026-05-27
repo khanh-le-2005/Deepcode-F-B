@@ -14,6 +14,7 @@ const orderItemSchema = new mongoose.Schema({
   // Customization
   selectedOption: { name: String, priceExtra: Number }, // Ví dụ: Size L (+10k)
   selectedAddons: [{ name: String, priceExtra: Number }], // Ví dụ: [Thêm lòng (+20k), Thêm bún (+10k)]
+  note: { type: String }, // Ghi chú riêng cho món này (VD: ít đá, không cay)
 
   // Tài chính của mục này = (basePrice + option + addons) * quantity
   totalPrice: { type: Number, required: true },
@@ -83,13 +84,15 @@ const orderSchema = new mongoose.Schema(
     // 6.1 URL Gốc của Frontend (để Redirect linh hoạt)
     frontendUrl: { type: String },
 
+    // 6.2 Ghi chú chung của cả đơn
+    note: { type: String },
+
     completedAt: { type: Date },
     completedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     completedByName: { type: String },
 
     // 7. PAYOS INTEGRATION - Bắt buộc phải có để thanh toán
     orderCode: { type: Number, unique: true, sparse: true },
-    frontendUrl: { type: String }, // Lưu địa chỉ frontend để PayOS quay về đúng chỗ
   },
   globalSchemaOptions,
 );

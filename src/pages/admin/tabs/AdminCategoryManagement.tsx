@@ -223,7 +223,7 @@ export const AdminCategoryManagement = () => {
               <Sparkles className="h-3.5 w-3.5" />
               UI danh mục đang làm trước backend
             </div>
-            <h2 className="mt-5 text-4xl font-black tracking-tight font-serif lg:text-6xl">Danh Mục</h2>
+            <h2 className="mt-5 text-4xl font-black tracking-tight lg:text-6xl">Danh Mục</h2>
             <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300 lg:text-base">
               Quản lý nhóm món hiển thị trên menu khách hàng. Trang này đang chạy bằng dữ liệu cục bộ để team frontend
               có thể dựng giao diện ngay trong lúc backend đang hoàn thiện.
@@ -316,7 +316,7 @@ export const AdminCategoryManagement = () => {
                           <div className="text-[10px] font-black uppercase tracking-[0.22em] text-gray-400">
                             Thứ tự hiển thị #{category.displayOrder}
                           </div>
-                          <h3 className="mt-1 text-2xl font-black text-slate-900 font-serif">{category.name}</h3>
+                          <h3 className="mt-1 text-2xl font-black text-slate-900">{category.name}</h3>
                         </div>
                       </div>
 
@@ -390,7 +390,7 @@ export const AdminCategoryManagement = () => {
               <div className="mb-6 flex h-24 w-24 items-center justify-center rounded-[2.5rem] bg-gray-50">
                 <WandSparkles className="h-10 w-10 text-gray-200" />
               </div>
-              <h3 className="text-2xl font-black text-slate-900 font-serif">Không có danh mục phù hợp</h3>
+              <h3 className="text-2xl font-black text-slate-900">Không có danh mục phù hợp</h3>
               <p className="mt-2 max-w-md text-sm text-gray-400">
                 Thử đổi bộ lọc hoặc tạo danh mục mới ở panel bên phải.
               </p>
@@ -402,8 +402,8 @@ export const AdminCategoryManagement = () => {
           <div className="premium-card sticky top-28 p-6 lg:p-7">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="text-[10px] font-black uppercase tracking-[0.22em] text-brand">Bảng điều khiển</div>
-                <h3 className="mt-2 text-2xl font-black text-slate-900 font-serif">
+                <div className="text-[10px] font-black uppercase text-brand">Bảng điều khiển</div>
+                <h3 className="mt-2 text-2xl font-black text-slate-900">
                   {editingId ? 'Chỉnh sửa danh mục' : 'Tạo danh mục mới'}
                 </h3>
                 <p className="mt-2 text-sm leading-6 text-gray-500">

@@ -40,12 +40,14 @@ export const getOrderStatus = async (req, res) => {
     paymentStatus: order.paymentStatus,
     paymentMethod: order.paymentMethod, // Trả về để Frontend biết là Chuyển khoản (Fixed)
     frontendUrl: order.frontendUrl,     // Đã bổ sung trường này theo ý bạn (Redirect URL)
+    note: order.note,                   // Ghi chú của đơn
     completedAt: order.completedAt,
     items: order.items.map(i => ({
       _id: i._id,
       name: i.name,
       quantity: i.quantity,
-      status: i.status
+      status: i.status,
+      note: i.note                      // Ghi chú của món
     }))
   });
 };

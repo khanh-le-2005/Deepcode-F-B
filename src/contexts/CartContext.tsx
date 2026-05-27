@@ -78,7 +78,8 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
       .map(a => a.name)
       .sort()
       .join('|');
-    return `${item.menuItemId}-${optionName}-${sortedAddons}`;
+    const noteStr = item.note ? `-${item.note.toLowerCase().trim()}` : '';
+    return `${item.menuItemId}-${optionName}-${sortedAddons}${noteStr}`;
   };
 
   const addToCart = (newItem: OrderItem) => {

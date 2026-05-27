@@ -23,7 +23,7 @@ type User = {
   id: string;
   email: string;
   name: string;
-  role: 'staff' | 'chef';
+  role: 'admin' | 'staff' | 'chef';
   createdAt?: string;
   updatedAt?: string;
 };
@@ -88,6 +88,7 @@ export const AdminUserManagement = () => {
 
   const stats = useMemo(() => ({
     total: users.length,
+    admin: users.filter((u) => u.role === 'admin').length,
     staff: users.filter((u) => u.role === 'staff').length,
     kitchen: users.filter((u) => u.role === 'chef').length,
   }), [users]);
@@ -176,7 +177,7 @@ export const AdminUserManagement = () => {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.26),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(255,255,255,0.08),transparent_28%)]" />
         <div className="relative z-10 flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
-            <h2 className="mt-5 text-4xl font-black tracking-tight font-serif lg:text-6xl">Nhân Viên</h2>
+            <h2 className="mt-5 text-4xl font-black tracking-tight lg:text-6xl">Nhân Viên</h2>
           </div>
 
           <div className="grid grid-cols-4 gap-3 lg:min-w-[420px]">
@@ -185,7 +186,7 @@ export const AdminUserManagement = () => {
               <div className="mt-2 text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">Tổng</div>
             </div>
             <div className="rounded-[1.75rem] border border-white/10 bg-white/5 p-4 text-center backdrop-blur">
-              <div className="text-3xl font-black leading-none text-rose-400">{stats.admins}</div>
+              <div className="text-3xl font-black leading-none text-rose-400">{stats.admin}</div>
               <div className="mt-2 text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">Admin</div>
             </div>
             <div className="rounded-[1.75rem] border border-white/10 bg-white/5 p-4 text-center backdrop-blur">
@@ -226,7 +227,7 @@ export const AdminUserManagement = () => {
                     key={item.key}
                     onClick={() => setSelectedRole(item.key as typeof selectedRole)}
                     className={cn(
-                      'inline-flex items-center gap-2 rounded-2xl border px-4 py-3 text-[10px] font-black uppercase tracking-[0.2em] transition-all',
+                      'inline-flex items-center gap-2 rounded-2xl border px-4 py-3 text-[10px] font-black uppercase tracking-[0.2em] transition-all cursor-pointer',
                       selectedRole === item.key
                         ? 'border-slate-900 bg-slate-900 text-white shadow-lg shadow-slate-900/10'
                         : 'border-gray-100 bg-white text-gray-500 hover:border-brand/40 hover:text-brand',
@@ -283,7 +284,7 @@ export const AdminUserManagement = () => {
                             )}>
                               {user.role}
                             </div>
-                            <h3 className="mt-1 text-2xl font-black text-slate-900 font-serif line-clamp-1">{user.name}</h3>
+                            <h3 className="mt-1 text-2xl font-black text-slate-900 line-clamp-1">{user.name}</h3>
                           </div>
                         </div>
 
@@ -298,13 +299,13 @@ export const AdminUserManagement = () => {
                         <div className="flex flex-wrap justify-end gap-2 mt-2">
                           <button
                             onClick={() => openEdit(user)}
-                            className="rounded-2xl border border-gray-100 bg-white px-3 py-2 text-xs font-bold text-slate-600 transition-all hover:border-brand/30 hover:text-brand"
-                          >
+                            className="rounded-2xl border border-gray-100 bg-white px-3 py-2 text-xs font-bold text-slate-600 transition-all hover:border-brand/30 hover:text-brand cursor-pointer"
+                          > 
                             <Edit2 className="mr-1 inline h-3.5 w-3.5" />
                           </button>
                           <button
                             onClick={() => handleDelete(user)}
-                            className="rounded-2xl border border-gray-100 bg-white px-3 py-2 text-xs font-bold text-rose-500 transition-all hover:border-rose-200 hover:text-rose-600"
+                            className="rounded-2xl border border-gray-100 bg-white px-3 py-2 text-xs font-bold text-rose-500 transition-all hover:border-rose-200 hover:text-rose-600 cursor-pointer"
                           >
                             <Trash2 className="mr-1 inline h-3.5 w-3.5" />
                           </button>
@@ -322,7 +323,7 @@ export const AdminUserManagement = () => {
               <div className="mb-6 flex h-24 w-24 items-center justify-center rounded-[2.5rem] bg-gray-50">
                 <WandSparkles className="h-10 w-10 text-gray-200" />
               </div>
-              <h3 className="text-2xl font-black text-slate-900 font-serif">Không có người dùng phù hợp</h3>
+              <h3 className="text-2xl font-black text-slate-900">Không có người dùng phù hợp</h3>
               <p className="mt-2 max-w-md text-sm text-gray-400">
                 Hãy thử kiểm tra lại từ khóa hoặc bộ lọc.
               </p>
@@ -335,7 +336,7 @@ export const AdminUserManagement = () => {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="text-[10px] font-black uppercase tracking-[0.22em] text-brand">Bảng điều khiển</div>
-                <h3 className="mt-2 text-2xl font-black text-slate-900 font-serif">
+                <h3 className="mt-2 text-2xl font-black text-slate-900">
                   {editingUser ? 'Chỉnh sửa nhân viên' : 'Thêm nhân viên mới'}
                 </h3>
               </div>
@@ -344,7 +345,7 @@ export const AdminUserManagement = () => {
                   setEditingUser(null);
                   setForm(emptyForm());
                 }}
-                className="rounded-2xl border border-gray-100 bg-white px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-500 transition-colors hover:border-brand/30 hover:text-brand"
+                className="rounded-2xl border border-gray-100 bg-white px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-500 transition-colors hover:border-brand/30 hover:text-brand cursor-pointer"
               >
                 Reset
               </button>
@@ -412,6 +413,7 @@ export const AdminUserManagement = () => {
                   onChange={(e) => setForm((prev) => ({ ...prev, role: e.target.value as UserFormState['role'] }))}
                   className="w-full rounded-2xl border border-gray-100 bg-white px-4 py-4 text-sm shadow-card focus:outline-none focus:ring-2 focus:ring-brand/20"
                 >
+                  {/* <option value="admin">Admin (Quản trị viên)</option> */}
                   <option value="staff">Staff (Nhân viên phục vụ/Cashier)</option>
                   <option value="chef">Kitchen (Đầu bếp)</option>
                 </select>
@@ -420,7 +422,7 @@ export const AdminUserManagement = () => {
 
             <Button
               onClick={persistUser}
-              className="mt-6 w-full rounded-2xl bg-brand text-white shadow-xl shadow-brand/20 hover:bg-brand-dark"
+              className="mt-6 w-full rounded-2xl bg-brand text-white shadow-xl shadow-brand/20 hover:bg-brand-dark cursor-pointer"
               size="lg"
             >
               <Shield className="h-4 w-4" />

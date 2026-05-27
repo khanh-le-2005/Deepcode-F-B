@@ -193,7 +193,7 @@ export const AdminMenuManagement = () => {
       {/* Header Area */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
         <div>
-          <h2 className="text-4xl font-black text-gray-900 tracking-tight font-serif">Thực Đơn</h2>
+          <h2 className="text-4xl font-black text-gray-900 tracking-tight">Thực Đơn</h2>
           <p className="text-gray-500 font-medium mt-1">Cập nhật danh mục món ăn và đồ uống của nhà hàng</p>
         </div>
         <div className="flex flex-wrap items-center gap-4">
@@ -201,7 +201,7 @@ export const AdminMenuManagement = () => {
             variant="secondary"
             size="lg"
             onClick={() => navigate('/admin/menu/create')}
-            className="bg-brand text-white hover:bg-brand-dark px-8 h-14 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-brand/20 border-none transition-all hover:-translate-y-1"
+            className="bg-brand text-white hover:bg-brand-dark px-8 h-14 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-brand/20 border-none transition-all hover:-translate-y-1 cursor-pointer"
           >
             <Plus className="w-5 h-5 mr-2" /> Thêm món mới
           </Button>
@@ -344,13 +344,13 @@ export const AdminMenuManagement = () => {
                   <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover/card:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-3 backdrop-blur-[2px]">
                     <button
                       onClick={() => navigate(`/admin/menu/edit/${itemId}`)}
-                      className="w-12 h-12 bg-white text-slate-900 rounded-2xl flex items-center justify-center shadow-2xl hover:scale-110 transition-transform active:scale-95"
+                      className="w-12 h-12 bg-white text-slate-900 rounded-2xl flex items-center justify-center shadow-2xl hover:scale-110 transition-transform active:scale-95 cursor-pointer"
                     >
                       <Edit2 className="w-5 h-5" />
                     </button>
                     <button
                       onClick={() => handleDelete(itemId)}
-                      className="w-12 h-12 bg-rose-500 text-white rounded-2xl flex items-center justify-center shadow-2xl hover:scale-110 transition-transform active:scale-95"
+                      className="w-12 h-12 bg-rose-500 text-white rounded-2xl flex items-center justify-center shadow-2xl hover:scale-110 transition-transform active:scale-95 cursor-pointer"
                     >
                       <Trash2 className="w-5 h-5" />
                     </button>
@@ -366,7 +366,7 @@ export const AdminMenuManagement = () => {
                 {/* Content Section */}
                 <div className="p-6 space-y-4">
                   <div className="flex items-start justify-between gap-4">
-                    <h4 className="font-serif font-black text-xl text-gray-900 leading-tight group-hover/card:text-brand transition-colors">{item.name}</h4>
+                    <h4 className=" font-black text-xl text-gray-900 leading-tight group-hover/card:text-brand transition-colors">{item.name}</h4>
                     <button
                       onClick={() => toggleStatus(item)}
                       className={cn(
@@ -402,7 +402,7 @@ export const AdminMenuManagement = () => {
           <div className="w-24 h-24 bg-gray-50 rounded-[3rem] flex items-center justify-center mb-6">
             <UtensilsCrossed className="w-10 h-10 text-gray-200" />
           </div>
-          <h3 className="text-2xl font-black text-gray-900 font-serif mb-2">Không tìm thấy món ăn</h3>
+          <h3 className="text-2xl font-black text-gray-900 mb-2">Không tìm thấy món ăn</h3>
           <p className="text-gray-400 font-medium">Bạn có thể thêm món mới bằng nút "Thêm món mới" phía trên</p>
         </div>
       )}

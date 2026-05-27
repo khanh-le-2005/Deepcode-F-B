@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Package, Search, Plus, Edit2, Trash2, X, CheckCircle2 } from 'lucide-react';
+import { Package, Search, Plus, Edit2, Trash2, X, CheckCircle2, Upload } from 'lucide-react';
 import axios from '@/src/api/axiosClient';
 import { toast } from 'react-toastify';
 import { Combo, MenuItem } from '../../../types';
@@ -19,6 +19,8 @@ type ComboFormState = {
   price: number;
   status: 'available' | 'unavailable';
   menuItemIds: string[];
+  previewImages: string[];
+  images: string[];
 };
 
 export const AdminComboManagement = () => {
@@ -33,7 +35,11 @@ export const AdminComboManagement = () => {
     price: 0,
     status: 'available',
     menuItemIds: [],
+    previewImages: [],
+    images: [],
   });
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchCombos();
@@ -60,20 +66,68 @@ export const AdminComboManagement = () => {
       price: 0,
       status: 'available',
       menuItemIds: [],
+      previewImages: [],
+      images: [],
     });
+    setSelectedFiles([]);
     setIsFormOpen(true);
   };
 
   const openEditForm = (combo: Combo) => {
     setEditingCombo(combo);
+    const ids = combo.images || (combo.image ? [combo.image] : []);
+    const existingPreviews = ids.map((imgId: string) => `/api/images/${imgId}`);
     setForm({
       name: combo.name || '',
       description: combo.description || '',
       price: combo.price || 0,
       status: combo.status || 'available',
       menuItemIds: (combo.menuItemIds || []).map((item: any) => item?._id || item?.id || item).filter(Boolean),
+      previewImages: existingPreviews,
+      images: ids,
     });
+    setSelectedFiles([]);
     setIsFormOpen(true);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []) as File[];
+    if (files.length === 0) return;
+
+    if (files.length + form.images.length + selectedFiles.length > 5) {
+      toast.warning('Tối đa 5 ảnh cho mỗi combo.');
+      return;
+    }
+
+    const validFiles = files.filter((file: File) => file.type.startsWith('image/'));
+    setSelectedFiles(prev => [...prev, ...validFiles]);
+
+    Promise.all(
+      validFiles.map(file => new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.readAsDataURL(file);
+      }))
+    ).then(previews => {
+      setForm(prev => ({ ...prev, previewImages: [...prev.previewImages, ...previews] }));
+    });
+  };
+
+  const removePreview = (index: number) => {
+    const totalGallery = form.images.length;
+    if (index < totalGallery) {
+      setForm(prev => ({
+        ...prev,
+        images: prev.images.filter((_, i) => i !== index),
+        previewImages: prev.previewImages.filter((_, i) => i !== index)
+      }));
+    } else {
+      setSelectedFiles(prev => prev.filter((_, i) => i !== (index - totalGallery)));
+      setForm(prev => ({
+        ...prev,
+        previewImages: prev.previewImages.filter((_, i) => i !== index)
+      }));
+    }
   };
 
   const handleToggleMenuItem = (menuItemId: string) => {
@@ -97,19 +151,28 @@ export const AdminComboManagement = () => {
     }
 
     try {
-      const payload = {
+      const dataToSave = {
         name: form.name.trim(),
         description: form.description.trim(),
         price: Number(form.price),
         status: form.status,
         menuItemIds: form.menuItemIds,
+        images: form.images,
       };
 
+      const submitData = new FormData();
+      submitData.append('data', JSON.stringify(dataToSave));
+      selectedFiles.forEach(file => {
+        submitData.append('images', file);
+      });
+
+      const headers = { 'Content-Type': 'multipart/form-data' };
+
       if (editingCombo) {
-        await axios.put(`/api/combos/${editingCombo.id || editingCombo._id}`, payload);
+        await axios.put(`/api/combos/${editingCombo.id || editingCombo._id}`, submitData, { headers });
         toast.success('Cập nhật combo thành công!');
       } else {
-        await axios.post('/api/combos', payload);
+        await axios.post('/api/combos', submitData, { headers });
         toast.success('Tạo combo mới thành công!');
       }
 
@@ -154,7 +217,7 @@ export const AdminComboManagement = () => {
           <h2 className="text-3xl font-black text-gray-900 tracking-tight">Quản lý combo</h2>
           {/* <p className="text-gray-500 font-medium mt-1">Tạo và quản lý các gói món theo đúng API `/api/combos`</p> */}
         </div>
-        <Button variant="secondary" size="lg" onClick={openCreateForm} className="shadow-xl shadow-amber-500/20">
+        <Button variant="secondary" size="lg" onClick={openCreateForm} className="shadow-xl shadow-amber-500/20 cursor-pointer hover:bg-amber-500">
           <Plus className="w-5 h-5" /> Thêm combo
         </Button>
       </div>
@@ -183,10 +246,14 @@ export const AdminComboManagement = () => {
                 key={combo.id || combo._id}
                 className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-gray-100"
               >
-                <div className="flex flex-col lg:flex-row lg:items-center gap-6 justify-between">
+                  <div className="flex flex-col lg:flex-row lg:items-center gap-6 justify-between">
                   <div className="flex items-start gap-5">
-                    <div className="w-16 h-16 bg-amber-50 rounded-2xl flex items-center justify-center text-amber-500 border border-amber-100">
-                      <Package className="w-8 h-8" />
+                    <div className="w-16 h-16 bg-amber-50 rounded-2xl flex items-center justify-center text-amber-500 border border-amber-100 overflow-hidden">
+                      {combo.image || (combo.images && combo.images[0]) ? (
+                        <img src={`/api/images/${combo.image || (combo.images && combo.images[0])}`} className="w-full h-full object-cover" alt={combo.name} />
+                      ) : (
+                        <Package className="w-8 h-8" />
+                      )}
                     </div>
                     <div>
                       <h3 className="text-2xl font-black text-gray-900">{combo.name}</h3>
@@ -221,13 +288,13 @@ export const AdminComboManagement = () => {
                     </span>
                     <button
                       onClick={() => openEditForm(combo)}
-                      className="p-3 bg-gray-50 text-gray-500 rounded-xl hover:bg-gray-100 transition-all"
+                      className="p-3 bg-gray-50 text-gray-500 rounded-xl hover:bg-gray-100 transition-all cursor-pointer"
                     >
-                      <Edit2 className="w-5 h-5" />
+                      <Edit2 className="w-5 h-5 " /> 
                     </button>
                     <button
                       onClick={() => handleDelete(combo)}
-                      className="p-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-100 transition-all"
+                      className="p-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-100 transition-all cursor-pointer"
                     >
                       <Trash2 className="w-5 h-5" />
                     </button>
@@ -278,7 +345,7 @@ export const AdminComboManagement = () => {
                   <div>
                     <label className="text-xs font-bold uppercase tracking-widest text-gray-400 ml-1">Giá combo</label>
                     <input
-                      type="number"
+                      type="input"
                       value={form.price}
                       onChange={(e) => setForm(prev => ({ ...prev, price: Number(e.target.value) }))}
                       className="mt-2 w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-amber-500/20"
@@ -303,6 +370,46 @@ export const AdminComboManagement = () => {
                   <p className="text-sm text-gray-500 mt-2">
                     Combo có thể được định giá thấp hơn tổng giá lẻ của từng món.
                   </p>
+                </div>
+
+                <div className="space-y-4">
+                  <label className="text-xs font-black text-gray-400 uppercase tracking-widest block">Hình ảnh ({form.previewImages.length}/5)</label>
+                  <div className="grid grid-cols-3 gap-3">
+                    {form.previewImages.map((src, idx) => (
+                      <div key={idx} className="relative aspect-square group rounded-2xl overflow-hidden border border-gray-100">
+                        <img src={src} className="w-full h-full object-cover" alt="Preview" />
+                        <button
+                          type="button"
+                          onClick={() => removePreview(idx)}
+                          className="absolute top-1.5 right-1.5 p-1.5 bg-red-500 hover:bg-red-600 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                        {idx === 0 && (
+                          <div className="absolute bottom-1.5 left-1.5 px-2 py-0.5 bg-amber-500 text-white text-[7px] font-black uppercase tracking-widest rounded shadow-sm">
+                            Ảnh bìa
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                    {form.previewImages.length < 5 && (
+                      <div
+                        onClick={() => fileInputRef.current?.click()}
+                        className="aspect-square bg-gray-50 border-2 border-dashed border-gray-200 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:border-amber-500 hover:bg-amber-55 transition-all text-gray-400 hover:text-amber-500 gap-1"
+                      >
+                        <Upload className="w-6 h-6 opacity-20" />
+                        <span className="text-[9px] font-black uppercase tracking-widest">Tải ảnh</span>
+                        <input
+                          type="file"
+                          ref={fileInputRef}
+                          onChange={handleFileChange}
+                          accept="image/*"
+                          multiple
+                          className="hidden"
+                        />
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -342,10 +449,10 @@ export const AdminComboManagement = () => {
             </div>
 
             <div className="p-8 bg-gray-50 border-t border-gray-100 flex gap-4">
-              <Button variant="outline" className="flex-1 py-4" onClick={() => setIsFormOpen(false)}>
+              <Button variant="outline" className="flex-1 py-4 hover:bg-red-600 hover:text-white cursor-pointer" onClick={() => setIsFormOpen(false)}>
                 Huỷ
               </Button>
-              <Button variant="secondary" className="flex-1 py-4 shadow-lg shadow-amber-500/20" onClick={handleSave}>
+              <Button variant="secondary" className="flex-1 py-4 shadow-lg shadow-amber-500/20 cursor-pointer hover:bg-amber-500 hover:text-white" onClick={handleSave}>
                 <CheckCircle2 className="w-4 h-4" /> Lưu combo
               </Button>
             </div>

@@ -182,27 +182,37 @@ export const AdminWeeklyMenuManagement = () => {
   const selectedMenuItems = menuItems.filter(item => form.menuItems.includes(item.id || item._id || ''));
   const selectedItemCount = form.menuItems.length;
   const activeCount = weeklyMenus.filter(menu => menu.status === 'active').length;
+
+  const allItemIds = useMemo(() => menuItems.map(item => item.id || item._id || '').filter(Boolean), [menuItems]);
+  const isAllSelected = useMemo(() => allItemIds.length > 0 && allItemIds.every(id => form.menuItems.includes(id)), [allItemIds, form.menuItems]);
+
+  const handleToggleSelectAll = () => {
+    setForm(prev => ({
+      ...prev,
+      menuItems: isAllSelected ? [] : allItemIds
+    }));
+  };
   const resolveMenuItemLabel = (item: string | { _id?: string; id?: string; name?: string; title?: string }) => {
     if (typeof item === 'object' && item) {
       return item.name || item.title || item._id || item.id || '';
     }
 
     const matchedItem = menuItems.find(menuItem => (menuItem.id || menuItem._id || '') === item);
-    return matchedItem?.name || matchedItem?.title || item;
+    return matchedItem?.name || (matchedItem as any)?.title || item;
   };
 
   return (
     <div className="space-y-10 pb-12">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
         <div>
-          <h2 className="text-4xl font-black text-gray-900 tracking-tight font-serif">Thực đơn tuần</h2>
+          <h2 className="text-4xl font-black text-gray-900 tracking-tight">Thực đơn tuần</h2>
           {/* <p className="text-gray-500 font-medium mt-1">Tạo lịch xuất bán món theo đúng API `/api/weekly-menu`</p> */}
         </div>
         <Button
           variant="secondary"
           size="lg"
           onClick={openCreateForm}
-          className="bg-brand text-white hover:bg-brand-dark px-8 h-14 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-brand/20 border-none transition-all hover:-translate-y-1"
+          className="bg-brand text-white hover:bg-brand-dark px-8 h-14 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-brand/20 border-none transition-all hover:-translate-y-1 cursor-pointer"
         >
           <Plus className="w-5 h-5 mr-2" /> Tạo lịch tuần
         </Button>
@@ -292,13 +302,13 @@ export const AdminWeeklyMenuManagement = () => {
                     </span>
                     <button
                       onClick={() => openEditForm(menu)}
-                      className="p-3 bg-gray-50 text-gray-500 rounded-xl hover:bg-gray-100 transition-all"
+                      className="p-3 bg-gray-50 text-gray-500 rounded-xl hover:bg-amber-200 transition-all cursor-pointer"
                     >
-                      <Edit2 className="w-5 h-5" />
+                      <Edit2 className="w-5 h-5 " />
                     </button>
                     <button
                       onClick={() => handleDelete(menu)}
-                      className="p-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-100 transition-all"
+                      className="p-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-100 transition-all cursor-pointer"
                     >
                       <Trash2 className="w-5 h-5" />
                     </button>
@@ -315,7 +325,7 @@ export const AdminWeeklyMenuManagement = () => {
           <div className="w-24 h-24 bg-gray-50 rounded-[3rem] flex items-center justify-center mb-6">
             <CalendarDays className="w-10 h-10 text-gray-200" />
           </div>
-          <h3 className="text-2xl font-black text-gray-900 font-serif mb-2">Chưa có thực đơn tuần</h3>
+          <h3 className="text-2xl font-black text-gray-900 mb-2">Chưa có thực đơn tuần</h3>
           <p className="text-gray-400 font-medium">Bấm “Tạo lịch tuần” để tạo tuần bán món đầu tiên</p>
         </div>
       )}
@@ -388,7 +398,16 @@ export const AdminWeeklyMenuManagement = () => {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <p className="text-xs font-bold uppercase tracking-widest text-gray-400">Chọn món cho tuần</p>
-                  <span className="text-xs font-black text-brand">{form.menuItems.length} món đã chọn</span>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={handleToggleSelectAll}
+                      className="px-3 py-1 bg-brand/10 hover:bg-brand/20 text-brand rounded-lg text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer"
+                    >
+                      {isAllSelected ? 'Bỏ chọn hết' : 'Chọn tất cả'}
+                    </button>
+                    <span className="text-xs font-black text-brand">{form.menuItems.length} món đã chọn</span>
+                  </div>
                 </div>
 
                 <div className="space-y-3 max-h-[45vh] overflow-y-auto pr-1">
@@ -420,11 +439,11 @@ export const AdminWeeklyMenuManagement = () => {
               </div>
             </div>
 
-            <div className="p-8 bg-gray-50 border-t border-gray-100 flex gap-4">
-              <Button variant="outline" className="flex-1 py-4" onClick={() => setIsFormOpen(false)}>
+            <div className="p-8 bg-gray-50 border-t border-gray-100 flex gap-4 ">
+              <Button variant="outline" className="flex-1 py-4 cursor-pointer hover:bg-red-600 hover:text-white " onClick={() => setIsFormOpen(false)}>
                 Huỷ
               </Button>
-              <Button variant="secondary" className="flex-1 py-4 shadow-lg shadow-brand/20" onClick={handleSave}>
+              <Button variant="secondary" className="flex-1 py-4 shadow-lg shadow-brand/20 hover:bg-brand/80 cursor-pointer" onClick={handleSave}>
                 <CheckCircle2 className="w-4 h-4" /> Lưu lịch tuần
               </Button>
             </div>

@@ -215,7 +215,7 @@ export const AdminCategoryManagement = () => {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(245,158,11,0.26),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(255,255,255,0.08),transparent_28%)]" />
         <div className="relative z-10 flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
-            <h2 className="mt-5 text-4xl font-black tracking-tight font-serif lg:text-6xl">Danh Mục</h2>
+            <h2 className="mt-5 text-4xl font-black tracking-tight lg:text-6xl">Danh Mục</h2>
           </div>
 
           <div className="grid grid-cols-3 gap-3 lg:min-w-[360px]">
@@ -258,7 +258,7 @@ export const AdminCategoryManagement = () => {
                     key={item.key}
                     onClick={() => setSelectedStatus(item.key as typeof selectedStatus)}
                     className={cn(
-                      'inline-flex items-center gap-2 rounded-2xl border px-4 py-3 text-[10px] font-black uppercase tracking-[0.2em] transition-all',
+                      'inline-flex items-center gap-2 rounded-2xl border px-4 py-3 text-[10px] font-black uppercase tracking-[0.2em] transition-all cursor-pointer',
                       selectedStatus === item.key
                         ? 'border-slate-900 bg-slate-900 text-white shadow-lg shadow-slate-900/10'
                         : 'border-gray-100 bg-white text-gray-500 hover:border-brand/40 hover:text-brand',
@@ -269,7 +269,7 @@ export const AdminCategoryManagement = () => {
                   </button>
                 ))}
                 <Button onClick={openCreate} className="rounded-2xl px-4 py-3 text-[10px] font-black uppercase tracking-[0.2em]">
-                  <Plus className="h-3.5 w-3.5" />
+                  <Plus className="h-3.5 w-3.5 " />
                   Thêm danh mục
                 </Button>
               </div>
@@ -317,7 +317,7 @@ export const AdminCategoryManagement = () => {
                             <div className="text-[10px] font-black uppercase tracking-[0.22em] text-gray-400">
                               Thứ tự hiển thị #{category.displayOrder}
                             </div>
-                            <h3 className="mt-1 text-2xl font-black text-slate-900 font-serif">{category.name}</h3>
+                            <h3 className="mt-1 text-2xl font-black text-slate-900">{category.name}</h3>
                           </div>
                         </div>
 
@@ -342,21 +342,21 @@ export const AdminCategoryManagement = () => {
                         <div className="flex flex-wrap justify-end gap-2">
                           <button
                             onClick={() => openEdit(category)}
-                            className="rounded-2xl border border-gray-100 bg-white px-3 py-2 text-xs font-bold text-slate-600 transition-all hover:border-brand/30 hover:text-brand"
+                            className="rounded-2xl border border-gray-100 bg-white px-3 py-2 text-xs font-bold text-slate-600 transition-all hover:border-brand/30 hover:text-brand cursor-pointer"
                           >
                             <Edit2 className="mr-1 inline h-3.5 w-3.5" />
                             Sửa
                           </button>
                           <button
                             onClick={() => handleToggleStatus(category)}
-                            className="rounded-2xl border border-gray-100 bg-white px-3 py-2 text-xs font-bold text-slate-600 transition-all hover:border-brand/30 hover:text-brand"
+                            className="rounded-2xl border border-gray-100 bg-white px-3 py-2 text-xs font-bold text-slate-600 transition-all hover:border-brand/30 hover:text-brand cursor-pointer"
                           >
                             <ArrowUpDown className="mr-1 inline h-3.5 w-3.5" />
                             Đổi trạng thái
                           </button>
                           <button
                             onClick={() => handleDelete(category)}
-                            className="rounded-2xl border border-gray-100 bg-white px-3 py-2 text-xs font-bold text-rose-500 transition-all hover:border-rose-200 hover:text-rose-600"
+                            className="rounded-2xl border border-gray-100 bg-white px-3 py-2 text-xs font-bold text-rose-500 transition-all hover:border-rose-200 hover:text-rose-600 cursor-pointer"
                           >
                             <Trash2 className="mr-1 inline h-3.5 w-3.5" />
                             Xoá
@@ -385,7 +385,7 @@ export const AdminCategoryManagement = () => {
               <div className="mb-6 flex h-24 w-24 items-center justify-center rounded-[2.5rem] bg-gray-50">
                 <WandSparkles className="h-10 w-10 text-gray-200" />
               </div>
-              <h3 className="text-2xl font-black text-slate-900 font-serif">Không có danh mục phù hợp</h3>
+              <h3 className="text-2xl font-black text-slate-900">Không có danh mục phù hợp</h3>
               <p className="mt-2 max-w-md text-sm text-gray-400">
                 Thử đổi bộ lọc hoặc thêm danh mục mới.
               </p>
@@ -398,7 +398,7 @@ export const AdminCategoryManagement = () => {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="text-[10px] font-black uppercase tracking-[0.22em] text-brand">Bảng điều khiển</div>
-                <h3 className="mt-2 text-2xl font-black text-slate-900 font-serif">
+                <h3 className="mt-2 text-2xl font-black text-slate-900">
                   {editingCategory ? 'Chỉnh sửa danh mục' : 'Tạo danh mục mới'}
                 </h3>
               </div>
@@ -407,7 +407,7 @@ export const AdminCategoryManagement = () => {
                   setEditingCategory(null);
                   setForm(emptyForm());
                 }}
-                className="rounded-2xl border border-gray-100 bg-white px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-500 transition-colors hover:border-brand/30 hover:text-brand"
+                className="rounded-2xl border border-gray-100 bg-white px-3 py-2 text-xs font-black uppercase tracking-widest text-gray-500 transition-colors hover:border-brand/30 hover:text-brand cursor-pointer"
               >
                 Reset
               </button>
@@ -493,7 +493,7 @@ export const AdminCategoryManagement = () => {
 
             <Button
               onClick={persistCategory}
-              className="mt-6 w-full rounded-2xl bg-brand text-white shadow-xl shadow-brand/20 hover:bg-brand-dark"
+              className="mt-6 w-full rounded-2xl bg-brand text-white shadow-xl shadow-brand/20 hover:bg-brand-dark cursor-pointer"
               size="lg"
             >
               <Plus className="h-4 w-4" />

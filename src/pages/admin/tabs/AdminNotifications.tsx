@@ -81,7 +81,7 @@ export const AdminNotifications = () => {
       {/* Header Area */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-4xl font-black text-slate-900 tracking-tight font-serif mb-2">Thông báo</h2>
+          <h2 className="text-4xl font-black text-slate-900 tracking-tight mb-2">Thông báo</h2>
           <p className="text-slate-500 font-medium">Bạn có {unreadCount} thông báo chưa đọc trong hệ thống</p>
         </div>
 
@@ -117,7 +117,7 @@ export const AdminNotifications = () => {
               key={f}
               onClick={() => setFilter(f)}
               className={cn(
-                "px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all",
+                "px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer",
                 filter === f ? "bg-slate-900 text-white shadow-lg" : "text-slate-400 hover:text-slate-600"
               )}
             >

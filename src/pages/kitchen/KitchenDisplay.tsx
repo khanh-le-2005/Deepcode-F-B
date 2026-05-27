@@ -238,9 +238,9 @@ export const KitchenDisplay = () => {
                   )}>
                     <div className="flex justify-between items-start">
                       <div>
-                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em]">BÀN</span>
-                        <h2 className={cn("text-4xl font-serif italic font-black leading-tight", isDark ? "text-white" : "text-slate-900")}>
-                          {tableNameMap[order.tableName] || order.tableName}
+                        <span className={cn("text-[10px] font-bold uppercase tracking-[0.3em]", isDark ? "text-slate-400" : "text-black")}>BÀN</span>
+                        <h2 className={cn("text-4xl font-sans font-black leading-tight tracking-tight", isDark ? "text-white" : "text-slate-900")}>
+                          {tableNameMap[order.tableId] || order.tableName || "Bàn mang đi"}
                         </h2>
                       </div>
                       <div className="text-right">
@@ -278,6 +278,29 @@ export const KitchenDisplay = () => {
                                 <h4 className={cn("font-bold text-base leading-snug", isDark ? "text-white" : "text-slate-900")}>
                                   {item.name}
                                 </h4>
+                                
+                                {/* Tùy chọn (Size) & Topping */}
+                                {((item as any).selectedOption || ((item as any).selectedAddons && (item as any).selectedAddons.length > 0)) && (
+                                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                                    {(item as any).selectedOption && (
+                                      <span className={cn(
+                                        "px-2 py-0.5 text-[10px] font-bold rounded-md border",
+                                        isDark ? "bg-slate-800 text-slate-300 border-slate-700" : "bg-slate-100 text-slate-600 border-slate-200"
+                                      )}>
+                                        Size: {(item as any).selectedOption.name}
+                                      </span>
+                                    )}
+                                    {(item as any).selectedAddons?.map((addon: any, aIdx: number) => (
+                                      <span key={aIdx} className={cn(
+                                        "px-2 py-0.5 text-[10px] font-bold rounded-md border",
+                                        isDark ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-emerald-50 text-emerald-600 border-emerald-100"
+                                      )}>
+                                        + {addon.name}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+
                                 {item.note && (
                                   <div className="mt-2 flex items-start gap-2 text-orange-500 bg-orange-500/5 p-2 rounded-xl border border-orange-500/10">
                                     <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
@@ -294,7 +317,7 @@ export const KitchenDisplay = () => {
                             <div className="mt-4 flex gap-2">
                               <button
                                 onClick={() => updateItemStatus(orderId, itemId, 'served')}
-                                className="flex-1 h-11 bg-emerald-500 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-emerald-600 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20"
+                                className="flex-1 h-11 bg-emerald-500 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-emerald-600 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 cursor-pointer"
                               >
                                 <CheckCircle2 className="w-4 h-4" /> Hoàn tất
                               </button>

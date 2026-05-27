@@ -1,4 +1,4 @@
-import { forwardRef, React } from 'react';
+import React, { forwardRef } from 'react';
 import { cn } from '../../api/cn';
 
 export const Input = forwardRef<

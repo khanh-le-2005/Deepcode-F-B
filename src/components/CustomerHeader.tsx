@@ -154,7 +154,7 @@ export const CustomerHeader = ({
                 )}
 
                 <div
-                  className="relative cursor-pointer flex items-center"
+                  className="relative cursor-pointer hidden sm:flex items-center"
                   onClick={onCartClick}
                 >
                   <ShoppingBag className="w-5 h-5 hover:text-red-600 transition-colors" />

@@ -9,6 +9,7 @@ import comboRoutes from "./ComboRoutes.js";
 import imageRoutes from "./imageRoutes.js";
 import categoryRoutes from "./categoryRoutes.js";
 import weeklyMenuRoutes from "./weeklyMenuRoutes.js";
+import bannerRoutes from "./bannerRoutes.js";
 
 const router = express.Router();
 
@@ -22,6 +23,7 @@ router.use("/tables", tableRoutes);
 router.use("/orders", orderRoutes);
 router.use("/payments", paymentRoutes);
 router.use("/stats", statsRoutes);
+router.use("/banners", bannerRoutes);
 
 
 export default router;
